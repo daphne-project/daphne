@@ -17,6 +17,7 @@
 #ifndef SRC_RUNTIME_LOCAL_KERNELS_READ_H
 #define SRC_RUNTIME_LOCAL_KERNELS_READ_H
 
+#include "runtime/local/io/FileIORegistry.h"
 #include <parser/metadata/MetaDataParser.h>
 #include <runtime/local/context/DaphneContext.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
@@ -62,6 +63,17 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
     static void apply(DenseMatrix<VT> *&res, const char *filename, DCTX(ctx)) {
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
+
+        try {
+            auto &registry = FileIORegistry::instance();
+            IODataType typeHash = DENSEMATRIX;
+            auto reader = registry.getReader(ext, typeHash);
+            IOOptions opts = registry.getOptions(ext, typeHash);
+            reader(&res, fmd, filename, opts, ctx);
+            return;
+        } catch (const std::out_of_range &) {
+            // no plugin, fall back to built-in
+        }
 
         if (ext == ".csv") {
             if (res == nullptr)
@@ -111,6 +123,17 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
 
+        try {
+            auto &registry = FileIORegistry::instance();
+            IODataType typeHash = CSRMATRIX;
+            auto reader = registry.getReader(ext, typeHash);
+            IOOptions opts = registry.getOptions(ext, typeHash);
+            reader(&res, fmd, filename, opts, ctx);
+            return;
+        } catch (const std::out_of_range &) {
+            // no plugin, fall back to built-in
+        }
+
         if (ext == ".csv") {
             if (fmd.numNonZeros == -1)
                 throw std::runtime_error("currently reading of sparse matrices requires a number of "
@@ -142,6 +165,17 @@ template <> struct Read<Frame> {
     static void apply(Frame *&res, const char *filename, DCTX(ctx)) {
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
+
+        try {
+            auto &registry = FileIORegistry::instance();
+            IODataType typeHash = FRAME;
+            auto reader = registry.getReader(ext, typeHash);
+            IOOptions opts = registry.getOptions(ext, typeHash);
+            reader(&res, fmd, filename, opts, ctx);
+            return;
+        } catch (const std::out_of_range &) {
+            // no plugin, fall back to built-in
+        }
 
         if (ext == ".csv") {
             ValueTypeCode *schema;
