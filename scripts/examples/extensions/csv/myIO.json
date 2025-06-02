@@ -1,0 +1,15 @@
+[
+  {
+    "extension": ".csv",
+    "readerFuncName": "csv_read",
+    "writerFuncName": "csv_write",
+    "libPath": "libCsvIO.so",
+    "type": "DenseMatrix",
+    "options": {
+      "delimiter": ",",
+      "hasHeader": "false",
+      "threads": "4",
+      "dateFormat": "YYYY-MM-DD"
+    }
+  }
+]
