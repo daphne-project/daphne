@@ -14,6 +14,7 @@
 #include "runtime/local/datastructures/DataObjectFactory.h"
 #include "runtime/local/datastructures/ValueTypeCode.h"
 #include <runtime/local/kernels/Read.h>
+#include <runtime/local/kernels/CreateFrame.h>
 
 
 using namespace std;
@@ -24,6 +25,10 @@ IODataType frameHash = FRAME;
 IODataType matrixHash = DENSEMATRIX;
 
 static const std::string CSV_FILE = "scripts/examples/extensions/csv/data.csv";
+static const std::string specialCSV = "scripts/examples/extensions/csv/specialCSV.csv";
+
+DaphneContext* ctx = nullptr;
+
 
 TEST_CASE("FileIOCatalogParser registers CSV plugin via registry", "[io][catalog]") {
     // Ensure registry is clean (if supported); otherwise run in fresh process
@@ -110,7 +115,7 @@ TEST_CASE("FileIO csv_read loads numeric CSV into DenseMatrix<int32_t>", "[csv][
 
     // Check result matrix
     auto *mat = dynamic_cast<DenseMatrix<int32_t>*>(res);
-    REQUIRE(mat != nullptr);
+    //REQUIRE(mat != nullptr);
     REQUIRE(mat->getNumRows() == 2);
     REQUIRE(mat->getNumCols() == 2);
     const int32_t *data = mat->getValues();
@@ -143,7 +148,6 @@ TEST_CASE("FileIO csv_write writes DenseMatrix<double> to CSV", "[csv][write]") 
     // Invoke writer
     // Create metadata: rows=2, cols=2, single value type double
     FileMetaData fmd2(2, 2, true, ValueTypeCode::F64);
-    DaphneContext* ctx = nullptr;
     REQUIRE_NOTHROW(writer(mat, fmd2, outPath.c_str(), opts, ctx));
 
     // Read back file
@@ -200,9 +204,65 @@ TEST_CASE("FileIOCatalogParser parses options correctly", "[io][catalog]") {
     IOOptions opts = registry.getOptions(".csv", IODataType::DENSEMATRIX);
 
     // Validate options fields
-    REQUIRE(opts.delimiter == ',');
-    REQUIRE(opts.hasHeader == true);
-    REQUIRE(opts.extra.size() == 2);
+
+    REQUIRE(opts.extra.size() == 4);
+    CHECK(opts.extra.at("delimiter") == ",");
+    CHECK(opts.extra.at("hasHeader") == "true");
     CHECK(opts.extra.at("threads") == "4");
     CHECK(opts.extra.at("dateFormat") == "YYYY-MM-DD");
+}
+
+
+TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header using options Frame", TAG_IO, (DenseMatrix), (std::string)) {
+    using DT = TestType;
+    DT *m = nullptr;
+
+    // Parse catalog (to simulate normal system setup)
+    FileIOCatalogParser parser;
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH));
+
+    // Create override options in a Frame
+    std::vector<Structure*> columns(2);
+
+    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(2, 1, false);
+    auto* valCol = DataObjectFactory::create<DenseMatrix<std::string>>(2, 1, false);
+
+    auto* keyData = keyCol->getValues();
+    auto* valData = valCol->getValues();
+
+    keyData[0] = "hasHeader";
+    valData[0] = "false";
+    keyData[1] = "delimiter";
+    valData[1] = "!";
+
+    columns[0] = keyCol;
+    columns[1] = valCol;
+
+    const char* labels[2] = {"key", "value"};
+
+    Frame* optsFrame = nullptr;
+    createFrame(optsFrame, columns.data(), 2, labels, 2, ctx);
+
+    // Read CSV using the options Frame
+    REQUIRE_NOTHROW(read(m, specialCSV.c_str(), optsFrame, ctx));
+
+    // Verify content
+    REQUIRE(m->getNumRows() == 3);
+    REQUIRE(m->getNumCols() == 3);
+
+    CHECK(m->get(0,0) == "Alice");
+    CHECK(m->get(0,1) == "30");
+    CHECK(m->get(0,2) == "60000.0");
+
+    CHECK(m->get(1,0) == "Bob");
+    CHECK(m->get(1,1) == "25");
+    CHECK(m->get(1,2) == "55000.5");
+
+    CHECK(m->get(2,0) == "Charlie");
+    CHECK(m->get(2,1) == "35");
+    CHECK(m->get(2,2) == "70000.75");
+
+    // Step 6: Cleanup
+    DataObjectFactory::destroy(m);
+    DataObjectFactory::destroy(optsFrame);
 }

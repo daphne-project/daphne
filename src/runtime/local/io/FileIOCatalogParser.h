@@ -70,21 +70,10 @@ inline void FileIOCatalogParser::parseFileIOCatalog(
 
         IOOptions opts;
         if(auto it = entry.find("options"); it != entry.end()) {
-            auto &o = *it;
-            // delimiter: expect a single‐character string
-            if(o.contains("delimiter")) {
-                auto s = o["delimiter"].get<std::string>();
-                if(s.size() != 1)
-                    throw std::runtime_error("invalid delimiter in options");
-                opts.delimiter = s[0];
-            }
-            // hasHeader: boolean
-            if(o.contains("hasHeader")) {
-                opts.hasHeader = o["hasHeader"].get<bool>();
-            }
-            // extra: map<string,string>
-            if(o.contains("extra")) {
-                opts.extra = o["extra"].get<std::map<std::string,std::string>>();
+            for(auto jt = it->begin(); jt != it->end(); ++jt) {
+                // Each key/value in JSON becomes a string→string pair
+                // e.g. "delimiter":"", "hasHeader":"", etc.
+                opts.extra[jt.key()] = jt.value().get<std::string>();
             }
         }
 

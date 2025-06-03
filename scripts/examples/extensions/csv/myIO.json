@@ -7,7 +7,7 @@
     "type": "DenseMatrix",
     "options": {
       "delimiter": ",",
-      "hasHeader": "false",
+      "hasHeader": "true",
       "threads": "4",
       "dateFormat": "YYYY-MM-DD"
     }
