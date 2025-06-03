@@ -17,8 +17,6 @@ enum IODataType {
 
 // Flexible options passed to readers/writers, stored externally
 struct IOOptions {
-    char delimiter = ',';                          // field separator
-    bool hasHeader = true;                          // skip first row
     std::map<std::string, std::string> extra; // plugin-specific flags
 };
 

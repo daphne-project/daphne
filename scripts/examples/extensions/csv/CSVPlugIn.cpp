@@ -36,69 +36,77 @@ void csv_read(Structure*& res,
               const char* filename,
               IOOptions& opts,
               DaphneContext* ctx) {
-        std::ifstream file(filename);
+    std::ifstream file(filename);
     if(!file.is_open())
         throw std::runtime_error(std::string("Failed to open file: ") + filename);
+
+    // === 1) Parse options ===
+    bool hasHeader = true;
+    char delimiter = ',';
+
+    if(opts.extra.count("hasHeader") > 0) {
+        const std::string& val = opts.extra.at("hasHeader");
+        hasHeader = (val == "true" || val == "1");
+    }
+
+    if(opts.extra.count("delimiter") > 0) {
+        const std::string& val = opts.extra.at("delimiter");
+        if(val.size() != 1)
+            throw std::runtime_error("Expected single character for delimiter, got: " + val);
+        delimiter = val[0];
+    }
 
     std::string line;
     size_t cols = 0;
     std::vector<std::vector<std::string>> raw;
 
-
-    // 1) Respect opts.hasHeader when deciding whether to skip the first line
+    // === 2) Read header or first row ===
     if(std::getline(file, line)) {
-        if(opts.hasHeader) {
-            // This was the header row—use it to count columns, but don't store it
-            std::istringstream ss(line);
-            std::string col;
-            while(std::getline(ss, col, opts.delimiter))
-                ++cols;
-        }
-        else {
-            // No header: treat first line as data
-            std::istringstream ss(line);
-            std::string cell;
-            std::vector<std::string> row;
-            while(std::getline(ss, cell, opts.delimiter))
-                row.push_back(cell);
-            cols = row.size();
-            if(!row.empty()) raw.emplace_back(std::move(row));
-        }
+        std::istringstream ss(line);
+        std::string cell;
+        std::vector<std::string> row;
+
+        while(std::getline(ss, cell, delimiter))
+            row.push_back(cell);
+
+        cols = row.size();
+
+        if(!hasHeader)
+            raw.emplace_back(std::move(row));
     }
 
-    // 2) Read the rest of the file using opts.delimiter
+    // === 3) Read remaining rows ===
     while(std::getline(file, line)) {
         std::istringstream ss(line);
         std::string cell;
         std::vector<std::string> row;
-        while(std::getline(ss, cell, opts.delimiter))
+
+        while(std::getline(ss, cell, delimiter))
             row.push_back(cell);
-        if(!row.empty()) raw.emplace_back(std::move(row));
+
+        if(!row.empty()) {
+            if(row.size() != cols)
+                throw std::runtime_error("Inconsistent column count in CSV row");
+            raw.emplace_back(std::move(row));
+        }
     }
+
     file.close();
 
     size_t rows = raw.size();
     if (rows == 0 || cols == 0)
-        throw std::runtime_error("Empty CSV or missing header");
+        throw std::runtime_error("Empty CSV or only header row present");
 
-    // Validate consistent column counts
-    for (auto &row : raw) {
-        if (row.size() != cols)
-            throw std::runtime_error("Inconsistent column count in CSV");
-    }
-
-    // Infer a single global type
+    // === 4) Type inference ===
     bool allInt = true, allNum = true;
-    for (auto &row : raw) {
-        for (auto &cell : row) {
+    for (const auto& row : raw) {
+        for (const auto& cell : row) {
             if (allInt && !is_integer(cell)) allInt = false;
             if (allNum && !(is_integer(cell) || is_double(cell))) allNum = false;
-            if (!allInt && !allNum) break;
         }
-        if (!allInt && !allNum) break;
     }
 
-    // Allocate and populate DenseMatrix based on inferred type
+    // === 5) Allocate and populate ===
     if (allInt) {
         auto *mat = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, cols, false);
         int32_t *data = mat->getValues();
@@ -106,26 +114,23 @@ void csv_read(Structure*& res,
             for (size_t j = 0; j < cols; ++j)
                 data[i * cols + j] = std::stoi(raw[i][j]);
         res = mat;
-        return;
     }
-
-    if (allNum) {
+    else if (allNum) {
         auto *mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, false);
         double *data = mat->getValues();
         for (size_t i = 0; i < rows; ++i)
             for (size_t j = 0; j < cols; ++j)
                 data[i * cols + j] = std::stod(raw[i][j]);
         res = mat;
-        return;
     }
-
-    // Fallback to string matrix
-    auto *mat_str = DataObjectFactory::create<DenseMatrix<std::string>>(rows, cols, false);
-    std::string *data_str = mat_str->getValues();
-    for (size_t i = 0; i < rows; ++i)
-        for (size_t j = 0; j < cols; ++j)
-            data_str[i * cols + j] = raw[i][j];
-    res = mat_str;
+    else {
+        auto *mat = DataObjectFactory::create<DenseMatrix<std::string>>(rows, cols, false);
+        std::string *data = mat->getValues();
+        for (size_t i = 0; i < rows; ++i)
+            for (size_t j = 0; j < cols; ++j)
+                data[i * cols + j] = raw[i][j];
+        res = mat;
+    }
 }
 
 /**
