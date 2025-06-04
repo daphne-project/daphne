@@ -1742,7 +1742,7 @@ def Daphne_ReadOp : Daphne_Op<"read", [
     DeclareOpInterfaceMethods<InferSparsityOpInterface>
 ]> {
     // TODO We might add arguments for a UDF later.
-    let arguments = (ins StrScalar:$fileName);
+    let arguments = (ins StrScalar:$fileName, MatrixOrFrame:$options);
     let results = (outs MatrixOrFrame:$res);
 }
 
