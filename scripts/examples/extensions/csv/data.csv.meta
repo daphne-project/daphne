@@ -1,6 +1,6 @@
 {
   "numRows": 3,
   "numCols": 3,
-  "valueType": "f64",
+  "valueType": "str",
   "numNonZeros": 0    
 }
