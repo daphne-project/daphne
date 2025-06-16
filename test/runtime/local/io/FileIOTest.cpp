@@ -28,6 +28,7 @@ static const std::string CSV_FILE = "scripts/examples/extensions/csv/data.csv";
 static const std::string specialCSV = "scripts/examples/extensions/csv/specialCSV.csv";
 
 DaphneContext* ctx = nullptr;
+static Frame *emptyFrame = DataObjectFactory::create<Frame>(0, 0, nullptr, nullptr, false);
 
 
 TEST_CASE("FileIOCatalogParser registers CSV plugin via registry", "[io][catalog]") {
@@ -170,7 +171,7 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader via Registry and Read kernel for m
     FileIOCatalogParser parser;
     REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH));
 
-    REQUIRE_NOTHROW(read(m, CSV_FILE.c_str(), nullptr));
+    REQUIRE_NOTHROW(read(m, CSV_FILE.c_str(), emptyFrame, nullptr));
 
     // Verify dimensions (3 rows, 3 cols)
     REQUIRE(m->getNumRows() == 3);
@@ -224,21 +225,19 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header u
     // Create override options in a Frame
     std::vector<Structure*> columns(2);
 
-    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(2, 1, false);
-    auto* valCol = DataObjectFactory::create<DenseMatrix<std::string>>(2, 1, false);
+    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    auto* valCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
 
-    auto* keyData = keyCol->getValues();
-    auto* valData = valCol->getValues();
+    auto* val1 = keyCol->getValues();
+    auto* val2 = valCol->getValues();
 
-    keyData[0] = "hasHeader";
-    valData[0] = "false";
-    keyData[1] = "delimiter";
-    valData[1] = "!";
+    val1[0] = "false";
+    val2[0] = "!";
 
     columns[0] = keyCol;
     columns[1] = valCol;
 
-    const char* labels[2] = {"key", "value"};
+    const char* labels[2] = {"hasHeader", "delimiter"};
 
     Frame* optsFrame = nullptr;
     createFrame(optsFrame, columns.data(), 2, labels, 2, ctx);

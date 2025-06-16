@@ -1,14 +1,10 @@
-keyCol = createFrame(
-    ["hasHeader", "delimiter"],
-    "key"
-);
-
 valCol = createFrame(
-    ["true", "!"],
-    "value"
+   ["hasHeader", "delimiter"],
+   ["true", "!"],
+   "key",
+   "value"
 );
 
-optsFrame = cbind(keyCol, valCol);
+f = readFrame("scripts/examples/extensions/csv/data.csv",valCol);
 
-
-print(readFrame("scripts/examples/extensions/csv/data.csv"));
+print(f);

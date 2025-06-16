@@ -4184,6 +4184,43 @@
     },
     {
         "kernelTemplate": {
+            "header": "Read.h",
+            "opName": "read",
+            "returnType": "void",
+            "templateParams": [
+                {
+                    "name": "DTRes",
+                    "isDataType": true
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "DTRes *&",
+                    "name": "res"
+                },
+                {
+                    "type": "const char *",
+                    "name": "filename"
+                },
+                {
+                    "type": "Frame *",
+                    "name": "opts"
+                }
+            ]
+        },
+        "instantiations": [
+            [["DenseMatrix", "float"]],
+            [["DenseMatrix", "double"]],
+            [["DenseMatrix", "int64_t"]],
+            [["DenseMatrix", "uint8_t"]],
+            [["DenseMatrix", "std::string"]],
+            [["CSRMatrix", "double"]],
+            [["CSRMatrix", "float"]],
+            ["Frame"]
+        ]
+    },
+    {
+        "kernelTemplate": {
             "header": "GetColIdx.h",
             "opName": "getColIdx",
             "returnType": "size_t",

@@ -26,6 +26,8 @@
 
 #include <cstdint>
 
+static Frame *emptyFrame = DataObjectFactory::create<Frame>(0, 0, nullptr, nullptr, false);
+
 TEMPLATE_PRODUCT_TEST_CASE("Read CSV", TAG_KERNELS, (DenseMatrix), (double)) {
     using DT = TestType;
 
@@ -36,7 +38,7 @@ TEMPLATE_PRODUCT_TEST_CASE("Read CSV", TAG_KERNELS, (DenseMatrix), (double)) {
 
     char filename[] = "./test/runtime/local/io/ReadCsv1.csv";
 
-    read(m, filename, nullptr);
+    read(m, filename, emptyFrame, nullptr);
 
     REQUIRE(m->getNumRows() == numRows);
     REQUIRE(m->getNumCols() == numCols);
@@ -62,7 +64,7 @@ TEMPLATE_PRODUCT_TEST_CASE("Read MM", TAG_KERNELS, (DenseMatrix), (uint32_t)) {
     size_t numCols = 9;
 
     char filename[] = "./test/runtime/local/io/cig.mtx";
-    read(m, filename, nullptr);
+    read(m, filename, emptyFrame, nullptr);
 
     REQUIRE(m->getNumRows() == numRows);
     REQUIRE(m->getNumCols() == numCols);
@@ -77,7 +79,7 @@ TEMPLATE_PRODUCT_TEST_CASE("Read MM", TAG_KERNELS, (DenseMatrix), (uint32_t)) {
 
 TEST_CASE("Read - Frame", TAG_KERNELS) {
     Frame *f = nullptr;
-    read(f, "./test/runtime/local/io/ReadCsv4.csv", nullptr);
+    read(f, "./test/runtime/local/io/ReadCsv4.csv", emptyFrame, nullptr);
 
     CHECK(f->getNumRows() == 2);
     CHECK(f->getNumCols() == 2);
