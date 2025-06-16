@@ -78,7 +78,7 @@ inline void FileIOCatalogParser::parseFileIOCatalog(
         }
 
         // Load the plugin library
-        void* handle = dlopen(libPath.c_str(), RTLD_NOW | RTLD_LOCAL);
+        void* handle = dlopen(libPath.c_str(), RTLD_NOW | RTLD_GLOBAL);
         if(!handle) {
             throw std::runtime_error("dlopen failed for " + libPath + ": " + dlerror());
         }

@@ -1282,16 +1282,24 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
     if (func == "readMatrix") {
         checkNumArgsBetween(loc, func, numArgs, 1, 2);
         mlir::Type resType = mlir::daphne::MatrixType::get(builder.getContext(), utils.unknownType);
-        return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0]));
+        if(numArgs == 1) {
+            return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0]));
+        }
+        else {
+            return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0], args[1]));
+        }
     }
 
     if (func == "readFrame") {
         checkNumArgsBetween(loc, func, numArgs, 1, 2);
-        mlir::Type resType = mlir::daphne::MatrixType::get(builder.getContext(), utils.unknownType);
-        return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0]));
+        mlir::Type resType = mlir::daphne::FrameType::get(builder.getContext(), {utils.unknownType});
+        if(numArgs == 1) {
+            return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0]));
+        }
+        else {
+            return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0], args[1]));
+        }    
     }
-
-    
 
     if (func == "writeFrame" || func == "writeMatrix" || func == "write") {
         // Note that the type of arg already indicates if it is a frame or a
