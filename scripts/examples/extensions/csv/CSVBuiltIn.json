@@ -1,0 +1,17 @@
+[
+  {
+    "extension": ".csv",
+    "readerFuncName": "ReadCsvFile",
+    "writerFuncName": "",
+    "libPath": "libCSVBuiltInPlugIn.so",
+    "type": "Frame",
+    "options": {
+      "delimiter": ",",
+      "numCols": "1",
+      "numRows": "1",
+      "sorted": "false",
+      "schema": "",
+      "numNonZeros": "0"
+    }
+  }
+]
