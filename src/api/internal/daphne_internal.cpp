@@ -15,6 +15,7 @@
  */
 
 #include "runtime/local/datastructures/IAllocationDescriptor.h"
+#include "runtime/local/io/FileIORegistry.h"
 
 #ifdef USE_MPI
 #include "runtime/distributed/worker/MPIWorker.h"
@@ -631,10 +632,18 @@ int startDAPHNE(int argc, const char **argv, DaphneLibResult *daphneLibRes, int 
     // Populate FileIO extension catalog
     // ************************************************************************
     FileIOCatalogParser fileIOParser;
+    FileIORegistry& registry = executor.getUserConfig().registry;
     try {
         if (!FileIOExt.empty()) {
-            fileIOParser.parseFileIOCatalog(FileIOExt); 
+            fileIOParser.parseFileIOCatalog(FileIOExt, registry); 
             std::cerr << "[info] Loaded FileIO catalog from " << FileIOExt << "\n";
+
+            std::cerr << "=== Registry Entries ===\n";
+            for(const auto &kv : registry.getAllOptions()) {
+            std::cerr << "  ext='" << kv.first.first
+                        << "'  dt="  << kv.first.second << "\n";
+            }
+
         }
     }
     catch (const std::exception &e) {

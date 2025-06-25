@@ -31,11 +31,11 @@ public:
      * Parses the given JSON file and registers each plugin's reader & writer.
      * @param filePath Path to the catalog JSON
      */
-    void parseFileIOCatalog(const std::string &filePath) const;
+    void parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry) const;
 };
 
 inline void FileIOCatalogParser::parseFileIOCatalog(
-    const std::string &filePath) const
+    const std::string &filePath, FileIORegistry &registry) const
 {
     namespace fs = std::filesystem;
     fs::path dir = fs::path(filePath).parent_path();
@@ -95,7 +95,7 @@ inline void FileIOCatalogParser::parseFileIOCatalog(
             }
             ReaderFn rdrFn = reinterpret_cast<ReaderFn>(rdrSym);
             GenericReader reader = rdrFn;
-            FileIORegistry::instance().registerReader(ext, typeHash, opts,reader);
+            registry.registerReader(ext, typeHash, opts,reader);
         }
 
         // Lookup and register writer if specified
@@ -107,7 +107,7 @@ inline void FileIOCatalogParser::parseFileIOCatalog(
             }
             WriterFn wtrFn = reinterpret_cast<WriterFn>(wtrSym);
             GenericWriter writer = wtrFn;
-            FileIORegistry::instance().registerWriter(ext, typeHash, opts, writer);
+            registry.registerWriter(ext, typeHash, opts, writer);
         }
 
         // Note: keep 'handle' loaded for process lifetime to preserve symbols

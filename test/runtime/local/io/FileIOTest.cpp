@@ -37,7 +37,7 @@ TEST_CASE("FileIOCatalogParser registers CSV plugin via registry", "[io][catalog
 
     FileIOCatalogParser parser;
     // Should parse without throwing
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
 
     // Now registry should have reader and writer for .csv and Frame type
     
@@ -72,7 +72,7 @@ TEST_CASE("FileIOPlugin dynamic load and registration validity", "[io][plugin]")
     // The parser already loads and registers the plugin
     auto &registry = FileIORegistry::instance();
     FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
 
     // Verify registry lookups work
     auto reader = registry.getReader(".csv", matrixHash);
@@ -99,12 +99,11 @@ TEST_CASE("FileIO csv_read loads numeric CSV into DenseMatrix<int32_t>", "[csv][
         ofs << "3,4\n";
     }
     IOOptions opts;
+    FileIORegistry &registry = FileIORegistry::instance();
 
     // Register the CSV plugin
     FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH));
-
-    auto &registry = FileIORegistry::instance();
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
     auto reader = registry.getReader(".csv", matrixHash);
 
     // Invoke reader
@@ -139,11 +138,12 @@ TEST_CASE("FileIO csv_write writes DenseMatrix<double> to CSV", "[csv][write]") 
     auto outPath = tempDir / "test_write.csv";
 
     IOOptions opts;
+    FileIORegistry &registry = FileIORegistry::instance();
+
 
     // Register the CSV plugin
     FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH));
-    auto &registry = FileIORegistry::instance();
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
     auto writer = registry.getWriter(".csv", matrixHash);
 
     // Invoke writer
@@ -168,8 +168,10 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader via Registry and Read kernel for m
     using DT = TestType;
     DT *m = nullptr;
 
+
+    FileIORegistry &registry = FileIORegistry::instance();
     FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
 
     REQUIRE_NOTHROW(read(m, CSV_FILE.c_str(), emptyFrame, nullptr));
 
@@ -198,17 +200,18 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader via Registry and Read kernel for m
 TEST_CASE("FileIOCatalogParser parses options correctly", "[io][catalog]") {
     // Parse the catalog
     FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH));
 
     // Retrieve the parsed options from the registry
     auto &registry = FileIORegistry::instance();
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
+
     IOOptions opts = registry.getOptions(".csv", IODataType::DENSEMATRIX);
 
     // Validate options fields
 
     REQUIRE(opts.extra.size() == 4);
     CHECK(opts.extra.at("delimiter") == ",");
-    CHECK(opts.extra.at("hasHeader") == "true");
+    CHECK(opts.extra.at("hasHeader") == "false");
     CHECK(opts.extra.at("threads") == "4");
     CHECK(opts.extra.at("dateFormat") == "YYYY-MM-DD");
 }
@@ -220,7 +223,8 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header u
 
     // Parse catalog (to simulate normal system setup)
     FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH));
+    FileIORegistry &registry = FileIORegistry::instance();
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
 
     // Create override options in a Frame
     std::vector<Structure*> columns(2);

@@ -46,12 +46,22 @@ static Frame *dummyFrame = DataObjectFactory::create<Frame>(0, 0, nullptr, nullp
 // ****************************************************************************
 static IOOptions mergeOptionsFromFrame(const std::string &ext,
                                        IODataType         dt,
-                                       Frame             *optsFrame)
+                                       Frame             *optsFrame,
+                                       DCTX(ctx))
 {
     // 1) Retrieve the plugin's default options
-    const IOOptions &defaults =
-        FileIORegistry::instance().getOptions(ext, dt);
 
+    auto& reg = ctx ? ctx->config.registry : FileIORegistry::instance();  
+    std::cerr << "=== Registry Entries ===\n";
+    for(const auto &kv : reg.getAllOptions()) {
+    std::cerr << "  ext='" << kv.first.first
+                << "'  dt="  << kv.first.second << "\n";
+    }
+    std::cerr << "Looking up ext='" << ext << "' dt=" << dt << "\n";
+
+
+    const IOOptions &defaults = reg.getOptions(ext, dt);
+    
     // 2) Copy defaults into merged
     IOOptions merged = defaults;
 
@@ -116,16 +126,6 @@ template <class DTRes> void read(DTRes *&res, const char *filename,Frame *opts, 
 }
 
 // ----------------------------------------------------------------------------
-// Convenience overload: two-arg user call -> forward to three-arg with opts=nullptr
-// ----------------------------------------------------------------------------
-template <typename DTRes>
-inline void read(DTRes *&res, const char *filename, DCTX(ctx))        // this is the old 3-param signature
-{
-    // forward to the 4-param version, passing nullptr for optsFrame
-    Read<DTRes>::apply(res, filename, dummyFrame, ctx);
-}
-
-// ----------------------------------------------------------------------------
 // DenseMatrix
 // ----------------------------------------------------------------------------
 
@@ -142,21 +142,21 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
         std::string ext(std::filesystem::path(filename).extension());
 
         try {
-            auto &registry = FileIORegistry::instance();
+            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
             IODataType typeHash = DENSEMATRIX;
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, optsFrame);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
+            //std::cout << "using registry\n";
 
             auto reader = registry.getReader(ext, typeHash);
-            std::cout << "using registry\n";
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
         }
-        catch (const std::out_of_range &) {
-            // no plugin, fall back to built-in
+        catch (const std::out_of_range &e) {
+            std::cout << "Caught: " << e.what();
         }
-        //std::cout << "using default";
+        //std::cout << "using default\n";
 
         if (ext == ".csv") {
             if (res == nullptr)
@@ -214,15 +214,15 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
         std::string ext(std::filesystem::path(filename).extension());
 
         try {
-            auto &registry = FileIORegistry::instance();
+            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
             IODataType typeHash = CSRMATRIX;
 
             // Merge user overrides from optsFrame
             IOOptions mergedOpts =
-                mergeOptionsFromFrame(ext, typeHash, optsFrame);
+                mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
 
             auto reader = registry.getReader(ext, typeHash);
-            std::cout << "using registry\n";
+            //std::cout << "using registry\n";
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
         }
@@ -271,15 +271,15 @@ template <> struct Read<Frame> {
         std::string ext(std::filesystem::path(filename).extension());
 
         try {
-            auto &registry = FileIORegistry::instance();
+            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
             IODataType typeHash = FRAME;
 
             // Merge user overrides from optsFrame
             IOOptions mergedOpts =
-                mergeOptionsFromFrame(ext, typeHash, optsFrame);
+                mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
 
             auto reader = registry.getReader(ext, typeHash);
-            std::cout << "using registry\n";
+            //std::cout << "using registry\n";
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
         } catch (const std::out_of_range &) {

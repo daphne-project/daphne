@@ -38,6 +38,9 @@ using GenericWriter = std::function<
 
 class FileIORegistry {
 public:
+
+    FileIORegistry() = default; 
+
     static FileIORegistry &instance() {
         static FileIORegistry inst;
         return inst;
@@ -81,9 +84,36 @@ public:
         return optionsMap.at({ext, (size_t)dt});
     }
 
+    // Optional: expose all options for debugging
+    std::map<std::pair<std::string, size_t>, IOOptions> getAllOptions()  {
+        std::lock_guard<std::mutex> lk(mtx);
+        return optionsMap;
+    }
+
+    FileIORegistry( const FileIORegistry& other) {
+        std::lock_guard<std::mutex> lk(other.mtx);
+        readers = other.readers;
+        writers = other.writers;
+        optionsMap = other.optionsMap;
+    }
+
+    FileIORegistry& operator=( const FileIORegistry& other) {
+        if (this != &other) {
+            std::unique_lock<std::mutex> lk1(mtx, std::defer_lock);
+            std::unique_lock<std::mutex> lk2(other.mtx, std::defer_lock);
+            std::lock(lk1, lk2);  // Lock both without deadlock
+
+            readers = other.readers;
+            writers = other.writers;
+            optionsMap = other.optionsMap;
+        }
+        return *this;
+    }
+
+
 private:
 
-    std::mutex mtx;
+    mutable std::mutex mtx;
     std::map<std::pair<std::string, size_t>, GenericReader> readers;
     std::map<std::pair<std::string, size_t>, GenericWriter> writers;
     std::map<std::pair<std::string, size_t>, IOOptions> optionsMap;

@@ -1,10 +1,10 @@
 valCol = createFrame(
-   ["hasHeader", "delimiter"],
-   ["true", "!"],
-   "key",
-   "value"
+   ["false"],
+   ["!"],
+   "hasHeader",
+   "delimiter"
 );
 
-f = readFrame("scripts/examples/extensions/csv/data.csv",valCol);
+f = readMatrix("scripts/examples/extensions/csv/specialCSV.csv", valCol);
 
 print(f);
