@@ -1,0 +1,76 @@
+[
+  {
+    "extension": ".csv",
+    "readerFuncName": "readCsvFromPath_Frame",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "Frame",
+    "options": {
+      "delimiter": ",",
+      "numCols": "1",
+      "numRows": "1",
+      "sorted": "false",
+      "schema": "[{\"label\":\"name\",\"valueType\":\"ui64\"},{\"label\":\"age\",\"valueType\":\"ui64\"},{\"label\":\"salary\",\"valueType\":\"f64\"}]",
+      "numNonZeros": "0"
+    }
+  },
+  {
+    "extension": ".csv",
+    "readerFuncName": "readCsvFromPath_Dense",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "DenseMatrix",
+    "options": {
+      "delimiter": ",",
+      "numCols": "1",
+      "numRows": "1",
+      "sorted": "false",
+      "numNonZeros": "0"
+    }
+  },
+  {
+    "extension": ".parquet",
+    "readerFuncName": "ReadParquet_Frame",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "Frame",
+    "options": {
+      "delimiter": ",",
+      "numCols": "1",
+      "numRows": "1",
+      "schema": "[{\"label\":\"a\",\"valueType\":\"f64\"},{\"label\":\"a\",\"valueType\":\"f64\"},{\"label\":\"a\",\"valueType\":\"f64\"},{\"label\":\"a\",\"valueType\":\"f64\"}]"
+    }
+  },
+  {
+    "extension": ".parquet",
+    "readerFuncName": "ReadParquet_Dense",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "DenseMatrix",
+    "options": {
+      "delimiter": ",",
+      "numCols": "1",
+      "numRows": "1"
+    }
+  },
+  {
+    "extension": ".mtx",
+    "readerFuncName": "ReadMM_Dense",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "DenseMatrix",
+    "options": {
+      "delimiter": ","
+    }
+  },
+  {
+    "extension": ".mtx",
+    "readerFuncName": "ReadMM_Frame",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "Frame",
+    "options": {
+      "delimiter": ","
+    }
+  }
+]

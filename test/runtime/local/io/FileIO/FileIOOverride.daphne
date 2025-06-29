@@ -1,10 +1,8 @@
 valCol = createFrame(
-   ["false"],
-   ["!"],
-   "hasHeader",
+   [" "],
    "delimiter"
 );
 
-f = readMatrix("scripts/examples/extensions/csv/specialCSV.csv", valCol);
+f = readFrame("scripts/examples/extensions/builtInIO/sample.mtx", valCol);
 
 print(f);
