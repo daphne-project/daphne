@@ -110,6 +110,13 @@ public:
         return *this;
     }
 
+    void clear() {
+        std::lock_guard<std::mutex> lk(mtx);
+        readers.clear();
+        writers.clear();
+        optionsMap.clear();
+    }
+
 
 private:
 

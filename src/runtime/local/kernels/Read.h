@@ -52,12 +52,12 @@ static IOOptions mergeOptionsFromFrame(const std::string &ext,
     // 1) Retrieve the plugin's default options
 
     auto& reg = ctx ? ctx->config.registry : FileIORegistry::instance();  
-    std::cerr << "=== Registry Entries ===\n";
+    /*std::cerr << "=== Registry Entries ===\n";
     for(const auto &kv : reg.getAllOptions()) {
     std::cerr << "  ext='" << kv.first.first
                 << "'  dt="  << kv.first.second << "\n";
     }
-    std::cerr << "Looking up ext='" << ext << "' dt=" << dt << "\n";
+    std::cerr << "Looking up ext='" << ext << "' dt=" << dt << "\n";*/
 
 
     const IOOptions &defaults = reg.getOptions(ext, dt);
@@ -66,7 +66,7 @@ static IOOptions mergeOptionsFromFrame(const std::string &ext,
     IOOptions merged = defaults;
 
     // 3) If optsFrame is non-null, override using first row values
-    if(optsFrame != nullptr) {
+    if(optsFrame != nullptr && optsFrame->getLabels()[0] != "dummy") {
         const size_t nRows = optsFrame->getNumRows();
         const size_t nCols = optsFrame->getNumCols();
 
@@ -144,19 +144,19 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
         try {
             auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
             IODataType typeHash = DENSEMATRIX;
+            auto reader = registry.getReader(ext, typeHash);
 
             // Merge user overrides from optsFrame
             IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
             //std::cout << "using registry\n";
 
-            auto reader = registry.getReader(ext, typeHash);
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
         }
         catch (const std::out_of_range &e) {
-            std::cout << "Caught: " << e.what();
+            //std::cout << "Caught: " << e.what();
         }
-        //std::cout << "using default\n";
+        //std::cout << "d";
 
         if (ext == ".csv") {
             if (res == nullptr)
@@ -168,13 +168,11 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
             else
                 readMM(res, filename);
         } else if (ext == ".parquet") {
-            if constexpr (std::is_same<VT, std::string>::value)
-                throw std::runtime_error("reading string-valued Parquet files is not supported (yet)");
-            else {
-                if (res == nullptr)
-                    res = DataObjectFactory::create<DenseMatrix<VT>>(fmd.numRows, fmd.numCols, false);
-                readParquet(res, filename, fmd.numRows, fmd.numCols);
-            }
+            
+            if (res == nullptr)
+                res = DataObjectFactory::create<DenseMatrix<VT>>(fmd.numRows, fmd.numCols, false);
+            readParquet(res, filename, fmd.numRows, fmd.numCols);
+            
         } else if (ext == ".dbdf") {
             if constexpr (std::is_same<VT, std::string>::value)
                 throw std::runtime_error("reading string-valued DAPHNE binary format files is not supported (yet)");
@@ -216,12 +214,11 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
         try {
             auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
             IODataType typeHash = CSRMATRIX;
+            auto reader = registry.getReader(ext, typeHash);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts =
-                mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
 
-            auto reader = registry.getReader(ext, typeHash);
             //std::cout << "using registry\n";
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
@@ -273,19 +270,18 @@ template <> struct Read<Frame> {
         try {
             auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
             IODataType typeHash = FRAME;
+            auto reader = registry.getReader(ext, typeHash);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts =
-                mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
 
-            auto reader = registry.getReader(ext, typeHash);
             //std::cout << "using registry\n";
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
         } catch (const std::out_of_range &) {
             // no plugin, fall back to built-in
         }
-        //std::cout << "using default";
+        //std::cout << "d";
 
         if (ext == ".csv") {
             ValueTypeCode *schema;
@@ -309,7 +305,27 @@ template <> struct Read<Frame> {
 
             if (fmd.isSingleValueType)
                 delete[] schema;
-        } else
+        } else if (ext == ".parquet") {
+
+            ValueTypeCode *schema;
+            if (fmd.isSingleValueType) {
+                schema = new ValueTypeCode[fmd.numCols];
+                for (size_t i = 0; i < fmd.numCols; i++)
+                    schema[i] = fmd.schema[0];
+            } else
+                schema = fmd.schema.data();
+
+            std::string *labels;
+            if (fmd.labels.empty())
+                labels = nullptr;
+            else
+                labels = fmd.labels.data();
+            
+            if (res == nullptr)
+                res = DataObjectFactory::create<Frame>(fmd.numRows, fmd.numCols, schema, labels,  false);
+            readParquet(res, filename, fmd.numRows, fmd.numCols,schema);
+            
+        }  else
             throw std::runtime_error("file extension not supported: '" + ext + "'");
     }
 }; // end Read<Frame>
