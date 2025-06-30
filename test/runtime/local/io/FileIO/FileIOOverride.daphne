@@ -1,8 +1,12 @@
 valCol = createFrame(
-   [" "],
-   "delimiter"
+   [","],
+   ["2"],
+   ["4"],
+   "delimiter",
+   "numRows",
+   "numCols"
 );
 
-f = readFrame("scripts/examples/extensions/builtInIO/sample.mtx", valCol);
+f = readFrame("scripts/examples/extensions/builtInIO/ReadParquet1.parquet",valCol);
 
 print(f);
