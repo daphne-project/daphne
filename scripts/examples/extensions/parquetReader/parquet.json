@@ -1,0 +1,24 @@
+[
+  {
+    "extension": ".parquet",
+    "readerFuncName": "parquet_read",
+    "writerFuncName": "",
+    "libPath": "libparquetPlugIn.so",
+    "type": "DenseMatrix",
+    "options": {
+      "delimiter": ",",
+      "threads": "1"
+    }
+  },
+  {
+    "extension": ".parquet",
+    "readerFuncName": "parquet_read_frame",
+    "writerFuncName": "",
+    "libPath": "libparquetPlugIn.so",
+    "type": "Frame",
+    "options": {
+      "delimiter": ",",
+      "threads": "1"
+    }
+  }
+]

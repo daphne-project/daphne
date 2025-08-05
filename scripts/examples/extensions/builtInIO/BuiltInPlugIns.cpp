@@ -16,6 +16,7 @@
 
 #include "runtime/local/io/FileIORegistry.h"
 #include "runtime/local/io/MMFile.h"
+#include <runtime/local/io/FileMetaData.h>
 #include <runtime/local/io/utils.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
@@ -98,8 +99,8 @@ template <typename VT>
 struct ReadCsvFile<DenseMatrix<VT>> {
     static void apply(DenseMatrix<VT> *&res, const FileMetaData& fmd, struct File *file, IOOptions &opts, DaphneContext *ctx) {
         // extract parameters
-        size_t numRows = std::stoull(opts.extra.at("numRows"));
-        size_t numCols = std::stoull(opts.extra.at("numCols"));
+        size_t numRows = fmd.numRows;
+        size_t numCols = fmd.numCols;
         char delim = ',';
         auto it = opts.extra.find("delimiter");
         if(it != opts.extra.end()) {
@@ -135,8 +136,8 @@ struct ReadCsvFile<DenseMatrix<VT>> {
 template <>
 struct ReadCsvFile<DenseMatrix<std::string>> {
     static void apply(DenseMatrix<std::string> *&res, const FileMetaData& fmd, struct File *file, IOOptions &opts, DaphneContext *ctx) {
-        size_t numRows = std::stoull(opts.extra.at("numRows"));
-        size_t numCols = std::stoull(opts.extra.at("numCols"));
+        size_t numRows = fmd.numRows;
+        size_t numCols = fmd.numCols;
         char delim = ',';
         auto it = opts.extra.find("delimiter");
         if(it != opts.extra.end()) {
@@ -168,8 +169,8 @@ struct ReadCsvFile<DenseMatrix<std::string>> {
 template <>
 struct ReadCsvFile<DenseMatrix<FixedStr16>> {
     static void apply(DenseMatrix<FixedStr16> *&res, const FileMetaData& fmd, File *file, IOOptions &opts, DaphneContext *ctx) {
-        size_t numRows = std::stoull(opts.extra.at("numRows"));
-        size_t numCols = std::stoull(opts.extra.at("numCols"));
+        size_t numRows = fmd.numRows;
+        size_t numCols = fmd.numCols;
         char delim = ',';
         auto it = opts.extra.find("delimiter");
         if(it != opts.extra.end()) {
@@ -205,9 +206,9 @@ struct ReadCsvFile<DenseMatrix<FixedStr16>> {
 template <typename VT>
 struct ReadCsvFile<CSRMatrix<VT>> {
     static void apply(CSRMatrix<VT> *&res, const FileMetaData& fmd, struct File *file, IOOptions &opts, DaphneContext *ctx) {
-        size_t numRows = std::stoull(opts.extra.at("numRows"));
-        size_t numCols = std::stoull(opts.extra.at("numCols"));
-        ssize_t numNonZeros = opts.extra.count("numNonZeros") ? std::stoll(opts.extra.at("numNonZeros")) : -1;
+        size_t numRows = fmd.numRows;
+        size_t numCols = fmd.numCols;
+        ssize_t numNonZeros = (fmd.numNonZeros >= 0) ? fmd.numNonZeros : -1;
         bool sorted = opts.extra.count("sorted") && opts.extra.at("sorted") == "true";
         char delim = ',';
         auto it = opts.extra.find("delimiter");
@@ -312,8 +313,8 @@ struct ReadCsvFile<Frame> {
     static void apply(Frame *&res, const FileMetaData& fmd, struct File *file, IOOptions &opts, DaphneContext *ctx) {
 
         // --- Step 1: Parse basic options ---
-        size_t numRows = std::stoull(opts.extra.at("numRows"));
-        size_t numCols = std::stoull(opts.extra.at("numCols"));
+        size_t numRows = fmd.numRows;
+        size_t numCols = fmd.numCols;
 
         if (numRows == 0) throw std::runtime_error("ReadCsvFile: numRows must be > 0");
         if (numCols == 0) throw std::runtime_error("ReadCsvFile: numCols must be > 0");
@@ -329,30 +330,7 @@ struct ReadCsvFile<Frame> {
         }
 
         // --- Step 3: Parse schema from JSON string ---
-        std::vector<ValueTypeCode> schemaVec;
-        json schemaJson;
-
-        if(opts.extra.count("schema")) {
-            schemaJson = json::parse(opts.extra.at("schema"));
-
-            for (const auto& field : schemaJson) {
-                std::string typeStr = field.at("valueType");
-                if      (typeStr == "si8")        schemaVec.push_back(ValueTypeCode::SI8);
-                else if (typeStr == "si32")       schemaVec.push_back(ValueTypeCode::SI32);
-                else if (typeStr == "si64")       schemaVec.push_back(ValueTypeCode::SI64);
-                else if (typeStr == "ui8")        schemaVec.push_back(ValueTypeCode::UI8);
-                else if (typeStr == "ui32")       schemaVec.push_back(ValueTypeCode::UI32);
-                else if (typeStr == "ui64")       schemaVec.push_back(ValueTypeCode::UI64);
-                else if (typeStr == "f32")        schemaVec.push_back(ValueTypeCode::F32);
-                else if (typeStr == "f64")        schemaVec.push_back(ValueTypeCode::F64);
-                else if (typeStr == "str")        schemaVec.push_back(ValueTypeCode::STR);
-                else if (typeStr == "fixedstr16") schemaVec.push_back(ValueTypeCode::FIXEDSTR16);
-                else
-                    throw std::runtime_error("Unknown valueType in schema: " + typeStr);
-            }
-        } else {
-            throw std::runtime_error("Missing schema in options");
-        }
+        std::vector<ValueTypeCode> schemaVec = fmd.schema;
 
         // --- Step 4: Create result Frame object ---
         ValueTypeCode *schemaArr = nullptr;
@@ -362,12 +340,7 @@ struct ReadCsvFile<Frame> {
         }
 
         if (res == nullptr) {
-            res = DataObjectFactory::create<Frame>(
-                numRows, numCols,
-                /* schema: */ schemaArr,
-                /* labels: */ nullptr,
-                /* sparse: */ false
-            );
+            res = DataObjectFactory::create<Frame>(numRows, numCols, schemaArr, nullptr, false);
         }
 
         // --- Step 5: Get raw column data pointers ---
@@ -645,9 +618,22 @@ extern "C" void readCsvFromPath_Frame(void* &res, const FileMetaData& fmd, const
     readCsvFromPath<Frame>(reinterpret_cast<Frame*&>(res), fmd, filename, opts, ctx);
 }
 
-extern "C" void readCsvFromPath_Dense(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
-    readCsvFromPath<DenseMatrix<double>>(reinterpret_cast<DenseMatrix<double>*&>(res), fmd, filename, opts, ctx);
+extern "C" void readCsvFromPath_Dense(void* &res, const FileMetaData &fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
+    // e.g. check an opts.extra flag, or peek at the file, etc.
+
+    if(fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F64) {
+        // cast and call the string-instantiation
+        readCsvFromPath<DenseMatrix<double>>(reinterpret_cast<DenseMatrix<double>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::UI64) {
+        // cast and call the double-instantiation
+        readCsvFromPath<DenseMatrix<uint64_t>>(reinterpret_cast<DenseMatrix<uint64_t>*&>(res), fmd, filename, opts, ctx);
+    } else {
+        readCsvFromPath<DenseMatrix<std::string>>(reinterpret_cast<DenseMatrix<std::string>*&>(res), fmd, filename, opts, ctx);
+    }
 }
+
+
 
 extern "C" void ReadParquet_Frame(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
     ReadParquet<Frame>::apply(reinterpret_cast<Frame*&>(res), fmd, filename, opts, ctx);

@@ -1,0 +1,31 @@
+{
+  "numRows": 1,
+  "numCols": 6,
+  "numNonZeros": 0,
+  "schema": [
+        {
+            "label": "col_0",
+            "valueType": "si64"
+        },
+        {
+            "label": "col_1",
+            "valueType": "f64"
+        },
+        {
+            "label": "col_2",
+            "valueType": "str"
+        },
+        {
+            "label": "col_3",
+            "valueType": "si64"
+        },
+        {
+            "label": "col_4",
+            "valueType": "f64"
+        },
+        {
+            "label": "col_5",
+            "valueType": "str"
+        }
+    ]  
+}
