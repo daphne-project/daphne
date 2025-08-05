@@ -6,9 +6,7 @@
     "libPath": "libBuiltInPlugIns.so",
     "type": "DenseMatrix",
     "options": {
-      "delimiter": ",",
-      "numCols": "4",
-      "numRows": "2"
+      "delimiter": ","
     }
   },
   {
@@ -18,10 +16,7 @@
     "libPath": "libBuiltInPlugIns.so",
     "type": "Frame",
     "options": {
-      "delimiter": ",",
-      "numCols": "4",
-      "numRows": "2",
-      "schema": "[{\"label\":\"a\",\"valueType\":\"f64\"},{\"label\":\"a\",\"valueType\":\"f64\"},{\"label\":\"a\",\"valueType\":\"f64\"},{\"label\":\"a\",\"valueType\":\"f64\"}]"
+      "delimiter": ","
     }
   },
   {
@@ -32,11 +27,7 @@
     "type": "Frame",
     "options": {
       "delimiter": ",",
-      "numCols": "3",
-      "numRows": "3",
-      "sorted": "false",
-      "schema": "[{\"label\":\"name\",\"valueType\":\"str\"},{\"label\":\"age\",\"valueType\":\"ui64\"},{\"label\":\"salary\",\"valueType\":\"f64\"}]",
-      "numNonZeros": "0"
+      "sorted": "false"
     }
   },
   {
@@ -47,10 +38,8 @@
     "type": "DenseMatrix",
     "options": {
       "delimiter": ",",
-      "numCols": "3",
-      "numRows": "3",
       "sorted": "false",
-      "numNonZeros": "0"
+      "forceString": "true"
     }
   }
 ]

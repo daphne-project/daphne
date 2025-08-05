@@ -1,12 +1,8 @@
-valCol = createFrame(
-   [","],
-   ["2"],
-   ["4"],
-   "delimiter",
-   "numRows",
-   "numCols"
+opts = createFrame(
+   ["16"],
+   "threads"
 );
 
-f = readFrame("scripts/examples/extensions/builtInIO/ReadParquet1.parquet",valCol);
+f = readFrame("scripts/examples/extensions/builtInIO/random_data.csv");
 
 print(f);

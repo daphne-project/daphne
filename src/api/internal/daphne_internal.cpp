@@ -636,13 +636,13 @@ int startDAPHNE(int argc, const char **argv, DaphneLibResult *daphneLibRes, int 
     try {
         if (!FileIOExt.empty()) {
             fileIOParser.parseFileIOCatalog(FileIOExt, registry); 
-            std::cerr << "[info] Loaded FileIO catalog from " << FileIOExt << "\n";
+            /*std::cerr << "[info] Loaded FileIO catalog from " << FileIOExt << "\n";
 
             std::cerr << "=== Registry Entries ===\n";
             for(const auto &kv : registry.getAllOptions()) {
             std::cerr << "  ext='" << kv.first.first
                         << "'  dt="  << kv.first.second << "\n";
-            }
+            }*/
 
         }
     }

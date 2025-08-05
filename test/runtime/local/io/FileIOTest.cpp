@@ -272,6 +272,32 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header u
     DataObjectFactory::destroy(optsFrame);
 }
 
+TEMPLATE_PRODUCT_TEST_CASE("FileIO ReadParquet, DenseMatrix", TAG_IO, (DenseMatrix), (double)) {
+    using DT = TestType;
+    DT *m = nullptr;
+    FileIORegistry::instance().clear();
+    FileIORegistry &registry = FileIORegistry::instance();
+    FileIOCatalogParser parser;
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json",registry));
+
+
+    read(m, "./test/runtime/local/io/ReadParquet1.parquet", emptyFrame, ctx);
+  
+
+    CHECK(m->get(0, 0) == -0.1);
+    CHECK(m->get(0, 1) == -0.2);
+    CHECK(m->get(0, 2) == 0.1);
+    CHECK(m->get(0, 3) == 0.2);
+
+    CHECK(m->get(1, 0) == 3.14);
+    CHECK(m->get(1, 1) == 5.41);
+    CHECK(m->get(1, 2) == 6.22216);
+    CHECK(m->get(1, 3) == 5);
+    
+    FileIORegistry::instance().clear();
+    DataObjectFactory::destroy(m);
+}
+
 
 
 
@@ -279,16 +305,203 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header u
 //                    BENCHMARK
 //#######################################################
 
-TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader overhead: default vs options-frame",
+TEMPLATE_PRODUCT_TEST_CASE("FileIO Benchmark double parquet into a densematrix",
+                           TAG_IO, (DenseMatrix), (double))
+{
+    using DT = TestType;
+    FileIORegistry::instance().clear();
+    FileIORegistry &registry = FileIORegistry::instance();
+    DT *m1 = nullptr;
+    DT *m2 = nullptr;
+
+    FileIOCatalogParser parser;
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json",registry));
+
+    BENCHMARK("read double parquet into a DenseMatrix with 1 thread") {
+        read(m1, "scripts/examples/extensions/parquetReader/random_doubles2.parquet", emptyFrame, ctx);
+        REQUIRE(m1->getNumRows() == 3000000);
+        REQUIRE(m1->getNumCols() == 16);
+    };
+    REQUIRE_NOTHROW(m1->get(1,1));
+
+    std::vector<Structure*> columns(1);
+
+    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+
+    auto* val1 = keyCol->getValues();
+
+    val1[0] = "16";
+
+    columns[0] = keyCol;
+
+    const char* labels[1] = {"threads"};
+
+    Frame* optsFrame = nullptr;
+    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
+
+    BENCHMARK("read double parquet into a DenseMatrix with 16 thread") {
+        read(m2, "scripts/examples/extensions/parquetReader/random_doubles2.parquet", optsFrame, ctx);
+        REQUIRE(m2->getNumRows() == 3000000);
+        REQUIRE(m2->getNumCols() == 16);
+    };
+
+    REQUIRE(*m1 == *m2);
+    DataObjectFactory::destroy(m1);
+    DataObjectFactory::destroy(m2);
+
+    FileIORegistry::instance().clear();
+
+}
+
+TEMPLATE_PRODUCT_TEST_CASE("FileIO Benchmark double parquet into a Frame",
+                           TAG_IO, (DenseMatrix), (double))
+{
+    FileIORegistry::instance().clear();
+    FileIORegistry &registry = FileIORegistry::instance();
+    Frame *m1 = nullptr;
+    Frame *m2 = nullptr;
+
+    FileIOCatalogParser parser;
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json",registry));
+
+    BENCHMARK("read double parquet into a Frame with 1 thread") {
+        read(m1, "scripts/examples/extensions/parquetReader/random_doubles.parquet", emptyFrame, ctx);
+        REQUIRE(m1->getNumRows() == 3000000);
+        REQUIRE(m1->getNumCols() == 16);
+    };
+    std::vector<Structure*> columns(1);
+
+    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+
+    auto* val1 = keyCol->getValues();
+
+    val1[0] = "16";
+
+    columns[0] = keyCol;
+
+    const char* labels[1] = {"threads"};
+
+    Frame* optsFrame = nullptr;
+    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
+
+    BENCHMARK("read double parquet into a Frame with 16 thread") {
+        read(m2, "scripts/examples/extensions/parquetReader/random_doubles.parquet", optsFrame, ctx);
+        REQUIRE(m2->getNumRows() == 3000000);
+        REQUIRE(m2->getNumCols() == 16);
+    };
+
+    REQUIRE(*m1 == *m2);
+    DataObjectFactory::destroy(m1);
+    DataObjectFactory::destroy(m2);
+
+    FileIORegistry::instance().clear();
+
+}
+
+
+TEMPLATE_PRODUCT_TEST_CASE("FileIOs CSV Reader into matrix overhead: default vs options-frame",
                            TAG_IO, (DenseMatrix), (std::string))
 {
     //Frame* optsFrame = nullptr;
     using DT = TestType;
-
-    FileIORegistry &registry = FileIORegistry::instance();
     FileIORegistry::instance().clear();
+    FileIORegistry &registry = FileIORegistry::instance();
+    DT *nm = nullptr;
+    DT *pm = nullptr;
+    FileIOCatalogParser parser;
+
+
+    BENCHMARK("read csv with built-in into a DenseMatrix") {
+        read(nm, "scripts/examples/extensions/builtInIO/random_data2.csv", emptyFrame, ctx);
+        REQUIRE(nm->getNumRows() == 1000000);
+        REQUIRE(nm->getNumCols() == 6);
+    };
+
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/builtInIO/benchmark-defaults.json",registry));
+
+
+    BENCHMARK("read csv with built-in as plug-in with default arguements into DenseMatrix") {
+        //DT *m = nullptr;
+        read(pm,"scripts/examples/extensions/builtInIO/random_data2.csv", emptyFrame, ctx);
+        REQUIRE(pm->getNumRows() == 1000000);
+        REQUIRE(pm->getNumCols() == 6);
+        //DataObjectFactory::destroy(m);
+    };
+
+    REQUIRE(*nm == *pm);
+
+    FileIORegistry::instance().clear();
+    DataObjectFactory::destroy(nm);
+    DataObjectFactory::destroy(pm);
+
+}
+
+TEMPLATE_PRODUCT_TEST_CASE("FileIOss CSV Reader into Frame overhead: default vs options-frame",
+                           TAG_IO, (DenseMatrix), (std::string))
+{
+    //Frame* optsFrame = nullptr;
+    FileIORegistry::instance().clear();
+    FileIORegistry &registry = FileIORegistry::instance();
+    FileIOCatalogParser parser;
+    Frame *nf = nullptr;
+    Frame *pf = nullptr;
+
+    BENCHMARK("read csv with built-in into a Frame") {
+        read(nf, "scripts/examples/extensions/builtInIO/random_data.csv", emptyFrame, ctx);
+        REQUIRE(nf->getNumRows() == 1);
+        REQUIRE(nf->getNumCols() == 6);
+    };
+
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/builtInIO/benchmark-defaults.json",registry));
+
+    BENCHMARK("read csv with built-in as plug-in with default arguements into Frame") {
+        read(pf,"scripts/examples/extensions/builtInIO/random_data.csv", emptyFrame, ctx);
+        REQUIRE(pf->getNumRows() == 1);
+        REQUIRE(pf->getNumCols() == 6);
+    };
     
-    BENCHMARK("read parquet with built-in into a DenseMatrix") {
+    nf->print(std::cout);
+    pf->print(std::cout);
+
+    REQUIRE(*nf == *pf);
+
+    DataObjectFactory::destroy(nf);
+    DataObjectFactory::destroy(pf);
+
+    FileIORegistry::instance().clear();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    /*BENCHMARK("read parquet with built-in into a DenseMatrix") {
         DT *m = nullptr;
         read(m, "scripts/examples/extensions/builtInIO/ReadParquet1.parquet", emptyFrame, ctx);
         REQUIRE(m->getNumRows() == 2);
@@ -302,28 +515,10 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader overhead: default vs options-frame
         REQUIRE(m->getNumRows() == 2);
         REQUIRE(m->getNumCols() == 4);
         DataObjectFactory::destroy(m);
-    };
+    };*/
 
-    BENCHMARK("read csv with built-in into a DenseMatrix") {
-        DT *m = nullptr;
-        read(m, "scripts/examples/extensions/csv/data.csv", emptyFrame, ctx);
-        REQUIRE(m->getNumRows() == 3);
-        REQUIRE(m->getNumCols() == 3);
-        DataObjectFactory::destroy(m);
-    };
-
-    BENCHMARK("read csv with built-in into a Frame") {
-        Frame *m = nullptr;
-        read(m, "scripts/examples/extensions/csv/data.csv", emptyFrame, ctx);
-        REQUIRE(m->getNumRows() == 3);
-        REQUIRE(m->getNumCols() == 3);
-        DataObjectFactory::destroy(m);
-    };
-
-    FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/builtInIO/benchmark-defaults.json",registry));
-
-    BENCHMARK("read parquet with built-in as plug-in with default arguements into DenseMatrix") {
+    
+    /*BENCHMARK("read parquet with built-in as plug-in with default arguements into DenseMatrix") {
         DT *m = nullptr;
         read(m,"scripts/examples/extensions/builtInIO/ReadParquet1.parquet", emptyFrame, ctx);
         REQUIRE(m->getNumRows() == 2);
@@ -337,23 +532,4 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader overhead: default vs options-frame
         REQUIRE(m->getNumRows() == 2);
         REQUIRE(m->getNumCols() == 4);
         DataObjectFactory::destroy(m);
-    };
-
-    BENCHMARK("read csv with built-in as plug-in with default arguements into DenseMatrix") {
-        DT *m = nullptr;
-        read(m,"scripts/examples/extensions/csv/data.csv", emptyFrame, ctx);
-        REQUIRE(m->getNumRows() == 3);
-        REQUIRE(m->getNumCols() == 3);
-        DataObjectFactory::destroy(m);
-    };
-
-    BENCHMARK("read csv with built-in as plug-in with default arguements into Frame") {
-        Frame *m = nullptr;
-        read(m,"scripts/examples/extensions/csv/data.csv", emptyFrame, ctx);
-        REQUIRE(m->getNumRows() == 3);
-        REQUIRE(m->getNumCols() == 3);
-        DataObjectFactory::destroy(m);
-    };
-    FileIORegistry::instance().clear();
-    //DataObjectFactory::destroy(optsFrame);
-}
+    };*/

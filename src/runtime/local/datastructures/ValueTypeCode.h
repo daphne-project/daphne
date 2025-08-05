@@ -36,8 +36,9 @@ enum class ValueTypeCode : uint8_t {
     F32,
     F64,        // floating point (float, double)
     STR,        // std::string
-    FIXEDSTR16, // fixed-size string (length 16)
-    INVALID,    // only for JSON enum conversion
+    FIXEDSTR16,
+    BOOL, // fixed-size string (length 16)
+    INVALID,   // only for JSON enum conversion
     // TODO Support bool as well, but poses some challenges (e.g. sizeof).
     //    UI1 // boolean (bool)
 };
