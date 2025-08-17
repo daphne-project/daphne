@@ -16,8 +16,12 @@
 #include "runtime/local/datastructures/DataObjectFactory.h"
 #include "runtime/local/datastructures/ValueTypeCode.h"
 #include <runtime/local/kernels/Read.h>
+#include <runtime/local/kernels/Write.h>
 #include <runtime/local/kernels/CreateFrame.h>
 
+#include <arrow/api.h>
+#include <arrow/io/api.h>
+#include <parquet/arrow/reader.h>
 
 using namespace std;
 
@@ -139,20 +143,15 @@ TEST_CASE("FileIO csv_write writes DenseMatrix<double> to CSV", "[csv][write]") 
     auto tempDir = std::filesystem::temp_directory_path();
     auto outPath = tempDir / "test_write.csv";
 
-    IOOptions opts;
+    //IOOptions opts;
     FileIORegistry &registry = FileIORegistry::instance();
 
 
     // Register the CSV plugin
     FileIOCatalogParser parser;
     REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
-    auto writer = registry.getWriter(".csv", matrixHash);
 
-    // Invoke writer
-    // Create metadata: rows=2, cols=2, single value type double
-    FileMetaData fmd2(2, 2, true, ValueTypeCode::F64);
-    REQUIRE_NOTHROW(writer(mat, fmd2, outPath.c_str(), opts, ctx));
-
+    write(mat, outPath.c_str(), emptyFrame, ctx);
     // Read back file
     std::ifstream ifs(outPath);
     REQUIRE(ifs.good());
@@ -298,7 +297,147 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO ReadParquet, DenseMatrix", TAG_IO, (DenseMatr
     DataObjectFactory::destroy(m);
 }
 
+TEST_CASE("FileIOw parquet_write_frame writes Frame to Parquet", "[parquet][write][frame]") {
+    // ---------- Arrange ----------
+    const size_t rows = 2;
+    const size_t cols = 3;
 
+    auto *c0 = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, 1, /*alloc*/false);
+    auto *c1 = DataObjectFactory::create<DenseMatrix<double>>( rows, 1, /*alloc*/false);
+    auto *c2 = DataObjectFactory::create<DenseMatrix<std::string>>(rows, 1, /*alloc*/false);
+
+    c0->getValues()[0] = 1;   c0->getValues()[1] = 2;
+    c1->getValues()[0] = 1.5; c1->getValues()[1] = 2.5;
+    c2->getValues()[0] = "a"; c2->getValues()[1] = "b";
+
+    Structure *dataCols[3] = {c0, c1, c2};
+    const char *dataLabels[3] = {"id", "value", "name"};
+
+    Frame *fr = nullptr;
+    DaphneContext *ctx = nullptr;
+    createFrame(fr, dataCols, cols, dataLabels, cols, ctx);
+    REQUIRE(fr != nullptr);
+    REQUIRE(fr->getNumRows() == rows);
+    REQUIRE(fr->getNumCols() == cols);
+
+    // Temp output path
+    auto outPath = std::filesystem::temp_directory_path() / "test_frame_write.parquet";
+    if (std::filesystem::exists(outPath)) std::filesystem::remove(outPath);
+
+    // Register catalog (must map ".parquet"+"Frame" to parquet_write_frame)
+    FileIORegistry &registry = FileIORegistry::instance();
+    FileIOCatalogParser parser;
+
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry));
+
+    // ---------- Act ----------
+    REQUIRE_NOTHROW(write(fr, outPath.c_str(), emptyFrame, ctx));
+    REQUIRE(std::filesystem::exists(outPath));
+
+    // ---------- Assert: read back with Arrow ----------
+    auto fh_res = arrow::io::ReadableFile::Open(outPath.string());
+    REQUIRE(fh_res.ok());
+    std::shared_ptr<arrow::io::ReadableFile> infile = *fh_res;
+
+    std::unique_ptr<parquet::arrow::FileReader> reader;
+    auto st_open = parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &reader);
+    REQUIRE(st_open.ok());
+
+    std::shared_ptr<arrow::Table> table;
+    auto st_tbl = reader->ReadTable(&table);
+    REQUIRE(st_tbl.ok());
+
+    REQUIRE(table->num_rows() == static_cast<int64_t>(rows));
+    REQUIRE(table->num_columns() == 3);
+
+    // Check column names match labels
+    auto schema = table->schema();
+    REQUIRE(schema->field(0)->name() == "id");
+    REQUIRE(schema->field(1)->name() == "value");
+    REQUIRE(schema->field(2)->name() == "name");
+
+    // Column 0: int32
+    {
+        auto arr = std::static_pointer_cast<arrow::Int32Array>(table->column(0)->chunk(0));
+        REQUIRE(arr->length() == static_cast<int64_t>(rows));
+        REQUIRE(arr->Value(0) == 1);
+        REQUIRE(arr->Value(1) == 2);
+    }
+    // Column 1: double
+    {
+        auto arr = std::static_pointer_cast<arrow::DoubleArray>(table->column(1)->chunk(0));
+        REQUIRE(arr->length() == static_cast<int64_t>(rows));
+        REQUIRE(arr->Value(0) == Approx(1.5));
+        REQUIRE(arr->Value(1) == Approx(2.5));
+    }
+    // Column 2: string
+    {
+        auto arr = std::static_pointer_cast<arrow::StringArray>(table->column(2)->chunk(0));
+        REQUIRE(arr->length() == static_cast<int64_t>(rows));
+        REQUIRE(arr->GetString(0) == "a");
+        REQUIRE(arr->GetString(1) == "b");
+    }
+
+    // Cleanup
+    std::filesystem::remove(outPath);
+}
+
+TEST_CASE("FileIOw parquet_write writes DenseMatrix<double> to Parquet", "[parquet][write]") {
+    // --- Arrange ---
+    const size_t rows = 2, cols = 2;
+    auto *mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, /*alloc*/false);
+    double *vals = mat->getValues();
+    // Row-major: [ [1.5, 2.5],
+    //              [3.5, 4.5] ]
+    vals[0] = 1.5; vals[1] = 2.5;
+    vals[2] = 3.5; vals[3] = 4.5;
+
+    auto tempDir = std::filesystem::temp_directory_path();
+    auto outPath = tempDir / "test_write.parquet";
+    if (std::filesystem::exists(outPath))
+        std::filesystem::remove(outPath);
+
+    // Registry + catalog (must include the parquet_write symbol mapping)
+    FileIORegistry &registry = FileIORegistry::instance();
+    FileIOCatalogParser parser;
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry));
+
+    // --- Act: write via generic write() that dispatches through the registry ---
+    REQUIRE_NOTHROW(write(mat, outPath.c_str(), emptyFrame, ctx));
+    REQUIRE(std::filesystem::exists(outPath));
+
+    // --- Assert: read back with Arrow and validate ---
+    std::shared_ptr<arrow::io::ReadableFile> infile;
+    auto st_open = arrow::io::ReadableFile::Open(outPath.string());
+    REQUIRE(st_open.ok());
+    infile = *st_open;
+
+    std::unique_ptr<parquet::arrow::FileReader> reader;
+    auto st_r = parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &reader);
+    REQUIRE(st_r.ok());
+
+    std::shared_ptr<arrow::Table> table;
+    auto st_tbl = reader->ReadTable(&table);
+    REQUIRE(st_tbl.ok());
+
+    REQUIRE(table->num_rows() == static_cast<int64_t>(rows));
+    REQUIRE(table->num_columns() == static_cast<int64_t>(cols));
+
+    auto col0 = std::static_pointer_cast<arrow::DoubleArray>(table->column(0)->chunk(0));
+    auto col1 = std::static_pointer_cast<arrow::DoubleArray>(table->column(1)->chunk(0));
+    REQUIRE(col0->length() == static_cast<int64_t>(rows));
+    REQUIRE(col1->length() == static_cast<int64_t>(rows));
+
+    // row 0
+    REQUIRE(col0->Value(0) == Approx(1.5));
+    REQUIRE(col1->Value(0) == Approx(2.5));
+    // row 1
+    REQUIRE(col0->Value(1) == Approx(3.5));
+    REQUIRE(col1->Value(1) == Approx(4.5));
+
+    // Cleanup (optional)
+    std::filesystem::remove(outPath);
+}
 
 
 //#######################################################

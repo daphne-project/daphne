@@ -2,7 +2,7 @@
   {
     "extension": ".parquet",
     "readerFuncName": "parquet_read",
-    "writerFuncName": "",
+    "writerFuncName": "parquet_write",
     "libPath": "libparquetPlugIn.so",
     "type": "DenseMatrix",
     "options": {
@@ -13,7 +13,7 @@
   {
     "extension": ".parquet",
     "readerFuncName": "parquet_read_frame",
-    "writerFuncName": "",
+    "writerFuncName": "parquet_write_frame",
     "libPath": "libparquetPlugIn.so",
     "type": "Frame",
     "options": {
