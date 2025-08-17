@@ -17,6 +17,7 @@
 #ifndef SRC_RUNTIME_LOCAL_KERNELS_WRITE_H
 #define SRC_RUNTIME_LOCAL_KERNELS_WRITE_H
 
+#include "runtime/local/io/FileIORegistry.h"
 #include <parser/metadata/MetaDataParser.h>
 #include <runtime/local/context/DaphneContext.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
@@ -26,6 +27,8 @@
 #include <runtime/local/io/FileMetaData.h>
 #include <runtime/local/io/WriteCsv.h>
 #include <runtime/local/io/WriteDaphne.h>
+#include <runtime/local/kernels/Read.h>
+
 #if USE_HDFS
 #include <runtime/local/io/HDFS/WriteHDFS.h>
 #endif
@@ -38,15 +41,15 @@
 // ****************************************************************************
 
 template <class DTArg> struct Write {
-    static void apply(const DTArg *arg, const char *filename, DCTX(ctx)) = delete;
+    static void apply(const DTArg *arg, const char *filename, Frame* opts, DCTX(ctx)) = delete;
 };
 
 // ****************************************************************************
 // Convenience function
 // ****************************************************************************
 
-template <class DTArg> void write(const DTArg *arg, const char *filename, DCTX(ctx)) {
-    Write<DTArg>::apply(arg, filename, ctx);
+template <class DTArg> void write(const DTArg *arg, const char *filename, Frame *opts, DCTX(ctx)) {
+    Write<DTArg>::apply(arg, filename, opts, ctx);
 }
 
 // ****************************************************************************
@@ -58,8 +61,25 @@ template <class DTArg> void write(const DTArg *arg, const char *filename, DCTX(c
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct Write<DenseMatrix<VT>> {
-    static void apply(const DenseMatrix<VT> *arg, const char *filename, DCTX(ctx)) {
+    static void apply(const DenseMatrix<VT> *arg, const char *filename, Frame *optsFrame, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
+        try {
+            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
+            IODataType typeHash = DENSEMATRIX;
+            auto writer = registry.getWriter(ext, typeHash);
+            FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
+
+            MetaDataParser::writeMetaData(filename, fmd);
+
+            // Merge user overrides from optsFrame
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
+            
+            writer(arg, fmd, filename, mergedOpts, ctx);
+            //std::cout << "using registry\n";
+            return;
+        }
+        catch (const std::out_of_range &e) {
+        }
 
         if (ext == ".csv") {
             File *file = openFileForWrite(filename);
@@ -94,8 +114,30 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
 // ----------------------------------------------------------------------------
 
 template <> struct Write<Frame> {
-    static void apply(const Frame *arg, const char *filename, DCTX(ctx)) {
+    static void apply(const Frame *arg, const char *filename, Frame *optsFrame, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
+
+        try {
+            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
+            IODataType typeHash = FRAME;
+            auto writer = registry.getWriter(ext, typeHash);
+            std::vector<ValueTypeCode> vtcs;
+            std::vector<std::string> labels;
+            for (size_t i = 0; i < arg->getNumCols(); i++) {
+                vtcs.push_back(arg->getSchema()[i]);
+                labels.push_back(arg->getLabels()[i]);
+            }
+            FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), false, vtcs, labels);            
+            MetaDataParser::writeMetaData(filename, fmd);
+
+            // Merge user overrides from optsFrame
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
+
+            writer(arg, fmd, filename, mergedOpts, ctx);
+            return;
+        }
+        catch (const std::out_of_range &e) {
+        }
 
         if (ext == ".csv") {
             File *file = openFileForWrite(filename);
@@ -119,7 +161,7 @@ template <> struct Write<Frame> {
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct Write<Matrix<VT>> {
-    static void apply(const Matrix<VT> *arg, const char *filename, DCTX(ctx)) {
+    static void apply(const Matrix<VT> *arg, const char *filename, Frame *optsFrame, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
 
         if (ext == ".csv") {

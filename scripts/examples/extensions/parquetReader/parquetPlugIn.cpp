@@ -23,6 +23,7 @@
 #include <arrow/table.h>
 #include <parquet/arrow/reader.h>
 #include <parquet/file_reader.h>
+#include <parquet/arrow/writer.h>
 
 #include <thread>
 #include <vector>
@@ -393,4 +394,218 @@ void parquet_read_frame(
         ctx
     );
 }
+
+void parquet_write(
+    const void *data,
+    const FileMetaData &fmd,
+    const char *filename,
+    const IOOptions &opts,
+    DaphneContext * ctx
+) {
+    using arrow::Array;
+    using arrow::DoubleBuilder;
+    using arrow::Int32Builder;
+    using arrow::StringBuilder;
+    using arrow::default_memory_pool;
+    using arrow::io::FileOutputStream;
+
+    const int64_t rows = static_cast<int64_t>(fmd.numRows);
+    const int64_t cols = static_cast<int64_t>(fmd.numCols);
+    if(rows < 0 || cols <= 0)
+        throw std::runtime_error("parquet_write: invalid shape");
+
+    // Row group / chunk size (optional)
+    int64_t chunk_size = 1024 * 1024; // default 1M rows per row group
+    if (auto it = opts.extra.find("row_group_size"); it != opts.extra.end()) {
+        try { chunk_size = std::max<int64_t>(1, std::stoll(it->second)); } catch(...) {}
+    }
+
+    // Compression (optional): snappy|gzip|zstd|brotli|lz4|none
+    parquet::Compression::type comp = parquet::Compression::SNAPPY;
+    if (auto it = opts.extra.find("compression"); it != opts.extra.end()) {
+        std::string s = it->second; std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+        if(s == "none"   || s == "uncompressed") comp = parquet::Compression::UNCOMPRESSED;
+        else if(s == "gzip" || s == "zlib")      comp = parquet::Compression::GZIP;
+        else if(s == "zstd")                     comp = parquet::Compression::ZSTD;
+        else if(s == "brotli")                   comp = parquet::Compression::BROTLI;
+        else if(s == "lz4")                      comp = parquet::Compression::LZ4;
+        else if(s == "snappy")                   comp = parquet::Compression::SNAPPY;
+    }
+    auto props = parquet::WriterProperties::Builder().compression(comp)->build();
+
+    // Column labels
+    std::vector<std::shared_ptr<arrow::Field>> fields;
+    fields.reserve(cols);
+    std::vector<std::shared_ptr<Array>> columns;
+    columns.reserve(cols);
+
+    // Helper to pick a name
+    auto col_name = [&](int64_t c)->std::string {
+        if (c < (int64_t)fmd.labels.size() && !fmd.labels[c].empty())
+            return fmd.labels[c];
+        return "col_" + std::to_string(c);
+    };
+
+    // Build arrays column-wise based on value type
+    if (fmd.isSingleValueType && fmd.schema.size() >= 1 && fmd.schema[0] == ValueTypeCode::SI32) {
+        auto mat = static_cast<const DenseMatrix<int32_t>*>(data);
+        const int32_t *vals = mat->getValues();
+        for (int64_t c = 0; c < cols; ++c) {
+            Int32Builder b(default_memory_pool());
+            PARQUET_THROW_NOT_OK(b.Reserve(rows));
+            for (int64_t r = 0; r < rows; ++r)
+                b.UnsafeAppend(vals[r * cols + c]);
+            std::shared_ptr<Array> arr;
+            PARQUET_THROW_NOT_OK(b.Finish(&arr));
+            fields.push_back(arrow::field(col_name(c), arrow::int32()));
+            columns.push_back(std::move(arr));
+        }
+    }
+    else if (fmd.isSingleValueType && fmd.schema.size() >= 1 && fmd.schema[0] == ValueTypeCode::F64) {
+        auto mat = static_cast<const DenseMatrix<double>*>(data);
+        const double *vals = mat->getValues();
+        for (int64_t c = 0; c < cols; ++c) {
+            DoubleBuilder b(default_memory_pool());
+            PARQUET_THROW_NOT_OK(b.Reserve(rows));
+            for (int64_t r = 0; r < rows; ++r)
+                b.UnsafeAppend(vals[r * cols + c]);
+            std::shared_ptr<Array> arr;
+            PARQUET_THROW_NOT_OK(b.Finish(&arr));
+            fields.push_back(arrow::field(col_name(c), arrow::float64()));
+            columns.push_back(std::move(arr));
+        }
+    }
+    else {
+        // Treat as string matrix
+        auto mat = static_cast<const DenseMatrix<std::string>*>(data);
+        const std::string *vals = mat->getValues();
+        for (int64_t c = 0; c < cols; ++c) {
+            StringBuilder b(default_memory_pool());
+            for (int64_t r = 0; r < rows; ++r)
+                PARQUET_THROW_NOT_OK(b.Append(vals[r * cols + c]));
+            std::shared_ptr<Array> arr;
+            PARQUET_THROW_NOT_OK(b.Finish(&arr));
+            fields.push_back(arrow::field(col_name(c), arrow::utf8()));
+            columns.push_back(std::move(arr));
+        }
+    }
+
+    auto sch = arrow::schema(fields);
+    auto tbl = arrow::Table::Make(sch, columns, rows);
+
+    auto out_res = FileOutputStream::Open(filename);
+    if (!out_res.ok())
+        throw std::runtime_error("parquet_write: cannot open file: " + out_res.status().ToString());
+    std::shared_ptr<arrow::io::OutputStream> out = *out_res;
+
+    // Write table
+    PARQUET_THROW_NOT_OK(parquet::arrow::WriteTable(*tbl, default_memory_pool(), out, chunk_size, props));
+}
+
+void parquet_write_frame(
+    const void *data,
+    const FileMetaData &fmd,
+    const char *filename,
+    const IOOptions &opts,
+    DaphneContext * ctx
+) {
+    using arrow::Array;
+    using arrow::DoubleBuilder;
+    using arrow::Int32Builder;
+    using arrow::StringBuilder;
+    using arrow::default_memory_pool;
+    using arrow::io::FileOutputStream;
+
+    const auto *frame = static_cast<const Frame*>(data);
+    const int64_t rows = static_cast<int64_t>(fmd.numRows);
+    const int64_t cols = static_cast<int64_t>(fmd.numCols);
+    if (rows < 0 || cols <= 0)
+        throw std::runtime_error("parquet_write_frame: invalid shape");
+
+    // Options: row group size + compression
+    int64_t row_group_size = 1024 * 1024; // default 1M rows/rg
+    if (auto it = opts.extra.find("row_group_size"); it != opts.extra.end()) {
+        try { row_group_size = std::max<int64_t>(1, std::stoll(it->second)); } catch(...) {}
+    }
+
+    parquet::Compression::type comp = parquet::Compression::SNAPPY;
+    if (auto it = opts.extra.find("compression"); it != opts.extra.end()) {
+        std::string s = it->second; std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+        if      (s == "none" || s == "uncompressed") comp = parquet::Compression::UNCOMPRESSED;
+        else if (s == "gzip" || s == "zlib")         comp = parquet::Compression::GZIP;
+        else if (s == "zstd")                         comp = parquet::Compression::ZSTD;
+        else if (s == "brotli")                       comp = parquet::Compression::BROTLI;
+        else if (s == "lz4")                          comp = parquet::Compression::LZ4;
+        else if (s == "snappy")                       comp = parquet::Compression::SNAPPY;
+    }
+    auto props = parquet::WriterProperties::Builder().compression(comp)->build();
+
+    // Build Arrow schema + columns
+    std::vector<std::shared_ptr<arrow::Field>> fields;
+    fields.reserve(cols);
+    std::vector<std::shared_ptr<Array>> arrays;
+    arrays.reserve(cols);
+
+    auto col_name = [&](int64_t c)->std::string {
+        if (c < (int64_t)fmd.labels.size() && !fmd.labels[c].empty())
+            return fmd.labels[c];
+        return "col_" + std::to_string(c);
+    };
+
+    for (int64_t c = 0; c < cols; ++c) {
+        switch (fmd.schema[c]) {
+            case ValueTypeCode::SI32: {
+                // Expect column stored as DenseMatrix<int32_t> of shape rows x 1
+                const auto *col = frame->getColumn<int32_t>(static_cast<size_t>(c));
+                const int32_t *vals = col->getValues();
+                Int32Builder b(default_memory_pool());
+                PARQUET_THROW_NOT_OK(b.Reserve(rows));
+                for (int64_t r = 0; r < rows; ++r)
+                    b.UnsafeAppend(vals[r]); // contiguous column vector
+                std::shared_ptr<Array> arr;
+                PARQUET_THROW_NOT_OK(b.Finish(&arr));
+                fields.push_back(arrow::field(col_name(c), arrow::int32()));
+                arrays.push_back(std::move(arr));
+                break;
+            }
+            case ValueTypeCode::F64: {
+                const auto *col = frame->getColumn<double>(static_cast<size_t>(c));
+                const double *vals = col->getValues();
+                DoubleBuilder b(default_memory_pool());
+                PARQUET_THROW_NOT_OK(b.Reserve(rows));
+                for (int64_t r = 0; r < rows; ++r)
+                    b.UnsafeAppend(vals[r]);
+                std::shared_ptr<Array> arr;
+                PARQUET_THROW_NOT_OK(b.Finish(&arr));
+                fields.push_back(arrow::field(col_name(c), arrow::float64()));
+                arrays.push_back(std::move(arr));
+                break;
+            }
+            default: {
+                // Treat any other type as string (mirrors your reader)
+                const auto *col = frame->getColumn<std::string>(static_cast<size_t>(c));
+                const std::string *vals = col->getValues();
+                StringBuilder b(default_memory_pool());
+                for (int64_t r = 0; r < rows; ++r)
+                    PARQUET_THROW_NOT_OK(b.Append(vals[r]));
+                std::shared_ptr<Array> arr;
+                PARQUET_THROW_NOT_OK(b.Finish(&arr));
+                fields.push_back(arrow::field(col_name(c), arrow::utf8()));
+                arrays.push_back(std::move(arr));
+                break;
+            }
+        }
+    }
+
+    auto schema = arrow::schema(fields);
+    auto table  = arrow::Table::Make(schema, arrays, rows);
+
+    auto out_res = FileOutputStream::Open(filename);
+    if (!out_res.ok())
+        throw std::runtime_error("parquet_write_frame: cannot open file: " + out_res.status().ToString());
+    std::shared_ptr<arrow::io::OutputStream> out = *out_res;
+
+    PARQUET_THROW_NOT_OK(parquet::arrow::WriteTable(*table, default_memory_pool(), out, row_group_size, props));
+}
+
 } // extern "C"

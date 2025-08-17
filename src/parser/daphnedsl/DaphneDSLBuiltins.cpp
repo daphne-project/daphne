@@ -1390,10 +1390,60 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
     if (func == "writeFrame" || func == "writeMatrix" || func == "write") {
         // Note that the type of arg already indicates if it is a frame or a
         // matrix.
-        checkNumArgsExact(loc, func, numArgs, 2);
+        checkNumArgsBetween(loc, func, numArgs, 2, 3);
+        mlir::Type resType = mlir::daphne::MatrixType::get(builder.getContext(), utils.unknownType);
+        auto *ctx = builder.getContext();
         mlir::Value arg = args[0];
         mlir::Value filename = args[1];
-        return builder.create<WriteOp>(loc, arg, filename).getOperation();
+        if(numArgs == 2) {
+            auto strTy     = mlir::daphne::StringType::get(ctx);
+
+            // 2) Build a StrScalar("") constant
+            auto emptyStr = builder.create<mlir::daphne::ConstantOp>(
+                loc, 
+                /*resultType=*/ strTy,
+                /*valueAttr=*/ builder.getStringAttr(""));  
+
+            // 3) Build a Index constant "1" for the dimensions
+            auto oneIdx = builder.create<mlir::arith::ConstantIndexOp>(loc, /*value=*/1);
+
+            // 4) Fill a 1×1 DenseMatrix<string> with that empty string
+            auto oneByOneMat = builder.create<mlir::daphne::FillOp>(
+                loc,
+                /*resultType=*/ mlir::daphne::MatrixType::get(ctx, strTy),
+                /*value=*/      emptyStr,
+                /*rows=*/       oneIdx,
+                /*cols=*/       oneIdx);
+
+            // 5) Build a StrScalar("dummy") for the single column’s label
+            auto labelStr = builder.create<mlir::daphne::ConstantOp>(
+                loc,
+                /*resultType=*/ strTy,
+                /*valueAttr=*/ builder.getStringAttr("dummy"));
+
+            // 6) Create the 1×1 Frame from [ oneByOneMat ] and [ labelStr ]
+            auto oneByOneFT = mlir::daphne::FrameType::get(
+                ctx,
+                /*colTypes=*/ { strTy },  // one column of strings
+                /*numRows=*/ 1,
+                /*numCols=*/ 1,
+                /*labels=*/ nullptr);
+
+            auto cf = builder.create<mlir::daphne::CreateFrameOp>(
+                loc,
+                /*resultType=*/ oneByOneFT,
+                /*cols=*/        mlir::ValueRange{ oneByOneMat },
+                /*labels=*/      mlir::ValueRange{ labelStr });
+
+            // 7) Extract the Frame value
+            mlir::Value optsFrame = cf.getResult();
+        
+            return builder.create<WriteOp>(loc, arg, filename, optsFrame).getOperation();    
+        }
+        else {
+            return builder.create<WriteOp>(loc, arg, filename, args[2]).getOperation();
+        }
+        
     }
     if (func == "receiveFromNumpy") {
         checkNumArgsExact(loc, func, numArgs, 4);

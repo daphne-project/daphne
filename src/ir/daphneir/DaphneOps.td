@@ -1747,7 +1747,7 @@ def Daphne_ReadOp : Daphne_Op<"read", [
 }
 
 def Daphne_WriteOp : Daphne_Op<"write"> {
-    let arguments = (ins MatrixOrFrame:$arg, StrScalar:$fileName);
+    let arguments = (ins MatrixOrFrame:$arg, StrScalar:$fileName, MatrixOrFrame:$options);
     let results = (outs); // no results
 }
 
