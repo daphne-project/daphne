@@ -53,7 +53,7 @@ static IOOptions mergeOptionsFromFrame(const std::string &ext,
 
     auto& reg = ctx ? ctx->config.registry : FileIORegistry::instance();  
     /*std::cerr << "=== Registry Entries ===\n";
-    for(const auto &kv : reg.getAllOptions()) {
+    for(const auto &kv : reg.getAllReaders()) {
     std::cerr << "  ext='" << kv.first.first
                 << "'  dt="  << kv.first.second << "\n";
     }

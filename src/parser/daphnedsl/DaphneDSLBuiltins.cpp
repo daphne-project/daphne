@@ -1285,46 +1285,20 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
         auto *ctx = builder.getContext();
 
         if(numArgs == 1) {
-            auto strTy     = mlir::daphne::StringType::get(ctx);
+            auto strTy = mlir::daphne::StringType::get(ctx);
+            
+            auto emptyStr = builder.create<mlir::daphne::ConstantOp>(loc, strTy, builder.getStringAttr(""));  
 
-            // 2) Build a StrScalar("") constant
-            auto emptyStr = builder.create<mlir::daphne::ConstantOp>(
-                loc, 
-                /*resultType=*/ strTy,
-                /*valueAttr=*/ builder.getStringAttr(""));  
+            auto oneIdx = builder.create<mlir::arith::ConstantIndexOp>(loc, 1);
 
-            // 3) Build a Index constant "1" for the dimensions
-            auto oneIdx = builder.create<mlir::arith::ConstantIndexOp>(loc, /*value=*/1);
+            auto oneByOneMat = builder.create<mlir::daphne::FillOp>(loc, mlir::daphne::MatrixType::get(ctx, strTy), emptyStr, oneIdx, oneIdx);
 
-            // 4) Fill a 1×1 DenseMatrix<string> with that empty string
-            auto oneByOneMat = builder.create<mlir::daphne::FillOp>(
-                loc,
-                /*resultType=*/ mlir::daphne::MatrixType::get(ctx, strTy),
-                /*value=*/      emptyStr,
-                /*rows=*/       oneIdx,
-                /*cols=*/       oneIdx);
+            auto labelStr = builder.create<mlir::daphne::ConstantOp>(loc, strTy, builder.getStringAttr("dummy"));
 
-            // 5) Build a StrScalar("dummy") for the single column’s label
-            auto labelStr = builder.create<mlir::daphne::ConstantOp>(
-                loc,
-                /*resultType=*/ strTy,
-                /*valueAttr=*/ builder.getStringAttr("dummy"));
+            auto oneByOneFT = mlir::daphne::FrameType::get(ctx, { strTy }, 1, 1, nullptr);
 
-            // 6) Create the 1×1 Frame from [ oneByOneMat ] and [ labelStr ]
-            auto oneByOneFT = mlir::daphne::FrameType::get(
-                ctx,
-                /*colTypes=*/ { strTy },  // one column of strings
-                /*numRows=*/ 1,
-                /*numCols=*/ 1,
-                /*labels=*/ nullptr);
+            auto cf = builder.create<mlir::daphne::CreateFrameOp>(loc, oneByOneFT, mlir::ValueRange{ oneByOneMat }, mlir::ValueRange{ labelStr });
 
-            auto cf = builder.create<mlir::daphne::CreateFrameOp>(
-                loc,
-                /*resultType=*/ oneByOneFT,
-                /*cols=*/        mlir::ValueRange{ oneByOneMat },
-                /*labels=*/      mlir::ValueRange{ labelStr });
-
-            // 7) Extract the Frame value
             mlir::Value optsFrame = cf.getResult();
         
             return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0], optsFrame));    
@@ -1381,9 +1355,9 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
             // 7) Extract the Frame value
             mlir::Value optsFrame = cf.getResult();
         
-            return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0], optsFrame));       
+            return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, args[0], optsFrame));       
         } else {
-            return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0], args[1]));
+            return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, args[0], args[1]));
         }  
     }
 
@@ -1391,51 +1365,24 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
         // Note that the type of arg already indicates if it is a frame or a
         // matrix.
         checkNumArgsBetween(loc, func, numArgs, 2, 3);
-        mlir::Type resType = mlir::daphne::MatrixType::get(builder.getContext(), utils.unknownType);
         auto *ctx = builder.getContext();
         mlir::Value arg = args[0];
         mlir::Value filename = args[1];
         if(numArgs == 2) {
             auto strTy     = mlir::daphne::StringType::get(ctx);
 
-            // 2) Build a StrScalar("") constant
-            auto emptyStr = builder.create<mlir::daphne::ConstantOp>(
-                loc, 
-                /*resultType=*/ strTy,
-                /*valueAttr=*/ builder.getStringAttr(""));  
+            auto emptyStr = builder.create<mlir::daphne::ConstantOp>( loc, strTy, builder.getStringAttr(""));  
 
-            // 3) Build a Index constant "1" for the dimensions
-            auto oneIdx = builder.create<mlir::arith::ConstantIndexOp>(loc, /*value=*/1);
+            auto oneIdx = builder.create<mlir::arith::ConstantIndexOp>(loc, 1);
 
-            // 4) Fill a 1×1 DenseMatrix<string> with that empty string
-            auto oneByOneMat = builder.create<mlir::daphne::FillOp>(
-                loc,
-                /*resultType=*/ mlir::daphne::MatrixType::get(ctx, strTy),
-                /*value=*/      emptyStr,
-                /*rows=*/       oneIdx,
-                /*cols=*/       oneIdx);
+            auto oneByOneMat = builder.create<mlir::daphne::FillOp>( loc, mlir::daphne::MatrixType::get(ctx, strTy), emptyStr, oneIdx, oneIdx);
 
-            // 5) Build a StrScalar("dummy") for the single column’s label
-            auto labelStr = builder.create<mlir::daphne::ConstantOp>(
-                loc,
-                /*resultType=*/ strTy,
-                /*valueAttr=*/ builder.getStringAttr("dummy"));
+            auto labelStr = builder.create<mlir::daphne::ConstantOp>(loc, strTy, builder.getStringAttr("dummy"));
 
-            // 6) Create the 1×1 Frame from [ oneByOneMat ] and [ labelStr ]
-            auto oneByOneFT = mlir::daphne::FrameType::get(
-                ctx,
-                /*colTypes=*/ { strTy },  // one column of strings
-                /*numRows=*/ 1,
-                /*numCols=*/ 1,
-                /*labels=*/ nullptr);
+            auto oneByOneFT = mlir::daphne::FrameType::get(ctx, { strTy }, 1, 1, nullptr);
 
-            auto cf = builder.create<mlir::daphne::CreateFrameOp>(
-                loc,
-                /*resultType=*/ oneByOneFT,
-                /*cols=*/        mlir::ValueRange{ oneByOneMat },
-                /*labels=*/      mlir::ValueRange{ labelStr });
+            auto cf = builder.create<mlir::daphne::CreateFrameOp>(loc, oneByOneFT, mlir::ValueRange{ oneByOneMat },  mlir::ValueRange{ labelStr });
 
-            // 7) Extract the Frame value
             mlir::Value optsFrame = cf.getResult();
         
             return builder.create<WriteOp>(loc, arg, filename, optsFrame).getOperation();    

@@ -279,12 +279,12 @@ void parquet_read_frame(
         throw std::runtime_error("row count mismatch");
 
     // 2) labels from fmd
-    if ((int)fmd.labels.size() < cols)
-        throw std::runtime_error("Not enough labels in FileMetaData");
     std::vector<const char*> colLabels(cols);
-    for (int c = 0; c < cols; ++c)
-        colLabels[c] = fmd.labels[c].c_str();
-
+    if ((int)fmd.labels.size() < cols){
+        throw std::runtime_error("Not enough labels in FileMetaData");
+    } else {
+        for (int c = 0; c < cols; ++c)colLabels[c] = fmd.labels[c].c_str();
+    }
     // 3) allocate one  rows×1 matrix per column
     std::vector<Structure*> columns(cols);
     for (int c = 0; c < cols; ++c) {

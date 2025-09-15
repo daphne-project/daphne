@@ -77,38 +77,8 @@ inline void FileIOCatalogParser::parseFileIOCatalog(
             }
         }
 
-        // Load the plugin library
-        void* handle = dlopen(libPath.c_str(), RTLD_NOW | RTLD_GLOBAL);
-        if(!handle) {
-            throw std::runtime_error("dlopen failed for " + libPath + ": " + dlerror());
-        }
+        registry.registerLazy(ext, typeHash, libPath, rdrName, wtrName, opts);
 
-        // Expected function pointer types matching GenericReader/GenericWriter
-        using ReaderFn = void(*)(void*, const FileMetaData&, const char*, const IOOptions&, DaphneContext*);
-        using WriterFn = void(*)(const void*, const FileMetaData&, const char*, const IOOptions&, DaphneContext*);
-
-        if(!rdrName.empty()) {
-            void* rdrSym = dlsym(handle, rdrName.c_str());
-            if(!rdrSym) {
-                dlclose(handle);
-                throw std::runtime_error("Symbol not found: " + rdrName + "; " + dlerror());
-            }
-            ReaderFn rdrFn = reinterpret_cast<ReaderFn>(rdrSym);
-            GenericReader reader = rdrFn;
-            registry.registerReader(ext, typeHash, opts,reader);
-        }
-
-        // Lookup and register writer if specified
-        if(!wtrName.empty()) {
-            void* wtrSym = dlsym(handle, wtrName.c_str());
-            if(!wtrSym) {
-                dlclose(handle);
-                throw std::runtime_error("Symbol not found: " + wtrName + "; " + dlerror());
-            }
-            WriterFn wtrFn = reinterpret_cast<WriterFn>(wtrSym);
-            GenericWriter writer = wtrFn;
-            registry.registerWriter(ext, typeHash, opts, writer);
-        }
 
         // Note: keep 'handle' loaded for process lifetime to preserve symbols
     }
