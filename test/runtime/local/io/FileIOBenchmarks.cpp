@@ -99,7 +99,7 @@ TEMPLATE_PRODUCT_TEST_CASE(
 
 // 2) Frame parquet benchmark (1 thread vs 16 threads)
 TEMPLATE_PRODUCT_TEST_CASE(
-    "FileIO Benchmark double parquet into a Frame",
+    "FileIO3 Benchmark double parquet into a Frame",
     TAG_IO "[.bench]",
     (DenseMatrix),
     (double)
@@ -127,7 +127,7 @@ TEMPLATE_PRODUCT_TEST_CASE(
     std::vector<Structure*> columns(1);
     auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
     auto* val1 = keyCol->getValues();
-    val1[0] = "16";
+    val1[0] = "4";
     columns[0] = keyCol;
     const char* labels[1] = {"threads"};
     Frame* optsFrame = nullptr;

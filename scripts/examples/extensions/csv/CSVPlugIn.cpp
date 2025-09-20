@@ -323,19 +323,19 @@ void csv_read_frame(
     for (size_t c = 0; c < cols; ++c) {
         switch (fmd.schema[c]) {
             case ValueTypeCode::SI32: {
-                auto* m = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, 1, false);
+                auto* m = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, 1, true);
                 columns[c] = m; colI32[c] = m->getValues(); break;
             }
             case ValueTypeCode::UI64: {
-                auto* m = DataObjectFactory::create<DenseMatrix<uint64_t>>(rows, 1, false);
+                auto* m = DataObjectFactory::create<DenseMatrix<uint64_t>>(rows, 1, true);
                 columns[c] = m; colU64[c] = m->getValues(); break;
             }
             case ValueTypeCode::F64: {
-                auto* m = DataObjectFactory::create<DenseMatrix<double>>(rows, 1, false);
+                auto* m = DataObjectFactory::create<DenseMatrix<double>>(rows, 1, true);
                 columns[c] = m; colF64[c] = m->getValues(); break;
             }
             default: {
-                auto* m = DataObjectFactory::create<DenseMatrix<std::string>>(rows, 1, false);
+                auto* m = DataObjectFactory::create<DenseMatrix<std::string>>(rows, 1, true);
                 columns[c] = m; colSTR[c] = m->getValues(); break;
             }
         }

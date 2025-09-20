@@ -290,13 +290,13 @@ void parquet_read_frame(
     for (int c = 0; c < cols; ++c) {
         switch(fmd.schema[c]) {
             case ValueTypeCode::SI32:
-                columns[c] = DataObjectFactory::create<DenseMatrix<int32_t>>(rows,1,false);
+                columns[c] = DataObjectFactory::create<DenseMatrix<int32_t>>(rows,1,true);
                 break;
             case ValueTypeCode::F64:
-                columns[c] = DataObjectFactory::create<DenseMatrix<double>>(rows,1,false);
+                columns[c] = DataObjectFactory::create<DenseMatrix<double>>(rows,1,true);
                 break;
             default:
-                columns[c] = DataObjectFactory::create<DenseMatrix<std::string>>(rows,1,false);
+                columns[c] = DataObjectFactory::create<DenseMatrix<std::string>>(rows,1,true);
         }
     }
 
