@@ -1,8 +1,37 @@
-libCsvIO.so: CsvIO.o
-	g++ -shared CsvIO.o -o libCsvIO.so -L../../../../build/src/runtime/local/datastructures -lDataStructures -L../../../../thirdparty/installed/lib -lLLVMSupport -lfmt
+# Paths
+DAPHNE_ROOT   := /home/yazan/daphneFork/daphne
+TP_INC_DIR    := $(DAPHNE_ROOT)/thirdparty/installed/include
+TP_LIB_DIR    := $(DAPHNE_ROOT)/thirdparty/installed/lib
+DS_LIB_DIR    := $(DAPHNE_ROOT)/build/src/runtime/local/datastructures
 
-CsvIO.o: CSVPlugIn.cpp
-	g++ -c -fPIC CSVPlugIn.cpp -I../../../../src/ -std=c++17 -O3 -mavx2 -o CsvIO.o
-    
+# Compiler & flags
+CXX           := g++
+CXXFLAGS      := -std=c++17 -O3 -mavx2 -fPIC  \
+                  -I$(DAPHNE_ROOT)/src \
+                  -I$(TP_INC_DIR) \
+                  -I$(DAPHNE_ROOT)/src/runtime/local/io \
+                  -DSPDLOG_FMT_EXTERNAL 
+
+# Linker & libraries
+LDFLAGS       := -shared -Wl,-rpath=$(TP_LIB_DIR)
+LDLIBS        := \
+    -L$(DS_LIB_DIR)    -lDataStructures \
+    -L$(TP_LIB_DIR)    -larrow -lparquet -lMLIRIR -lMLIRSupport -lLLVMOption -lLLVMSupport -lLLVMDemangle -lLLVMCore -lspdlog -lfmt      
+
+# Source files
+SRC           := CSVPlugIn.cpp
+OBJ           := $(SRC:.cpp=.o)
+LIB_NAME      := libCsvIO.so
+
+.PHONY: all clean
+
+all: $(LIB_NAME)
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(LIB_NAME): $(OBJ)
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDLIBS)
+
 clean:
-	rm -rf CsvIO.o libCsvIO.so
+	rm -f $(OBJ) $(LIB_NAME)
