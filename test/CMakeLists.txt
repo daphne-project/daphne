@@ -83,6 +83,7 @@ set(TEST_SOURCES
 
         runtime/local/io/ReadCsvTest.cpp
         runtime/local/io/FileIOTest.cpp
+        runtime/local/io/FileIOBenchmarks.cpp
         runtime/local/io/ReadParquetTest.cpp
         runtime/local/io/ReadMMTest.cpp
         runtime/local/io/WriteDaphneTest.cpp

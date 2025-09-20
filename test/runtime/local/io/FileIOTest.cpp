@@ -1,5 +1,4 @@
 #include <iostream>
-#define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include <catch.hpp>
 
 #include <string>
@@ -215,8 +214,9 @@ TEST_CASE("FileIOCatalogParser parses options correctly", "[io][catalog]") {
     REQUIRE(opts.extra.size() == 4);
     CHECK(opts.extra.at("delimiter") == ",");
     CHECK(opts.extra.at("hasHeader") == "false");
-    CHECK(opts.extra.at("threads") == "4");
+    CHECK(opts.extra.at("threads") == "16");
     CHECK(opts.extra.at("dateFormat") == "YYYY-MM-DD");
+    FileIORegistry::instance().clear();
 }
 
 
@@ -271,6 +271,7 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header u
     // Step 6: Cleanup
     DataObjectFactory::destroy(m);
     DataObjectFactory::destroy(optsFrame);
+    FileIORegistry::instance().clear();
 }
 
 TEMPLATE_PRODUCT_TEST_CASE("FileIO ReadParquet, DenseMatrix", TAG_IO, (DenseMatrix), (double)) {
@@ -382,6 +383,7 @@ TEST_CASE("FileIOw parquet_write_frame writes Frame to Parquet", "[parquet][writ
 
     // Cleanup
     std::filesystem::remove(outPath);
+    FileIORegistry::instance().clear();
 }
 
 TEST_CASE("FileIOw parquet_write writes DenseMatrix<double> to Parquet", "[parquet][write]") {
@@ -439,176 +441,6 @@ TEST_CASE("FileIOw parquet_write writes DenseMatrix<double> to Parquet", "[parqu
 
     // Cleanup (optional)
     std::filesystem::remove(outPath);
-}
-
-
-//#######################################################
-//                    BENCHMARK
-//#######################################################
-
-TEMPLATE_PRODUCT_TEST_CASE("FileIO_Benchmark double parquet into a densematrix",
-                           TAG_IO, (DenseMatrix), (double))
-{
-    using DT = TestType;
-    FileIORegistry::instance().clear();
-    FileIORegistry &registry = FileIORegistry::instance();
-    DT *m1 = nullptr;
-    DT *m2 = nullptr;
-
-    FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json",registry));
-
-    BENCHMARK("read double parquet into a DenseMatrix with 1 thread") {
-        read(m1, "scripts/examples/extensions/parquetReader/random_doubles2.parquet", emptyFrame, ctx);
-        REQUIRE(m1->getNumRows() == 3000000);
-        REQUIRE(m1->getNumCols() == 16);
-    };
-    REQUIRE_NOTHROW(m1->get(1,1));
-
-    std::vector<Structure*> columns(1);
-
-    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
-
-    auto* val1 = keyCol->getValues();
-
-    val1[0] = "16";
-
-    columns[0] = keyCol;
-
-    const char* labels[1] = {"threads"};
-
-    Frame* optsFrame = nullptr;
-    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
-
-    BENCHMARK("read double parquet into a DenseMatrix with 16 thread") {
-        read(m2, "scripts/examples/extensions/parquetReader/random_doubles2.parquet", optsFrame, ctx);
-        REQUIRE(m2->getNumRows() == 3000000);
-        REQUIRE(m2->getNumCols() == 16);
-    };
-
-    REQUIRE(*m1 == *m2);
-    DataObjectFactory::destroy(m1);
-    DataObjectFactory::destroy(m2);
-
-    FileIORegistry::instance().clear();
-
-}
-
-TEMPLATE_PRODUCT_TEST_CASE("FileIO Benchmark double parquet into a Frame",
-                           TAG_IO, (DenseMatrix), (double))
-{
-    FileIORegistry::instance().clear();
-    FileIORegistry &registry = FileIORegistry::instance();
-    Frame *m1 = nullptr;
-    Frame *m2 = nullptr;
-
-    FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json",registry));
-
-    BENCHMARK("read double parquet into a Frame with 1 thread") {
-        read(m1, "scripts/examples/extensions/parquetReader/random_doubles.parquet", emptyFrame, ctx);
-        REQUIRE(m1->getNumRows() == 3000000);
-        REQUIRE(m1->getNumCols() == 16);
-    };
-    std::vector<Structure*> columns(1);
-
-    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
-
-    auto* val1 = keyCol->getValues();
-
-    val1[0] = "16";
-
-    columns[0] = keyCol;
-
-    const char* labels[1] = {"threads"};
-
-    Frame* optsFrame = nullptr;
-    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
-
-    BENCHMARK("read double parquet into a Frame with 16 thread") {
-        read(m2, "scripts/examples/extensions/parquetReader/random_doubles.parquet", optsFrame, ctx);
-        REQUIRE(m2->getNumRows() == 3000000);
-        REQUIRE(m2->getNumCols() == 16);
-    };
-
-    REQUIRE(*m1 == *m2);
-    DataObjectFactory::destroy(m1);
-    DataObjectFactory::destroy(m2);
-
-    FileIORegistry::instance().clear();
-
-}
-
-
-TEMPLATE_PRODUCT_TEST_CASE("FileIOs CSV Reader into matrix overhead: default vs options-frame",
-                           TAG_IO, (DenseMatrix), (std::string))
-{
-    //Frame* optsFrame = nullptr;
-    using DT = TestType;
-    FileIORegistry::instance().clear();
-    FileIORegistry &registry = FileIORegistry::instance();
-    DT *nm = nullptr;
-    DT *pm = nullptr;
-    FileIOCatalogParser parser;
-
-
-    BENCHMARK("read csv with built-in into a DenseMatrix") {
-        read(nm, "scripts/examples/extensions/builtInIO/random_data2.csv", emptyFrame, ctx);
-        REQUIRE(nm->getNumRows() == 1000000);
-        REQUIRE(nm->getNumCols() == 6);
-    };
-
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/builtInIO/benchmark-defaults.json",registry));
-
-
-    BENCHMARK("read csv with built-in as plug-in with default arguements into DenseMatrix") {
-        //DT *m = nullptr;
-        read(pm,"scripts/examples/extensions/builtInIO/random_data2.csv", emptyFrame, ctx);
-        REQUIRE(pm->getNumRows() == 1000000);
-        REQUIRE(pm->getNumCols() == 6);
-        //DataObjectFactory::destroy(m);
-    };
-
-    REQUIRE(*nm == *pm);
-
-    FileIORegistry::instance().clear();
-    DataObjectFactory::destroy(nm);
-    DataObjectFactory::destroy(pm);
-
-}
-
-TEMPLATE_PRODUCT_TEST_CASE("FileIOa CSV Reader into Frame overhead: default vs options-frame",
-                           TAG_IO, (DenseMatrix), (std::string))
-{
-    //Frame* optsFrame = nullptr;
-    FileIORegistry::instance().clear();
-    FileIORegistry &registry = FileIORegistry::instance();
-    FileIOCatalogParser parser;
-    Frame *nf = nullptr;
-    Frame *pf = nullptr;
-
-    BENCHMARK("read csv with built-in into a Frame") {
-        read(nf, "scripts/examples/extensions/builtInIO/random_data.csv", emptyFrame, ctx);
-        REQUIRE(nf->getNumRows() == 1000000);
-        REQUIRE(nf->getNumCols() == 6);
-    };
-
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/builtInIO/benchmark-defaults.json",registry));
-
-    BENCHMARK("read csv with built-in as plug-in with default arguements into Frame") {
-        read(pf,"scripts/examples/extensions/builtInIO/random_data.csv", emptyFrame, ctx);
-        REQUIRE(pf->getNumRows() == 1000000);
-        REQUIRE(pf->getNumCols() == 6);
-    };
-    
-    //nf->print(std::cout);
-    //pf->print(std::cout);
-
-    REQUIRE(*nf == *pf);
-
-    DataObjectFactory::destroy(nf);
-    DataObjectFactory::destroy(pf);
-
     FileIORegistry::instance().clear();
 }
 
@@ -628,46 +460,12 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO_parquetProbe_1_thread",
     FileIORegistry::instance().clear();
     FileIORegistry &registry = FileIORegistry::instance();
     FileIOCatalogParser parser;
-    const std::string path =
-        "scripts/examples/extensions/parquetReader/random_doubles2.parquet";
-
-    DT* m0 = nullptr;
-
-
-    auto t00 = std::chrono::steady_clock::now();
-    read(m0, path.c_str(), emptyFrame, ctx);            // your existing call
-    auto t10 = std::chrono::steady_clock::now();
-    REQUIRE(m0 != nullptr);
-
-    const size_t rows0 = m0->getNumRows();
-    const size_t cols0 = m0->getNumCols();
-
-    // Force full decode: touch data
-    double checksum0 = 0.0;
-    for (size_t i = 0; i < rows0; ++i)
-        for (size_t j = 0; j < cols0; ++j)
-            checksum0 += m0->get(i, j);
-
-    const double wall_s0 = std::chrono::duration<double>(t10 - t00).count();
-    const size_t peak_bytes0 = peak_rss_bytes();
-
-    nlohmann::json j0{
-        {"tool","daphne"},
-        {"file",path},
-        {"rows",rows0},
-        {"cols",cols0},
-        {"checksum",checksum0},
-        {"wall_s",wall_s0},
-        {"peak_rss_bytes",peak_bytes0}
-    };
-    std::cout << "PROBE " << j0.dump() << "\n";
+    const std::string path = "scripts/examples/extensions/parquetReader/random_doubles2.parquet";
 
     FileIORegistry::instance().clear();
 
     try {
-        std::cerr << "[A] before parse\n";
         parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry);
-        std::cerr << "[B] after parse\n";
     } catch (const std::length_error& e) {
         std::cerr << "length_error in parseFileIOCatalog: " << e.what() << "\n";
         throw; // or FAIL();
@@ -754,12 +552,8 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO_parquetProbe_1_thread",
     std::cout << "PROBE " << j1.dump() << "\n";
 
     REQUIRE(*m == *m1);
-    REQUIRE(*m0 == *m1);
     DataObjectFactory::destroy(m);
     DataObjectFactory::destroy(m1);
-    DataObjectFactory::destroy(m0);
-
-
 }
 
 TEST_CASE("FileIO_csvProbe_1_thread", "[FileIO][Parquet][Probe]") {
@@ -823,66 +617,35 @@ TEST_CASE("FileIO_csvProbe_1_thread", "[FileIO][Parquet][Probe]") {
     };
     std::cout << "PROBE " << j1.dump() << "\n";
 
+    DT *m2 = nullptr;
+
+    auto t000 = std::chrono::steady_clock::now();
+    read(m2, path.c_str(), emptyFrame, ctx);            // your existing call
+    auto t111 = std::chrono::steady_clock::now();
+    REQUIRE(m2 != nullptr);
+
+    const size_t rows1 = m2->getNumRows();
+    const size_t cols1 = m2->getNumCols();
+
+    const double wall_s1 = std::chrono::duration<double>(t111 - t000).count();
+    const size_t peak_bytes1 = peak_rss_bytes();
+
+    nlohmann::json j2{
+        {"tool","daphne"},
+        {"file",path},
+        {"rows",rows1},
+        {"cols",cols1},
+        {"wall_s",wall_s1},
+        {"peak_rss_bytes",peak_bytes1}
+    };
+    std::cout << "PROBE " << j2.dump() << "\n";
+
     //f1->print(std::cout);
 
     //REQUIRE(*m == *m1);
     DataObjectFactory::destroy(m);
     DataObjectFactory::destroy(m1);
+    DataObjectFactory::destroy(m2);
 
-}
-
-/*TEST_CASE("FileIO_ParquetProbe_16_threads", "[FileIO][Parquet][Probe]") {
-    using DT = DenseMatrix<double>;
     FileIORegistry::instance().clear();
-    FileIORegistry &registry = FileIORegistry::instance();
-    FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(
-        "scripts/examples/extensions/parquetReader/parquet.json", registry));
-
-    const std::string path =
-        "scripts/examples/extensions/parquetReader/random_doubles2.parquet";
-
-    DT* m = nullptr;
-        std::vector<Structure*> columns(1);
-
-    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
-
-    auto* val1 = keyCol->getValues();
-
-    val1[0] = "16";
-
-    columns[0] = keyCol;
-
-    const char* labels[1] = {"threads"};
-
-    Frame* optsFrame = nullptr;
-    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
-
-    auto t0 = std::chrono::steady_clock::now();
-    read(m, path.c_str(), optsFrame, ctx);            // your existing call
-    auto t1 = std::chrono::steady_clock::now();
-    REQUIRE(m != nullptr);
-
-    const size_t rows = m->getNumRows();
-    const size_t cols = m->getNumCols();
-
-    // Force full decode: touch data
-    double checksum = 0.0;
-    for (size_t i = 0; i < rows; ++i)
-        for (size_t j = 0; j < cols; ++j)
-            checksum += m->get(i, j);
-
-    const double wall_s = std::chrono::duration<double>(t1 - t0).count();
-    const size_t peak_bytes = peak_rss_bytes();
-
-    nlohmann::json j{
-        {"tool","daphne"},
-        {"file",path},
-        {"rows",rows},
-        {"cols",cols},
-        {"checksum",checksum},
-        {"wall_s",wall_s},
-        {"peak_rss_bytes",peak_bytes}
-    };
-    std::cout << "PROBE " << j.dump() << "\n";
-}*/
+}

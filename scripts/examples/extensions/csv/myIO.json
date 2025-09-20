@@ -8,7 +8,19 @@
     "options": {
       "delimiter": ",",
       "hasHeader": "false",
-      "threads": "4",
+      "threads": "16",
+      "dateFormat": "YYYY-MM-DD"
+    }
+  },
+  {
+    "extension": ".csv",
+    "readerFuncName": "csv_read_frame",
+    "writerFuncName": "",
+    "libPath": "libCsvIO.so",
+    "type": "Frame",
+    "options": {
+      "delimiter": ",",
+      "hasHeader": "false",
       "dateFormat": "YYYY-MM-DD"
     }
   }
