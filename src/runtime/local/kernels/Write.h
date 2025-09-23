@@ -66,13 +66,14 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
         try {
             auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
             IODataType typeHash = DENSEMATRIX;
-            auto writer = registry.getWriter(ext, typeHash);
+            std::string engine = extractEngineFromFrame(optsFrame);
+            auto writer = registry.getWriter(ext, typeHash, engine);
             FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
 
             MetaDataParser::writeMetaData(filename, fmd);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
             
             writer(arg, fmd, filename, mergedOpts, ctx);
             //std::cout << "using registry\n";
@@ -120,7 +121,8 @@ template <> struct Write<Frame> {
         try {
             auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
             IODataType typeHash = FRAME;
-            auto writer = registry.getWriter(ext, typeHash);
+            std::string engine = extractEngineFromFrame(optsFrame);
+            auto writer = registry.getWriter(ext, typeHash, engine);
             std::vector<ValueTypeCode> vtcs;
             std::vector<std::string> labels;
             for (size_t i = 0; i < arg->getNumCols(); i++) {
@@ -131,7 +133,7 @@ template <> struct Write<Frame> {
             MetaDataParser::writeMetaData(filename, fmd);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
             return;

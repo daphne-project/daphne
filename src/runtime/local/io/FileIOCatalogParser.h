@@ -53,7 +53,8 @@ inline void FileIOCatalogParser::parseFileIOCatalog(
         const std::string wtrName  = entry.at("writerFuncName").get<std::string>();
         const std::string libRel   = entry.at("libPath").get<std::string>();
         const std::string libPath  = (dir / libRel).string();
-
+        const std::string engine = entry.value("engine", "default");
+        const int priority       = entry.value("priority", 0);
         const std::string typeName  = entry.value("type", "Frame");
 
         // Map typeName string to actual type_info
@@ -77,7 +78,7 @@ inline void FileIOCatalogParser::parseFileIOCatalog(
             }
         }
 
-        registry.registerLazy(ext, typeHash, libPath, rdrName, wtrName, opts);
+        registry.registerLazy(ext, typeHash, libPath, rdrName, wtrName, opts, engine, priority);
 
 
         // Note: keep 'handle' loaded for process lifetime to preserve symbols

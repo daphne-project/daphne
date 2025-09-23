@@ -50,6 +50,7 @@ TEST_CASE("FileIOCatalogParser registers CSV plugin via registry", "[io][catalog
     
     REQUIRE_NOTHROW(registry.getReader(".csv", matrixHash));
     REQUIRE_NOTHROW(registry.getWriter(".csv", matrixHash));
+    registry.clear();
 }
 
 TEST_CASE("FileIORegistry registerReader and getReader", "[io][registry]") {
@@ -73,6 +74,7 @@ TEST_CASE("FileIORegistry registerReader and getReader", "[io][registry]") {
     SECTION("Lookup non-registered reader throws") {
         REQUIRE_THROWS_AS(registry.getReader(".unknown", frameHash), std::out_of_range);
     }
+    registry.clear();
 }
 
 TEST_CASE("FileIOPlugin dynamic load and registration validity", "[io][plugin]") {
@@ -207,7 +209,7 @@ TEST_CASE("FileIOCatalogParser parses options correctly", "[io][catalog]") {
     auto &registry = FileIORegistry::instance();
     REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
 
-    IOOptions opts = registry.getOptions(".csv", IODataType::DENSEMATRIX);
+    IOOptions opts = registry.getOptions(".csv", IODataType::DENSEMATRIX,"default");
 
     // Validate options fields
 
@@ -648,4 +650,69 @@ TEST_CASE("FileIO_csvProbe_1_thread", "[FileIO][Parquet][Probe]") {
     DataObjectFactory::destroy(m2);
 
     FileIORegistry::instance().clear();
+}
+
+
+static std::atomic<int> MYREADER_CALLS{0};
+static std::atomic<int> YOURREADER_CALLS{0};
+
+
+static void myReader(void* res, const FileMetaData&, const char*, const IOOptions&, DaphneContext*) {
+    MYREADER_CALLS.fetch_add(1);
+    *reinterpret_cast<Frame**>(res) = DataObjectFactory::create<Frame>(0,0,nullptr,nullptr,false);
+}
+static void yourReader(void* res, const FileMetaData&, const char*, const IOOptions&, DaphneContext*) {
+    YOURREADER_CALLS.fetch_add(1);
+    *reinterpret_cast<Frame**>(res) = DataObjectFactory::create<Frame>(0,0,nullptr,nullptr,false);
+}
+
+TEST_CASE("FileIO Direct call proves selected engine runs") {
+    auto &reg = FileIORegistry::instance();
+    reg.clear();
+    MYREADER_CALLS = 0; YOURREADER_CALLS = 0;
+
+    IOOptions opts;
+    // Register both engines for the same (.csv, FRAME)
+    reg.registerReader(".csv", IODataType::FRAME, "myReader", 5,  opts, myReader);
+    reg.registerReader(".csv", IODataType::FRAME, "yourReader",10, opts, yourReader);
+
+    std::vector<Structure*> columns(1);
+    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    auto* val1 = keyCol->getValues();
+    val1[0] = "myReader";
+    columns[0] = keyCol;
+    const char* labels[1] = {"engine"};
+    Frame* optsFrame = nullptr;
+    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
+
+    // ----- A) No engine hint -> highest priority -> yourReader -----
+    {
+        Frame* out = nullptr;
+        REQUIRE_NOTHROW(read(out, CSV_FILE.c_str(), emptyFrame, ctx));
+        REQUIRE(YOURREADER_CALLS.load() == 1);
+        REQUIRE(MYREADER_CALLS.load() == 0);
+        DataObjectFactory::destroy(out);
+    }
+
+    // ----- B) Explicit engine -> myReader even if lower priority -----
+    {
+        Frame* out = nullptr;
+        read(out, CSV_FILE.c_str(), optsFrame, ctx);
+        REQUIRE(YOURREADER_CALLS.load() == 1);
+        REQUIRE(MYREADER_CALLS.load() == 1);
+        DataObjectFactory::destroy(out);
+    }
+
+    reg.clear();
+}
+
+TEST_CASE("FileIO Duplicate Registration is rejected") {
+    auto &reg = FileIORegistry::instance();
+    reg.clear();
+    IOOptions opts;
+
+    reg.registerReader(".csv", IODataType::FRAME, "myReader", 5,  opts, myReader);
+    REQUIRE_THROWS( reg.registerReader(".csv", IODataType::FRAME, "myReader",5, opts, yourReader));
+
+    reg.clear();
 }

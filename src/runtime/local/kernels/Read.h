@@ -46,39 +46,35 @@ static Frame *dummyFrame = DataObjectFactory::create<Frame>(0, 0, nullptr, nullp
 // ****************************************************************************
 static IOOptions mergeOptionsFromFrame(const std::string &ext,
                                        IODataType         dt,
+                                       const std::string &engine, // NEW
                                        Frame             *optsFrame,
                                        DCTX(ctx))
 {
-    // 1) Retrieve the plugin's default options
+    auto& reg = ctx ? ctx->config.registry : FileIORegistry::instance();
 
-    auto& reg = ctx ? ctx->config.registry : FileIORegistry::instance();  
-    /*std::cerr << "=== Registry Entries ===\n";
-    for(const auto &kv : reg.getAllReaders()) {
-    std::cerr << "  ext='" << kv.first.first
-                << "'  dt="  << kv.first.second << "\n";
-    }
-    std::cerr << "Looking up ext='" << ext << "' dt=" << dt << "\n";*/
+    // Ask the registry for defaults for this (ext, dt, engine).
+    // If engine == "", registry should pick highest-priority impl.
+    const IOOptions &defaults = reg.getOptions(ext, dt, engine);
 
-
-    const IOOptions &defaults = reg.getOptions(ext, dt);
-    
-    // 2) Copy defaults into merged
     IOOptions merged = defaults;
 
-    // 3) If optsFrame is non-null, override using first row values
+    //reg.dumpReaders();
+
     if(optsFrame != nullptr && optsFrame->getLabels()[0] != "dummy") {
         const size_t nRows = optsFrame->getNumRows();
         const size_t nCols = optsFrame->getNumCols();
+        if(nRows == 0) return merged;
 
-        if(nRows == 0)
-            return merged;
         const std::string* labels = optsFrame->getLabels();
 
         for(size_t colIdx = 0; colIdx < nCols; ++colIdx) {
             const std::string &key = labels[colIdx];
-            std::string value;
 
-            // Try to read the value as a string (most general)
+            // Ignore non-plugin selection knobs if user sent them in the frame.
+            if(key == "engine" || key == "priority")
+                continue;
+
+            std::string value;
             if(auto* strCol = dynamic_cast<DenseMatrix<std::string>*>(optsFrame->getColumn<std::string>(colIdx))) {
                 value = strCol->get(0, 0);
             }
@@ -95,8 +91,11 @@ static IOOptions mergeOptionsFromFrame(const std::string &ext,
                 throw std::runtime_error("Unsupported column type for option: " + key);
             }
 
-            // Only override known keys
-            if(merged.extra.find(key) == merged.extra.end()) {
+            // Only override known plugin options
+            auto itKnown = merged.extra.find(key);
+            if(itKnown == merged.extra.end()) {
+                // silently ignore unknown keys instead of throwing if you prefer:
+                // continue;
                 throw std::runtime_error("Unknown option '" + key + "'");
             }
 
@@ -107,6 +106,31 @@ static IOOptions mergeOptionsFromFrame(const std::string &ext,
     return merged;
 }
 
+
+// Extract "engine" (and ignore "priority") from the options Frame if present.
+// Returns "" if not provided (so registry picks highest-priority default).
+static std::string extractEngineFromFrame(Frame *optsFrame) {
+    
+    if(!optsFrame) return "";
+    if(optsFrame->getNumRows() == 0) return "";
+    const auto *labels = optsFrame->getLabels();
+    const size_t nCols = optsFrame->getNumCols();
+
+    for(size_t c = 0; c < nCols; ++c) {
+        if(labels[c] == "engine") {
+            if(auto* strCol = dynamic_cast<DenseMatrix<std::string>*>(optsFrame->getColumn<std::string>(c)))
+                return strCol->get(0, 0);
+            // allow non-string columns too (we’ll stringify)
+            if(auto* boolCol = dynamic_cast<DenseMatrix<bool>*>(optsFrame->getColumn<bool>(c)))
+                return boolCol->get(0, 0) ? "true" : "false";
+            if(auto* intCol = dynamic_cast<DenseMatrix<int64_t>*>(optsFrame->getColumn<int64_t>(c)))
+                return std::to_string(intCol->get(0, 0));
+            if(auto* floatCol = dynamic_cast<DenseMatrix<double>*>(optsFrame->getColumn<double>(c)))
+                return std::to_string(floatCol->get(0, 0));
+        }
+    }
+    return "";
+}
 
 
 // ****************************************************************************
@@ -140,15 +164,18 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
     {
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
-
+        IODataType typeHash = DENSEMATRIX;
         try {
-            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
-            IODataType typeHash = DENSEMATRIX;
-            auto reader = registry.getReader(ext, typeHash);
+            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();
 
-            // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
-            //std::cout << "using registry\n";
+            // NEW: get the engine (may be "")
+            std::string engine = extractEngineFromFrame(optsFrame);
+
+            // NEW: select reader with engine hint
+            auto reader = registry.getReader(ext, typeHash, engine);
+
+            // Merge user overrides using defaults for that engine
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
 
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
@@ -210,16 +237,19 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
     {
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
-
+        IODataType typeHash = CSRMATRIX;
         try {
-            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
-            IODataType typeHash = CSRMATRIX;
-            auto reader = registry.getReader(ext, typeHash);
+            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();
 
-            // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
+            // NEW: get the engine (may be "")
+            std::string engine = extractEngineFromFrame(optsFrame);
 
-            //std::cout << "using registry\n";
+            // NEW: select reader with engine hint
+            auto reader = registry.getReader(ext, typeHash, engine);
+
+            // Merge user overrides using defaults for that engine
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
+
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
         }
@@ -266,16 +296,20 @@ template <> struct Read<Frame> {
     {
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
+        IODataType typeHash = FRAME;
 
         try {
-            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
-            IODataType typeHash = FRAME;
-            auto reader = registry.getReader(ext, typeHash);
+            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();
 
-            // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, optsFrame,ctx);
+            // NEW: get the engine (may be "")
+            std::string engine = extractEngineFromFrame(optsFrame);
 
-            //std::cout << "using registry\n";
+            // NEW: select reader with engine hint
+            auto reader = registry.getReader(ext, typeHash, engine);
+
+            // Merge user overrides using defaults for that engine
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
+
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
         } catch (const std::out_of_range &) {
