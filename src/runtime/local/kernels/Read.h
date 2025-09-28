@@ -168,6 +168,9 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
         try {
             auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();
 
+            //registry.dumpReaders();
+            //registry.dumpWriters();
+
             // NEW: get the engine (may be "")
             std::string engine = extractEngineFromFrame(optsFrame);
 
@@ -181,26 +184,11 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
             return;
         }
         catch (const std::out_of_range &e) {
-            //std::cout << "Caught: " << e.what();
+            std::cerr << "no suitable reader found in the registry";
         }
         //std::cout << "d";
 
-        if (ext == ".csv") {
-            if (res == nullptr)
-                res = DataObjectFactory::create<DenseMatrix<VT>>(fmd.numRows, fmd.numCols, false);
-            readCsv(res, filename, fmd.numRows, fmd.numCols, ',');
-        } else if (ext == ".mtx") {
-            if constexpr (std::is_same<VT, std::string>::value)
-                throw std::runtime_error("reading string-valued MatrixMarket files is not supported (yet)");
-            else
-                readMM(res, filename);
-        } else if (ext == ".parquet") {
-            
-            if (res == nullptr)
-                res = DataObjectFactory::create<DenseMatrix<VT>>(fmd.numRows, fmd.numCols, false);
-            readParquet(res, filename, fmd.numRows, fmd.numCols);
-            
-        } else if (ext == ".dbdf") {
+        if (ext == ".dbdf") {
             if constexpr (std::is_same<VT, std::string>::value)
                 throw std::runtime_error("reading string-valued DAPHNE binary format files is not supported (yet)");
             else
@@ -297,12 +285,15 @@ template <> struct Read<Frame> {
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
         IODataType typeHash = FRAME;
-
+        std::string engine;
         try {
             auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();
 
+            //registry.dumpReaders();
+            //registry.dumpWriters();
+            
             // NEW: get the engine (may be "")
-            std::string engine = extractEngineFromFrame(optsFrame);
+            engine = extractEngineFromFrame(optsFrame);
 
             // NEW: select reader with engine hint
             auto reader = registry.getReader(ext, typeHash, engine);
@@ -313,54 +304,10 @@ template <> struct Read<Frame> {
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
         } catch (const std::out_of_range &) {
-            // no plugin, fall back to built-in
+            throw std::runtime_error("No suitable reader found in the registry");
         }
         //std::cout << "d";
 
-        if (ext == ".csv") {
-            ValueTypeCode *schema;
-            if (fmd.isSingleValueType) {
-                schema = new ValueTypeCode[fmd.numCols];
-                for (size_t i = 0; i < fmd.numCols; i++)
-                    schema[i] = fmd.schema[0];
-            } else
-                schema = fmd.schema.data();
-
-            std::string *labels;
-            if (fmd.labels.empty())
-                labels = nullptr;
-            else
-                labels = fmd.labels.data();
-
-            if (res == nullptr)
-                res = DataObjectFactory::create<Frame>(fmd.numRows, fmd.numCols, schema, labels, false);
-
-            readCsv(res, filename, fmd.numRows, fmd.numCols, ',', schema);
-
-            if (fmd.isSingleValueType)
-                delete[] schema;
-        } else if (ext == ".parquet") {
-
-            ValueTypeCode *schema;
-            if (fmd.isSingleValueType) {
-                schema = new ValueTypeCode[fmd.numCols];
-                for (size_t i = 0; i < fmd.numCols; i++)
-                    schema[i] = fmd.schema[0];
-            } else
-                schema = fmd.schema.data();
-
-            std::string *labels;
-            if (fmd.labels.empty())
-                labels = nullptr;
-            else
-                labels = fmd.labels.data();
-            
-            if (res == nullptr)
-                res = DataObjectFactory::create<Frame>(fmd.numRows, fmd.numCols, schema, labels,  false);
-            readParquet(res, filename, fmd.numRows, fmd.numCols,schema);
-            
-        }  else
-            throw std::runtime_error("file extension not supported: '" + ext + "'");
     }
 }; // end Read<Frame>
 

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include "runtime/local/io/FileIOCatalogParser.h"
+#include "runtime/local/io/FileIORegistry.h"
 #include <runtime/local/datagen/GenGivenVals.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/datastructures/Frame.h>
@@ -28,9 +30,16 @@
 
 static Frame *emptyFrame = DataObjectFactory::create<Frame>(0, 0, nullptr, nullptr, false);
 
+
+static void loadBuiltInIOPlugins() {
+    FileIOCatalogParser parser;
+    parser.parseFileIOCatalog("scripts/examples/extensions/builtInIO/BuiltIns.json", FileIORegistry::instance());
+    FileIORegistry::instance().captureBaseline();
+}
+
 TEMPLATE_PRODUCT_TEST_CASE("Read CSV", TAG_KERNELS, (DenseMatrix), (double)) {
     using DT = TestType;
-
+    loadBuiltInIOPlugins();
     DT *m = nullptr;
 
     size_t numRows = 2;

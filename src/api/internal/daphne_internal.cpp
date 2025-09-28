@@ -634,16 +634,10 @@ int startDAPHNE(int argc, const char **argv, DaphneLibResult *daphneLibRes, int 
     FileIOCatalogParser fileIOParser;
     FileIORegistry& registry = executor.getUserConfig().registry;
     try {
+        fileIOParser.parseFileIOCatalog("scripts/examples/extensions/builtInIO/BuiltIns.json", registry);
+        registry.captureBaseline();
         if (!FileIOExt.empty()) {
             fileIOParser.parseFileIOCatalog(FileIOExt, registry); 
-            /*std::cerr << "[info] Loaded FileIO catalog from " << FileIOExt << "\n";
-
-            std::cerr << "=== Registry Entries ===\n";
-            for(const auto &kv : registry.getAllOptions()) {
-            std::cerr << "  ext='" << kv.first.first
-                        << "'  dt="  << kv.first.second << "\n";
-            }*/
-
         }
     }
     catch (const std::exception &e) {

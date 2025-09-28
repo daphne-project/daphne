@@ -9,6 +9,7 @@
 #include <string>
 #include <tuple>
 
+
 // Forward decls from your codebase
 struct FileMetaData;
 class DaphneContext;
@@ -298,14 +299,28 @@ public:
         os << std::flush;
     }
 
-    void clear() {
+
+    // Call this once right after you load BuiltIns.json
+    void captureBaseline() {
         std::lock_guard<std::mutex> lk(mtx);
-        readers.clear();
-        writers.clear();
-        optionsMap.clear();
-        lazySpecs.clear();
-        libHandles.clear();
+        baseline_readers = readers;
+        baseline_writers = writers;
+        baseline_options = optionsMap;
+        baseline_lazy    = lazySpecs;
+        baselineCaptured = true;
     }
+
+    // Reset registry back to the captured baseline (keeps built-ins, drops recent)
+    void resetToBaseline() {
+        std::lock_guard<std::mutex> lk(mtx);
+        if (!baselineCaptured) { readers.clear(); writers.clear(); optionsMap.clear(); lazySpecs.clear(); return; }
+        readers    = baseline_readers;
+        writers    = baseline_writers;
+        optionsMap = baseline_options;
+        lazySpecs  = baseline_lazy;
+        // libHandles: you can keep them; or prune ones not referenced if needed.
+    }
+
 
 private:
     using Key4 = std::tuple<std::string /*ext*/,
@@ -393,6 +408,12 @@ private:
     std::map<Key4, GenericWriter> writers;
     std::map<Key4, IOOptions>     optionsMap;
     std::map<Key4, LazySpec>      lazySpecs;
+
+    std::map<Key4, GenericReader> baseline_readers;
+    std::map<Key4, GenericWriter> baseline_writers;
+    std::map<Key4, IOOptions>     baseline_options;
+    std::map<Key4, LazySpec>      baseline_lazy;
+    bool baselineCaptured = false;
 
     // Keep lib handles alive (once per libPath)
     std::map<std::string, void*>  libHandles;
