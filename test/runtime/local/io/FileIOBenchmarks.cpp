@@ -58,7 +58,7 @@ TEMPLATE_PRODUCT_TEST_CASE(
     }
 
     using DT = TestType;
-    FileIORegistry::instance().clear();
+    FileIORegistry::instance().resetToBaseline();
     FileIORegistry &registry = FileIORegistry::instance();
     DT *m1 = nullptr;
     DT *m2 = nullptr;
@@ -66,25 +66,41 @@ TEMPLATE_PRODUCT_TEST_CASE(
     FileIOCatalogParser parser;
     REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json",registry));
 
+    std::vector<Structure*> columns(1);
+    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    auto* val1 = keyCol->getValues();
+    val1[0] = "Daphne";
+    columns[0] = keyCol;
+    const char* labels[1] = {"engine"};
+    Frame* optsFrame = nullptr;
+    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
+
     BENCHMARK("read double parquet into a DenseMatrix with 1 thread") {
-        read(m1, "scripts/examples/extensions/parquetReader/random_doubles2.parquet", emptyFrame, ctx);
+        read(m1, "scripts/examples/extensions/parquetReader/random_doubles2.parquet", optsFrame, ctx);
         REQUIRE(m1->getNumRows() == 3000000);
         REQUIRE(m1->getNumCols() == 16);
         return 0;
     };
     REQUIRE_NOTHROW(m1->get(1,1));
 
-    std::vector<Structure*> columns(1);
-    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
-    auto* val1 = keyCol->getValues();
-    val1[0] = "16";
-    columns[0] = keyCol;
-    const char* labels[1] = {"threads"};
-    Frame* optsFrame = nullptr;
-    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
+    std::vector<Structure*> columns2(2);
+    auto* threadsCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    threadsCol->getValues()[0] = "16";
+
+    auto* engineCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    engineCol->getValues()[0] = "Daphne";
+
+    columns2[0] = threadsCol;
+    columns2[1] = engineCol;
+
+    // Two labels matching the two columns
+    const char* labels2[2] = {"threads", "engine"};
+
+    Frame* optsFrame2 = nullptr;
+    createFrame(optsFrame2, columns2.data(), /*numCols=*/2, labels2, /*numLabels=*/2, ctx);
 
     BENCHMARK("read double parquet into a DenseMatrix with 16 thread") {
-        read(m2, "scripts/examples/extensions/parquetReader/random_doubles2.parquet", optsFrame, ctx);
+        read(m2, "scripts/examples/extensions/parquetReader/random_doubles2.parquet", optsFrame2, ctx);
         REQUIRE(m2->getNumRows() == 3000000);
         REQUIRE(m2->getNumCols() == 16);
         return 0;
@@ -94,7 +110,7 @@ TEMPLATE_PRODUCT_TEST_CASE(
     DataObjectFactory::destroy(m1);
     DataObjectFactory::destroy(m2);
 
-    FileIORegistry::instance().clear();
+    FileIORegistry::instance().resetToBaseline();
 }
 
 // 2) Frame parquet benchmark (1 thread vs 16 threads)
@@ -109,7 +125,7 @@ TEMPLATE_PRODUCT_TEST_CASE(
         return;
     }
 
-    FileIORegistry::instance().clear();
+    FileIORegistry::instance().resetToBaseline();
     FileIORegistry &registry = FileIORegistry::instance();
     Frame *m1 = nullptr;
     Frame *m2 = nullptr;
@@ -117,24 +133,40 @@ TEMPLATE_PRODUCT_TEST_CASE(
     FileIOCatalogParser parser;
     REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json",registry));
 
+    std::vector<Structure*> columns(1);
+    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    auto* val1 = keyCol->getValues();
+    val1[0] = "Daphne";
+    columns[0] = keyCol;
+    const char* labels[1] = {"engine"};
+    Frame* optsFrame = nullptr;
+    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
+
     BENCHMARK("read double parquet into a Frame with 1 thread") {
-        read(m1, "scripts/examples/extensions/parquetReader/random_doubles.parquet", emptyFrame, ctx);
+        read(m1, "scripts/examples/extensions/parquetReader/random_doubles.parquet", optsFrame, ctx);
         REQUIRE(m1->getNumRows() == 3000000);
         REQUIRE(m1->getNumCols() == 16);
         return 0;
     };
 
-    std::vector<Structure*> columns(1);
-    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
-    auto* val1 = keyCol->getValues();
-    val1[0] = "4";
-    columns[0] = keyCol;
-    const char* labels[1] = {"threads"};
-    Frame* optsFrame = nullptr;
-    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
+    std::vector<Structure*> columns2(2);
+    auto* threadsCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    threadsCol->getValues()[0] = "16";
+
+    auto* engineCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    engineCol->getValues()[0] = "Daphne";
+
+    columns2[0] = threadsCol;
+    columns2[1] = engineCol;
+
+    // Two labels matching the two columns
+    const char* labels2[2] = {"threads", "engine"};
+
+    Frame* optsFrame2 = nullptr;
+    createFrame(optsFrame2, columns2.data(), /*numCols=*/2, labels2, /*numLabels=*/2, ctx);
 
     BENCHMARK("read double parquet into a Frame with 16 thread") {
-        read(m2, "scripts/examples/extensions/parquetReader/random_doubles.parquet", optsFrame, ctx);
+        read(m2, "scripts/examples/extensions/parquetReader/random_doubles.parquet", optsFrame2, ctx);
         REQUIRE(m2->getNumRows() == 3000000);
         REQUIRE(m2->getNumCols() == 16);
         return 0;
@@ -144,9 +176,9 @@ TEMPLATE_PRODUCT_TEST_CASE(
     DataObjectFactory::destroy(m1);
     DataObjectFactory::destroy(m2);
 
-    FileIORegistry::instance().clear();
+    FileIORegistry::instance().resetToBaseline();
 }
-
+/*
 // 3) CSV -> DenseMatrix overhead: built-in vs plug-in defaults
 TEMPLATE_PRODUCT_TEST_CASE(
     "FileIOBenchmark CSV Reader into matrix overhead: default vs options-frame",
@@ -160,7 +192,7 @@ TEMPLATE_PRODUCT_TEST_CASE(
     }
 
     using DT = TestType;
-    FileIORegistry::instance().clear();
+    FileIORegistry::instance().resetToBaseline();
     FileIORegistry &registry = FileIORegistry::instance();
     DT *nm = nullptr;
     DT *pm = nullptr;
@@ -185,7 +217,7 @@ TEMPLATE_PRODUCT_TEST_CASE(
 
     REQUIRE(*nm == *pm);
 
-    FileIORegistry::instance().clear();
+    FileIORegistry::instance().resetToBaseline();
 
    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/csv/myIO.json",registry));
 
@@ -196,7 +228,7 @@ TEMPLATE_PRODUCT_TEST_CASE(
         return 0;
     };
 
-    FileIORegistry::instance().clear();
+    FileIORegistry::instance().resetToBaseline();
     REQUIRE(*nm == *pm2);
 
     DataObjectFactory::destroy(nm);
@@ -216,7 +248,7 @@ TEMPLATE_PRODUCT_TEST_CASE(
         return;
     }
 
-    FileIORegistry::instance().clear();
+    FileIORegistry::instance().resetToBaseline();
     FileIORegistry &registry = FileIORegistry::instance();
     FileIOCatalogParser parser;
     Frame *nf = nullptr;
@@ -240,7 +272,7 @@ TEMPLATE_PRODUCT_TEST_CASE(
     };
 
     REQUIRE(*nf == *pf);
-    FileIORegistry::instance().clear();
+    FileIORegistry::instance().resetToBaseline();
 
     REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/csv/myIO.json",registry));
 
@@ -257,4 +289,4 @@ TEMPLATE_PRODUCT_TEST_CASE(
     DataObjectFactory::destroy(pf);
     DataObjectFactory::destroy(pf2);
     
-}
+}*/

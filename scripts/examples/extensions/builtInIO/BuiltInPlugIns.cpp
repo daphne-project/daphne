@@ -22,6 +22,7 @@
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/datastructures/CSRMatrix.h>
 #include <runtime/local/datastructures/Frame.h>
+#include <parser/metadata/MetaDataParser.h>
 
 #include <util/preprocessor_defs.h>
 #include <runtime/local/io/File.h>
@@ -311,7 +312,6 @@ struct ReadCsvFile<CSRMatrix<VT>> {
 template <>
 struct ReadCsvFile<Frame> {
     static void apply(Frame *&res, const FileMetaData& fmd, struct File *file, IOOptions &opts, DaphneContext *ctx) {
-
         // --- Step 1: Parse basic options ---
         size_t numRows = fmd.numRows;
         size_t numCols = fmd.numCols;
@@ -329,18 +329,8 @@ struct ReadCsvFile<Frame> {
             delim = val[0];
         }
 
-        // --- Step 3: Parse schema from JSON string ---
-        std::vector<ValueTypeCode> schemaVec = fmd.schema;
-
-        // --- Step 4: Create result Frame object ---
-        ValueTypeCode *schemaArr = nullptr;
-        if (!schemaVec.empty()) {
-            schemaArr = new ValueTypeCode[schemaVec.size()];
-            std::copy(schemaVec.begin(), schemaVec.end(), schemaArr);
-        }
-
         if (res == nullptr) {
-            res = DataObjectFactory::create<Frame>(numRows, numCols, schemaArr, nullptr, false);
+            res = DataObjectFactory::create<Frame>(numRows, numCols, fmd.schema.data(), fmd.labels.data(), false);
         }
 
         // --- Step 5: Get raw column data pointers ---
@@ -621,16 +611,38 @@ extern "C" void readCsvFromPath_Frame(void* &res, const FileMetaData& fmd, const
 extern "C" void readCsvFromPath_Dense(void* &res, const FileMetaData &fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
     // e.g. check an opts.extra flag, or peek at the file, etc.
 
-    if(fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F64) {
-        // cast and call the string-instantiation
-        readCsvFromPath<DenseMatrix<double>>(reinterpret_cast<DenseMatrix<double>*&>(res), fmd, filename, opts, ctx);
+    if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F64) {
+    readCsvFromPath<DenseMatrix<double>>(reinterpret_cast<DenseMatrix<double>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F32) {
+        readCsvFromPath<DenseMatrix<float>>(reinterpret_cast<DenseMatrix<float>*&>(res), fmd, filename, opts, ctx);
     }
     else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::UI64) {
-        // cast and call the double-instantiation
         readCsvFromPath<DenseMatrix<uint64_t>>(reinterpret_cast<DenseMatrix<uint64_t>*&>(res), fmd, filename, opts, ctx);
-    } else {
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::UI32) {
+        readCsvFromPath<DenseMatrix<uint32_t>>(reinterpret_cast<DenseMatrix<uint32_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::UI8) {
+        readCsvFromPath<DenseMatrix<uint8_t>>(reinterpret_cast<DenseMatrix<uint8_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::SI64) {
+        readCsvFromPath<DenseMatrix<int64_t>>(reinterpret_cast<DenseMatrix<int64_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::SI32) {
+        readCsvFromPath<DenseMatrix<int32_t>>(reinterpret_cast<DenseMatrix<int32_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::SI8) {
+        readCsvFromPath<DenseMatrix<int8_t>>(reinterpret_cast<DenseMatrix<int8_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::STR) {
         readCsvFromPath<DenseMatrix<std::string>>(reinterpret_cast<DenseMatrix<std::string>*&>(res), fmd, filename, opts, ctx);
     }
+    else {
+        // Fallback: treat as strings
+        readCsvFromPath<DenseMatrix<std::string>>(reinterpret_cast<DenseMatrix<std::string>*&>(res), fmd, filename, opts, ctx);
+    }
+
 }
 
 
@@ -648,5 +660,220 @@ extern "C" void ReadMM_Frame(void* &res, const FileMetaData& fmd, const char* fi
 }
 
 extern "C" void ReadMM_Dense(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
+    if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F64) {
     ReadMM<DenseMatrix<double>>::apply(reinterpret_cast<DenseMatrix<double>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F32) {
+        ReadMM<DenseMatrix<float>>::apply(reinterpret_cast<DenseMatrix<float>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::UI64) {
+        ReadMM<DenseMatrix<uint64_t>>::apply(reinterpret_cast<DenseMatrix<uint64_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::UI32) {
+        ReadMM<DenseMatrix<uint32_t>>::apply(reinterpret_cast<DenseMatrix<uint32_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::UI8) {
+        ReadMM<DenseMatrix<uint8_t>>::apply(reinterpret_cast<DenseMatrix<uint8_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::SI64) {
+        ReadMM<DenseMatrix<int64_t>>::apply(reinterpret_cast<DenseMatrix<int64_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::SI32) {
+        ReadMM<DenseMatrix<int32_t>>::apply(reinterpret_cast<DenseMatrix<int32_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::SI8) {
+        ReadMM<DenseMatrix<int8_t>>::apply(reinterpret_cast<DenseMatrix<int8_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::STR) {
+        throw std::runtime_error("ReadMM_Dense: string-valued MatrixMarket files are not supported");
+    }
+    else {
+        // Sensible default (or throw if you prefer strict typing)
+        ReadMM<DenseMatrix<double>>::apply(reinterpret_cast<DenseMatrix<double>*&>(res), fmd, filename, opts, ctx);
+    }
+}
+
+
+
+//#############################################################
+//                       CSV Writer
+//#############################################################
+
+// ---- helper copied from WriteCsv.h (needed for strings) --------------------
+static inline std::string quoteStrCsvIf_inline(const std::string &s) {
+    if (s.find_first_of(",\n\r\"") != std::string::npos) {
+        std::stringstream strm;
+        strm << '"';
+        for (size_t i = 0; i < s.length(); i++) {
+            char c = s[i];
+            if (c == '"') strm << '"' << '"';
+            else          strm << c;
+        }
+        strm << '"';
+        return strm.str();
+    } else {
+        return s;
+    }
+}
+
+// ======================= DenseMatrix<VT> writers ============================
+
+template<typename VT>
+static inline void dumpDenseToCsv_inline(const DenseMatrix<VT>* arg, File *file) {
+    if (file == nullptr)
+        throw std::runtime_error("WriteCsv: requires a file to be specified (must not be nullptr)");
+
+    const VT *valuesArg = arg->getValues();
+    const size_t rowSkip = arg->getRowSkip();
+    const size_t argNumCols = arg->getNumCols();
+
+    for (size_t i = 0; i < arg->getNumRows(); ++i) {
+        for (size_t j = 0; j < argNumCols; ++j) {
+            if constexpr (std::is_same<VT, std::string>::value) {
+                fprintf(file->identifier, "%s", quoteStrCsvIf_inline(valuesArg[i * rowSkip + j]).c_str());
+            } else {
+                fprintf(file->identifier,
+                        std::is_floating_point<VT>::value ? "%f"
+                        : (std::is_same<VT, long int>::value ? "%ld" : "%d"),
+                        valuesArg[i * rowSkip + j]);
+            }
+            if (j < (arg->getNumCols() - 1)) fprintf(file->identifier, ",");
+            else                             fprintf(file->identifier, "\n");
+        }
+    }
+}
+
+template<typename VT>
+static inline void writeCsvDenseBuiltin_inline(const DenseMatrix<VT>* arg, const char* filename) {
+    File *file = openFileForWrite(filename);
+    FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
+    MetaDataParser::writeMetaData(filename, metaData);
+    dumpDenseToCsv_inline(arg, file);
+    closeFile(file);
+}
+
+extern "C" void WriteCsv_Dense(void const *arg,
+                               const FileMetaData &fmd,
+                               const char *filename,
+                               IOOptions &opts,
+                               DaphneContext *ctx)
+{
+    // Mirror your readCsvFromPath_Dense logic:
+    // choose VT by the single-value schema in fmd
+
+    if(!arg)
+        throw std::runtime_error("WriteCsv_Dense: arg == nullptr");
+
+    if(!fmd.isSingleValueType || fmd.schema.empty())
+        throw std::runtime_error("WriteCsv_Dense: expected single value type schema");
+
+    switch(fmd.schema[0]) {
+        case ValueTypeCode::F64:
+            writeCsvDenseBuiltin_inline(reinterpret_cast<const DenseMatrix<double>*>(arg), filename);
+            break;
+        case ValueTypeCode::UI64:
+            writeCsvDenseBuiltin_inline(reinterpret_cast<const DenseMatrix<uint64_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::STR:
+            writeCsvDenseBuiltin_inline(reinterpret_cast<const DenseMatrix<std::string>*>(arg), filename);
+            break;
+        case ValueTypeCode::F32:
+            writeCsvDenseBuiltin_inline(reinterpret_cast<const DenseMatrix<float>*>(arg), filename);
+            break;
+        case ValueTypeCode::SI32:
+            writeCsvDenseBuiltin_inline(reinterpret_cast<const DenseMatrix<int32_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::SI64:
+            writeCsvDenseBuiltin_inline(reinterpret_cast<const DenseMatrix<int64_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::UI32:
+            writeCsvDenseBuiltin_inline(reinterpret_cast<const DenseMatrix<uint32_t>*>(arg),filename);
+            break;
+        case ValueTypeCode::UI8:
+            writeCsvDenseBuiltin_inline(reinterpret_cast<const DenseMatrix<uint8_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::SI8:
+            writeCsvDenseBuiltin_inline(reinterpret_cast<const DenseMatrix<int8_t>*>(arg), filename);
+            break;
+        default:
+            throw std::runtime_error("WriteCsv_Dense: unsupported VT in schema[0]");
+    }
+}
+
+// ================================ Frame writer ==============================
+
+static inline void dumpFrameToCsv_inline(const Frame* arg, File *file) {
+    if (file == nullptr)
+        throw std::runtime_error("WriteCsv: requires a file to be specified (must not be nullptr)");
+
+    for (size_t i = 0; i < arg->getNumRows(); ++i) {
+        for (size_t j = 0; j < arg->getNumCols(); ++j) {
+            const void *array = arg->getColumnRaw(j);
+            ValueTypeCode vtc = arg->getColumnType(j);
+            switch (vtc) {
+            // SI8 as number (cast to int32 for formatting)
+            case ValueTypeCode::SI8:
+                fprintf(file->identifier, "%" PRId8,
+                        static_cast<int32_t>(reinterpret_cast<const int8_t *>(array)[i]));
+                break;
+            case ValueTypeCode::SI32:
+                fprintf(file->identifier, "%" PRId32, reinterpret_cast<const int32_t *>(array)[i]);
+                break;
+            case ValueTypeCode::SI64:
+                fprintf(file->identifier, "%" PRId64, reinterpret_cast<const int64_t *>(array)[i]);
+                break;
+            // UI8 as number (cast to uint32 for formatting)
+            case ValueTypeCode::UI8:
+                fprintf(file->identifier, "%" PRIu8,
+                        static_cast<uint32_t>(reinterpret_cast<const uint8_t *>(array)[i]));
+                break;
+            case ValueTypeCode::UI32:
+                fprintf(file->identifier, "%" PRIu32, reinterpret_cast<const uint32_t *>(array)[i]);
+                break;
+            case ValueTypeCode::UI64:
+                fprintf(file->identifier, "%" PRIu64, reinterpret_cast<const uint64_t *>(array)[i]);
+                break;
+            case ValueTypeCode::F32:
+                fprintf(file->identifier, "%f", reinterpret_cast<const float *>(array)[i]);
+                break;
+            case ValueTypeCode::F64:
+                fprintf(file->identifier, "%f", reinterpret_cast<const double *>(array)[i]);
+                break;
+            case ValueTypeCode::STR:
+                fprintf(file->identifier, "%s",
+                        quoteStrCsvIf_inline(reinterpret_cast<const std::string *>(array)[i]).c_str());
+                break;
+            default:
+                throw std::runtime_error("unknown value type code");
+            }
+
+            if (j < (arg->getNumCols() - 1)) fprintf(file->identifier, ",");
+            else                              fprintf(file->identifier, "\n");
+        }
+    }
+}
+
+extern "C" void WriteCsv_Frame( void const *arg, const FileMetaData &fmd, const char *filename, IOOptions &opts, DaphneContext *ctx) {
+    auto fr = reinterpret_cast<const Frame*>(arg);
+
+    File *file = openFileForWrite(filename);
+    if(!file) {
+        throw std::runtime_error(std::string("openFileForWrite failed for '")
+                                 + filename + "'");
+    }
+
+    std::vector<ValueTypeCode> vtcs;
+    std::vector<std::string> labels;
+    vtcs.reserve(fr->getNumCols());
+    labels.reserve(fr->getNumCols());
+    for (size_t i = 0; i < fr->getNumCols(); i++) {
+        vtcs.push_back(fr->getSchema()[i]);
+        labels.push_back(fr->getLabels() ? fr->getLabels()[i] : std::string());
+    }
+
+    FileMetaData metaData(fr->getNumRows(), fr->getNumCols(), false, vtcs, labels);
+    MetaDataParser::writeMetaData(filename, metaData);
+
+    dumpFrameToCsv_inline(fr, file);
+    closeFile(file);
 }

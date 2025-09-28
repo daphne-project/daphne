@@ -1,8 +1,6 @@
 opts = createFrame(
-   ["16"],
-   "threads"
+   ["builtin"],
+   "engine"
 );
 
 f = readFrame("scripts/examples/extensions/builtInIO/random_data.csv");
-
-print(f);

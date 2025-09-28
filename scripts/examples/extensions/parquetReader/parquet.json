@@ -5,6 +5,7 @@
     "writerFuncName": "parquet_write",
     "libPath": "libparquetPlugIn.so",
     "type": "DenseMatrix",
+    "engine": "Daphne",
     "options": {
       "delimiter": ",",
       "threads": "1"
@@ -16,6 +17,7 @@
     "writerFuncName": "parquet_write_frame",
     "libPath": "libparquetPlugIn.so",
     "type": "Frame",
+    "engine": "Daphne",
     "options": {
       "delimiter": ",",
       "threads": "1"

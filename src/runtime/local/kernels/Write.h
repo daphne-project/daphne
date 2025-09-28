@@ -80,15 +80,10 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
             return;
         }
         catch (const std::out_of_range &e) {
+             std::cerr << "no suitable reader found in the registry";
         }
 
-        if (ext == ".csv") {
-            File *file = openFileForWrite(filename);
-            FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
-            MetaDataParser::writeMetaData(filename, metaData);
-            writeCsv(arg, file);
-            closeFile(file);
-        } else if (ext == ".dbdf") {
+        if (ext == ".dbdf") {
             FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
             MetaDataParser::writeMetaData(filename, metaData);
             writeDaphne(arg, filename);
@@ -139,22 +134,8 @@ template <> struct Write<Frame> {
             return;
         }
         catch (const std::out_of_range &e) {
+            throw std::runtime_error("No suitable reader found in the registry");
         }
-
-        if (ext == ".csv") {
-            File *file = openFileForWrite(filename);
-            std::vector<ValueTypeCode> vtcs;
-            std::vector<std::string> labels;
-            for (size_t i = 0; i < arg->getNumCols(); i++) {
-                vtcs.push_back(arg->getSchema()[i]);
-                labels.push_back(arg->getLabels()[i]);
-            }
-            FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), false, vtcs, labels);
-            MetaDataParser::writeMetaData(filename, metaData);
-            writeCsv(arg, file);
-            closeFile(file);
-        } else
-            throw std::runtime_error("file extension not supported: '" + ext + "'");
     }
 };
 

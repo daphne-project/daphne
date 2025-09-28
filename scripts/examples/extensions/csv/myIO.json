@@ -5,6 +5,7 @@
     "writerFuncName": "csv_write",
     "libPath": "libCsvIO.so",
     "type": "DenseMatrix",
+    "engine": "Daphne",
     "options": {
       "delimiter": ",",
       "hasHeader": "false",
@@ -18,6 +19,7 @@
     "writerFuncName": "",
     "libPath": "libCsvIO.so",
     "type": "Frame",
+    "engine": "Daphne",
     "options": {
       "delimiter": ",",
       "hasHeader": "false",
