@@ -481,12 +481,23 @@ void csv_read(Structure*& res,
     }
 }
 
+#include <cinttypes> // PRId64, PRIu64
+
 void csv_write(const Structure* matrix,
                const FileMetaData& /*fmd*/,
                const char* filename,
-               IOOptions& /*opts*/,
+               IOOptions& opts,
                DaphneContext* /*ctx*/)
 {
+    // 1) Resolve delimiter from opts (default: ',')
+    char delim = ',';
+    if (auto it = opts.extra.find("delimiter"); it != opts.extra.end()) {
+        const std::string &d = it->second;
+        if (d.size() != 1)
+            throw std::runtime_error("csv_write: 'delimiter' must be a single character");
+        delim = d[0];
+    }
+
     FILE* f = std::fopen(filename, "wb");
     if (!f) throw std::runtime_error(std::string("Failed to open for writing: ") + filename);
 
@@ -494,35 +505,54 @@ void csv_write(const Structure* matrix,
         using T = std::decay_t<decltype(*m->getValues())>;
         const size_t R = m->getNumRows(), C = m->getNumCols();
         const T* v = m->getValues();
+
         for (size_t i = 0; i < R; ++i) {
             for (size_t j = 0; j < C; ++j) {
                 if constexpr (std::is_same_v<T, std::string>) {
-                    std::fwrite(v[i*C + j].data(), 1, v[i*C + j].size(), f);
+                    const auto &s = v[i*C + j];
+                    std::fwrite(s.data(), 1, s.size(), f);
                 } else {
                     char buf[64];
+                    int n = 0;
+
                     if constexpr (std::is_same_v<T, double>) {
-                        int n = std::snprintf(buf, sizeof(buf), "%.17g", v[i*C + j]);
-                        std::fwrite(buf, 1, n, f);
+                        n = std::snprintf(buf, sizeof(buf), "%.17g", v[i*C + j]);
+                    } else if constexpr (std::is_same_v<T, float>) {
+                        n = std::snprintf(buf, sizeof(buf), "%.9g", v[i*C + j]);
+                    } else if constexpr (std::is_same_v<T, int64_t>) {
+                        n = std::snprintf(buf, sizeof(buf), "%" PRId64, static_cast<int64_t>(v[i*C + j]));
                     } else if constexpr (std::is_same_v<T, uint64_t>) {
-                        int n = std::snprintf(buf, sizeof(buf), "%llu",
-                                              static_cast<unsigned long long>(v[i*C + j]));
-                        std::fwrite(buf, 1, n, f);
+                        n = std::snprintf(buf, sizeof(buf), "%" PRIu64, static_cast<uint64_t>(v[i*C + j]));
                     } else if constexpr (std::is_same_v<T, int32_t>) {
-                        int n = std::snprintf(buf, sizeof(buf), "%d",
-                                              static_cast<int>(v[i*C + j]));
-                        std::fwrite(buf, 1, n, f);
+                        n = std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(v[i*C + j]));
+                    } else if constexpr (std::is_same_v<T, uint32_t>) {
+                        n = std::snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(v[i*C + j]));
+                    } else if constexpr (std::is_same_v<T, int8_t>) {
+                        n = std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(v[i*C + j]));
+                    } else if constexpr (std::is_same_v<T, uint8_t>) {
+                        n = std::snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(v[i*C + j]));
+                    } else {
+                        static_assert(!sizeof(T*), "csv_write: unsupported element type");
                     }
+
+                    std::fwrite(buf, 1, static_cast<size_t>(n), f);
                 }
-                if (j + 1 < C) std::fputc(',', f);
+
+                if (j + 1 < C) std::fputc(delim, f);  // use custom delimiter
             }
             std::fputc('\n', f);
         }
     };
 
-    if      (auto *im = dynamic_cast<const DenseMatrix<int32_t>*>(matrix))          write_rows(im);
-    else if (auto *dm = dynamic_cast<const DenseMatrix<double>*>(matrix))           write_rows(dm);
-    else if (auto *um = dynamic_cast<const DenseMatrix<uint64_t>*>(matrix))         write_rows(um);
-    else if (auto *sm = dynamic_cast<const DenseMatrix<std::string>*>(matrix))      write_rows(sm);
+    if      (auto *m = dynamic_cast<const DenseMatrix<double>*>(matrix))           write_rows(m);
+    else if (auto *m = dynamic_cast<const DenseMatrix<float>*>(matrix))            write_rows(m);
+    else if (auto *m = dynamic_cast<const DenseMatrix<int64_t>*>(matrix))          write_rows(m);
+    else if (auto *m = dynamic_cast<const DenseMatrix<int32_t>*>(matrix))          write_rows(m);
+    else if (auto *m = dynamic_cast<const DenseMatrix<int8_t>*>(matrix))           write_rows(m);
+    else if (auto *m = dynamic_cast<const DenseMatrix<uint64_t>*>(matrix))         write_rows(m);
+    else if (auto *m = dynamic_cast<const DenseMatrix<uint32_t>*>(matrix))         write_rows(m);
+    else if (auto *m = dynamic_cast<const DenseMatrix<uint8_t>*>(matrix))          write_rows(m);
+    else if (auto *m = dynamic_cast<const DenseMatrix<std::string>*>(matrix))      write_rows(m);
     else {
         std::fclose(f);
         throw std::runtime_error("csv_write: unsupported matrix type");

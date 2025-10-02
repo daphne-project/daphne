@@ -104,19 +104,32 @@ public:
     }
 
     // Lazy registration (entries may have reader, writer, or both)
+    // Lazy registration (reject duplicates outright)
     void registerLazy(const std::string& ext,
-                      IODataType dt,
-                      const std::string& libPath,
-                      const std::string& readerSymbol,
-                      const std::string& writerSymbol,
-                      const IOOptions&  opts,
-                      const std::string& engine,
-                      int priority) {
+                    IODataType dt,
+                    const std::string& libPath,
+                    const std::string& readerSymbol,
+                    const std::string& writerSymbol,
+                    const IOOptions&  opts,
+                    const std::string& engine,
+                    int priority) {
         std::lock_guard<std::mutex> lk(mtx);
         Key4 k{ext, engine, (size_t)dt, priority};
+
+        // Reject if anything already exists for this full key
+        if (lazySpecs.find(k) != lazySpecs.end() ||
+            readers.find(k)    != readers.end()   ||
+            writers.find(k)    != writers.end()) {
+            throw std::runtime_error(
+                "registerLazy: duplicate registration for (ext=" + ext +
+                ", engine=" + engine + ", dt=" + std::to_string(dt) +
+                ", prio=" + std::to_string(priority) + ")");
+        }
+
         lazySpecs[k]  = LazySpec{libPath, readerSymbol, writerSymbol, opts};
-        optionsMap[k] = opts; // optional defaults visible pre-load
+        optionsMap[k] = opts; // defaults visible pre-load
     }
+
 
     // ---------- Lookup (engine optional; highest priority wins) ----------
     GenericReader getReader(const std::string &ext, IODataType dt,
@@ -125,7 +138,7 @@ public:
 
         const Key4* best = findBestKey(readers, ext, (size_t)dt, engine);
         if (!best) best   = findBestKey(lazySpecs, ext, (size_t)dt, engine);
-        if (!best) throw std::out_of_range("No reader registered for ext=" + ext);
+        if (!best) throw std::out_of_range("No suitable reader found in the registry");
 
         return ensureReaderLoaded(*best);
     }
@@ -136,7 +149,7 @@ public:
 
         const Key4* best = findBestKey(writers, ext, (size_t)dt, engine);
         if (!best) best   = findBestKey(lazySpecs, ext, (size_t)dt, engine);
-        if (!best) throw std::out_of_range("No writer registered for ext=" + ext);
+        if (!best) throw std::out_of_range("No suitable writer found in the registry");
 
         return ensureWriterLoaded(*best);
     }
@@ -156,7 +169,7 @@ public:
         std::lock_guard<std::mutex> lk(mtx);
 
         const Key4* best = findBestKey(optionsMap, ext, (size_t)dt, engine);
-        if (!best) throw std::out_of_range("No options for ext=" + ext);
+        if (!best) throw std::out_of_range("No suitable options found in the registry");
         return optionsMap.at(*best);
     }
 
@@ -318,7 +331,6 @@ public:
         writers    = baseline_writers;
         optionsMap = baseline_options;
         lazySpecs  = baseline_lazy;
-        // libHandles: you can keep them; or prune ones not referenced if needed.
     }
 
 

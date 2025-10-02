@@ -1,0 +1,6 @@
+// Use of a CSV reader by specifying the engine without changing the default options
+opts = {"engine": ["Daphne"]};
+
+m = readMatrix("scripts/examples/extensions/csv/data.csv", opts);
+
+print(m);

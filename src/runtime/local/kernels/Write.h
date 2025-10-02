@@ -80,7 +80,7 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
             return;
         }
         catch (const std::out_of_range &e) {
-             std::cerr << "no suitable reader found in the registry";
+             std::cerr << "no suitable writer found in the registry";
         }
 
         if (ext == ".dbdf") {
@@ -101,7 +101,7 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
             writeHDFS(arg, filename, ctx);
 #endif
         } else
-            throw std::runtime_error("file extension not supported: '" + ext + "'");
+            throw std::runtime_error("no suitable writer found in the registry");
     }
 };
 
@@ -134,7 +134,7 @@ template <> struct Write<Frame> {
             return;
         }
         catch (const std::out_of_range &e) {
-            throw std::runtime_error("No suitable reader found in the registry");
+            throw std::runtime_error("No suitable writer found in the registry");
         }
     }
 };
@@ -154,7 +154,7 @@ template <typename VT> struct Write<Matrix<VT>> {
             writeCsv(arg, file);
             closeFile(file);
         } else
-            throw std::runtime_error("file extension not supported: '" + ext + "'");
+            throw std::runtime_error("no suitable writer found in the registry");
     }
 };
 

@@ -1,6 +1,6 @@
-opts = createFrame(
-   ["builtin"],
-   "engine"
-);
+opts = {"engine": ["Daphne"], "threads": ["4"]};
+
 
 f = readFrame("scripts/examples/extensions/builtInIO/random_data.csv");
+
+print(f);
