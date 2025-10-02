@@ -719,6 +719,15 @@ TEST_CASE("FileIO Duplicate Registration is rejected") {
     registry.resetToBaseline();
 }
 
+TEST_CASE("FileIO Duplicate lazy Registration is rejected") {
+    IOOptions opts;
+
+    registry.registerLazy(".csv", IODataType::FRAME,"lib.so", "myReader", "mywriter", opts, "daphne",5);
+    REQUIRE_THROWS( registry.registerLazy(".csv", IODataType::FRAME, "lib.so", "myReader", "mywriter", opts, "daphne", 5));
+
+    registry.resetToBaseline();
+}
+
 TEST_CASE("FileIOx csv_write writes DenseMatrix<double> to CSV", "[csv][write]") {
     // Create a 2x2 double matrix
     size_t rows = 2, cols = 2;

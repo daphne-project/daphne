@@ -1,0 +1,6 @@
+// Use of a CSV reader by specifying the engine and changing the default options
+opts = {"engine": ["Daphne"], "delimiter": ["!"], "hasHeader": ["false"]};
+
+m = readMatrix("scripts/examples/extensions/csv/specialCSV.csv", opts);
+
+print(m);

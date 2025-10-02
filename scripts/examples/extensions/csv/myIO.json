@@ -6,6 +6,7 @@
     "libPath": "libCsvIO.so",
     "type": "DenseMatrix",
     "engine": "Daphne",
+    "priority": 10,
     "options": {
       "delimiter": ",",
       "hasHeader": "false",
@@ -20,6 +21,7 @@
     "libPath": "libCsvIO.so",
     "type": "Frame",
     "engine": "Daphne",
+    "priority": 10,
     "options": {
       "delimiter": ",",
       "hasHeader": "false",

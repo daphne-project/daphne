@@ -1,0 +1,6 @@
+// Use of unrecognised option would lead to failure
+opts = {"noOption": ["5"]};
+
+m = readMatrix("scripts/examples/extensions/csv/data.csv", opts);
+
+print(m);

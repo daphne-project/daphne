@@ -206,7 +206,7 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
         }
 #endif
         else
-            throw std::runtime_error("file extension not supported: '" + ext + "'");
+            throw std::runtime_error("no suitable reader found in the registry");
     }
 }; // end Read<DenseMatrix<VT>>
 
