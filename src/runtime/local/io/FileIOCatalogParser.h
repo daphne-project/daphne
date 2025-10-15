@@ -7,6 +7,7 @@
 #include <dlfcn.h>
 #include <runtime/local/datastructures/Frame.h>
 #include <string>
+#include <optional>  
 
 /**
  * @brief Parses a JSON catalog of I/O plugins, dynamically loads each shared
@@ -31,12 +32,10 @@ public:
      * Parses the given JSON file and registers each plugin's reader & writer.
      * @param filePath Path to the catalog JSON
      */
-    void parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry) const;
+    void parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry, std::optional<int> promptPriority = std::nullopt) const;
 };
 
-inline void FileIOCatalogParser::parseFileIOCatalog(
-    const std::string &filePath, FileIORegistry &registry) const
-{
+inline void FileIOCatalogParser::parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry, std::optional<int> promptPriority) const {
     namespace fs = std::filesystem;
     fs::path dir = fs::path(filePath).parent_path();
 
@@ -54,7 +53,10 @@ inline void FileIOCatalogParser::parseFileIOCatalog(
         const std::string libRel   = entry.at("libPath").get<std::string>();
         const std::string libPath  = (dir / libRel).string();
         const std::string engine = entry.value("engine", "default");
-        const int priority       = entry.value("priority", 0);
+
+        int jsonPriority = entry.value("priority", 0);
+        int effPriority  = promptPriority.has_value() ? *promptPriority : jsonPriority;
+
         const std::string typeName  = entry.value("type", "Frame");
 
         // Map typeName string to actual type_info
@@ -78,9 +80,7 @@ inline void FileIOCatalogParser::parseFileIOCatalog(
             }
         }
 
-        registry.registerLazy(ext, typeHash, libPath, rdrName, wtrName, opts, engine, priority);
+        registry.registerLazy(ext, typeHash, libPath, rdrName, wtrName, opts, engine, effPriority);
 
-
-        // Note: keep 'handle' loaded for process lifetime to preserve symbols
     }
 }

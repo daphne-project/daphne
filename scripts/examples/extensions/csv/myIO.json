@@ -10,7 +10,7 @@
     "options": {
       "delimiter": ",",
       "hasHeader": "false",
-      "threads": "16",
+      "threads": "1",
       "dateFormat": "YYYY-MM-DD"
     }
   },
@@ -25,6 +25,7 @@
     "options": {
       "delimiter": ",",
       "hasHeader": "false",
+      "threads": "1",
       "dateFormat": "YYYY-MM-DD"
     }
   }

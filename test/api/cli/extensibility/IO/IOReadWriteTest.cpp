@@ -17,10 +17,8 @@
 
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <string>
 
-namespace fs = std::filesystem;
 
 // -----------------------------------------------------------------------------
 // Paths
@@ -38,7 +36,6 @@ static const char* kExtPath = "scripts/examples/extensions/csv/myIO.json";
 #include <vector>
 #include <cmath>
 #include <cctype>
-#include <algorithm>
 
 static inline std::string trim(const std::string &s) {
     size_t a = 0, b = s.size();

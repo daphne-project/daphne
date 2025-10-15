@@ -333,8 +333,11 @@ template <typename ValueType> class DenseMatrix : public Matrix<ValueType> {
 
         for (size_t r = 0; r < numRows; ++r) {
             for (size_t c = 0; c < numCols; ++c) {
-                if (*(valuesLhs + c) != *(valuesRhs + c))
+                if (*(valuesLhs + c) != *(valuesRhs + c)){
+                    std::cout << "Mismatch at (" << r << ", " << c << "): "
+                              << *(valuesLhs + c) << " != " << *(valuesRhs + c) << std::endl;
                     return false;
+                }
             }
             valuesLhs += rowSkipLhs;
             valuesRhs += rowSkipRhs;

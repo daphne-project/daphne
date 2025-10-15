@@ -8,11 +8,8 @@
     "engine": "builtin",
     "options": {
       "delimiter": ",",
-      "numCols": "1",
-      "numRows": "1",
       "sorted": "false",
-      "schema": "[{\"label\":\"name\",\"valueType\":\"ui64\"},{\"label\":\"age\",\"valueType\":\"ui64\"},{\"label\":\"salary\",\"valueType\":\"f64\"}]",
-      "numNonZeros": "0"
+      "hasHeader": "false"         
     }
   },
   {
@@ -22,12 +19,11 @@
     "libPath": "libBuiltInPlugIns.so",
     "type": "DenseMatrix",
     "engine": "builtin",
+    "priority": 5,
     "options": {
       "delimiter": ",",
-      "numCols": "1",
-      "numRows": "1",
       "sorted": "false",
-      "numNonZeros": "0"
+      "hasHeader": "false"         
     }
   },
   {
@@ -38,10 +34,7 @@
     "type": "Frame",
     "engine": "builtin",
     "options": {
-      "delimiter": ",",
-      "numCols": "1",
-      "numRows": "1",
-      "schema": "[{\"label\":\"a\",\"valueType\":\"f64\"},{\"label\":\"a\",\"valueType\":\"f64\"},{\"label\":\"a\",\"valueType\":\"f64\"},{\"label\":\"a\",\"valueType\":\"f64\"}]"
+      "threads": "1"
     }
   },
   {
@@ -52,9 +45,7 @@
     "type": "DenseMatrix",
     "engine": "builtin",
     "options": {
-      "delimiter": ",",
-      "numCols": "1",
-      "numRows": "1"
+      "threads": "1"
     }
   },
   {
@@ -74,6 +65,17 @@
     "writerFuncName": "",
     "libPath": "libBuiltInPlugIns.so",
     "type": "Frame",
+    "engine": "builtin",
+    "options": {
+      "delimiter": ","
+    }
+  },
+  {
+    "extension": ".mtx",
+    "readerFuncName": "ReadMM_CSR",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "CSRMatrix",
     "engine": "builtin",
     "options": {
       "delimiter": ","
