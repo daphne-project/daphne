@@ -1,4 +1,4 @@
-// CsvIO.cpp — fast CSV plugin with great single-thread performance and scalable multi-thread parsing.
+// CsvIO.cpp — fast CSV plugin with improved scan & lower indexing memory.
 // Assumptions: no quoted fields; fixed columns; '\n' line ends (tolerates '\r\n').
 // Type rule: F64 -> double, UI64 -> uint64_t, else strings.
 // Options (IOOptions.extra): hasHeader=true|false, delimiter=",", threads="N" (>=1).
@@ -14,16 +14,13 @@
 #include <stdexcept>
 #include <type_traits>
 #include <system_error>
-#include <charconv> // from_chars for uint64_t
+#include <charconv> // from_chars, to_chars
+#include <limits>
 
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-#ifdef DAPHNE_USE_FAST_FLOAT
-  #include <fast_float/fast_float.h> // https://github.com/fastfloat/fast_float
-#endif
 
 #include "runtime/local/datastructures/DataObjectFactory.h"
 #include "runtime/local/datastructures/DenseMatrix.h"
@@ -32,6 +29,20 @@
 #include "runtime/local/io/FileIORegistry.h"
 #include "runtime/local/datastructures/Frame.h"
 #include "runtime/local/kernels/CreateFrame.h"
+
+#if defined(__has_builtin)
+#  if __has_builtin(__builtin_expect)
+#    define LIKELY(x)   __builtin_expect(!!(x), 1)
+#    define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#  else
+#    define LIKELY(x)   (x)
+#    define UNLIKELY(x) (x)
+#  endif
+#else
+#  define LIKELY(x)   (x)
+#  define UNLIKELY(x) (x)
+#endif
+
 //======================= file mapping =======================
 
 struct MappedFile {
@@ -47,6 +58,9 @@ struct MappedFile {
         if (m.fd < 0) {
             throw std::system_error(errno, std::generic_category(), std::string("open: ") + path);
         }
+#if defined(POSIX_FADV_SEQUENTIAL)
+        ::posix_fadvise(m.fd, 0, 0, POSIX_FADV_SEQUENTIAL);
+#endif
         struct stat st{};
         if (fstat(m.fd, &st) != 0) {
             int e = errno;
@@ -59,9 +73,9 @@ struct MappedFile {
             if (m.map != MAP_FAILED) {
                 m.data = static_cast<const char*>(m.map);
                 // Hint the kernel we're going to scan forward once.
-                #ifdef POSIX_MADV_SEQUENTIAL
+#ifdef POSIX_MADV_SEQUENTIAL
                 ::posix_madvise(m.map, m.size, POSIX_MADV_SEQUENTIAL);
-                #endif
+#endif
                 return m;
             }
             // Fallback: read whole file
@@ -88,6 +102,13 @@ struct MappedFile {
 
 //======================= small helpers =======================
 
+static inline int64_t parse_i64_token(const char* b, const char* e) {
+    int64_t out = 0;
+    auto res = std::from_chars(b, e, out, 10);
+    if (res.ec == std::errc()) return out;
+    char* ep = nullptr; return static_cast<int64_t>(std::strtoll(b, &ep, 10));
+}
+
 static inline int32_t parse_i32_token(const char* b, const char* e) {
     int32_t out = 0;
     auto res = std::from_chars(b, e, out, 10);
@@ -96,9 +117,10 @@ static inline int32_t parse_i32_token(const char* b, const char* e) {
 }
 
 static inline size_t header_end(const char* p, size_t n) {
-    size_t i = 0;
-    while (i < n && p[i] != '\n') ++i;
-    if (i < n) ++i; // skip '\n'
+    const void* nl = memchr(p, '\n', n);
+    if (!nl) return n;
+    size_t i = static_cast<const char*>(nl) - p;
+    if (i + 1 <= n) ++i; // skip '\n'
     return std::min(i, n);
 }
 
@@ -107,41 +129,40 @@ static inline void trim_token(const char*& b, const char*& e) {
     while (e > b && (e[-1] == ' ' || e[-1] == '\t' || e[-1] == '\r')) --e;
 }
 
-static inline const char* find_next_sep(const char* p, const char* end, char delim, char& which) {
-    // returns pointer to next delim ('d') or newline ('n'); sets which accordingly; end => which=0
-    while (p < end) {
-        char c = *p;
-        if (c == delim) { which = 'd'; return p; }
-        if (c == '\n')  { which = 'n'; return p; }
-        ++p;
-    }
-    which = 0;
-    return end;
+static inline const char* find_next_sep_memchr(const char* p, const char* end, char delim, char& which) {
+    const size_t len = static_cast<size_t>(end - p);
+    const char* pd = static_cast<const char*>(memchr(p, delim, len));
+    const char* pn = static_cast<const char*>(memchr(p, '\n',  len));
+    if (pd && pn) {
+        if (pd < pn) { which = 'd'; return pd; }
+        else         { which = 'n'; return pn; }
+    } else if (pd)  { which = 'd'; return pd; }
+    else if (pn)    { which = 'n'; return pn; }
+    which = 0; return end;
 }
 
-// Build an index of line starts (byte offsets) for exactly `rows` rows, starting at `dataStart`.
-// Produces vector of size rows+1 with sentinel=end-of-last-line (possibly file end).
-static inline void build_line_index(const char* base, size_t n, size_t dataStart,
-                                    size_t rows, std::vector<size_t>& lineStart) {
-    lineStart.clear();
-    lineStart.reserve(rows + 1);
-    size_t i = dataStart;
-    lineStart.push_back(i); // first row starts here
-    while (lineStart.size() < rows && i < n) {
-        if (base[i] == '\n') {
-            size_t next = i + 1;
-            if (next < n) lineStart.push_back(next);
+// Heuristic: check first few rows for leading/trailing blanks. If none, skip trim.
+static inline bool detect_likely_no_trim(const char* p, const char* end, char delim, size_t cols, size_t rowsToSample = 8) {
+    size_t seenRows = 0;
+    const char* cur = p;
+    while (seenRows < rowsToSample && cur < end) {
+        for (size_t c = 0; c < cols; ++c) {
+            char which = 0;
+            const char* sep = find_next_sep_memchr(cur, end, delim, which);
+            const char* b = cur; const char* e = sep;
+            // Check whitespace without actually trimming
+            bool leftWS = (b < e) && (*b == ' ' || *b == '\t');
+            bool rightWS = (e > b) && (e[-1] == ' ' || e[-1] == '\t' || e[-1] == '\r');
+            if (leftWS || rightWS) return false;
+            if (which == 'd') cur = sep + 1;
+            else { // 'n' or 0
+                cur = (which == 'n' && sep < end) ? sep + 1 : sep;
+                break;
+            }
         }
-        ++i;
+        ++seenRows;
     }
-    // For the final sentinel, walk to end-of-last-line (or EOF)
-    if (i < n) {
-        while (i < n && base[i] != '\n') ++i;
-    }
-    size_t sentinel = (i < n) ? (i) : n; // sentinel points to '\n' or EOF
-    lineStart.push_back(sentinel);
-    if (lineStart.size() != rows + 1)
-        throw std::runtime_error("CSV: could not index requested number of rows");
+    return true;
 }
 
 //======================= numeric token parsing =======================
@@ -150,7 +171,6 @@ static inline uint64_t parse_u64_token(const char* b, const char* e) {
     uint64_t out = 0;
     auto res = std::from_chars(b, e, out, 10);
     if (res.ec != std::errc()) {
-        // fallback (tolerate +spaces- trimming)
         char* ep = nullptr;
         out = static_cast<uint64_t>(std::strtoull(b, &ep, 10));
     }
@@ -158,17 +178,8 @@ static inline uint64_t parse_u64_token(const char* b, const char* e) {
 }
 
 static inline double parse_f64_token(const char* b, const char* e) {
-#ifdef DAPHNE_USE_FAST_FLOAT
-    double v = 0.0;
-    auto [ptr, ec] = fast_float::from_chars(b, e, v);
-    if (ec == std::errc()) return v;
-    // fallback:
     char* ep = nullptr;
     return std::strtod(b, &ep);
-#else
-    char* ep = nullptr;
-    return std::strtod(b, &ep);
-#endif
 }
 
 //======================= single-thread fast paths =======================
@@ -176,49 +187,65 @@ static inline double parse_f64_token(const char* b, const char* e) {
 template<typename NumT>
 static void parse_numeric_single(const char* p, const char* end,
                                  size_t rows, size_t cols, char delim,
-                                 NumT* out)
+                                 NumT* out, bool likelyNoTrim)
 {
     for (size_t r = 0; r < rows; ++r) {
         for (size_t c = 0; c + 1 < cols; ++c) {
             char which = 0;
-            const char* sep = find_next_sep(p, end, delim, which);
-            if (which != 'd')
+            const char* sep = find_next_sep_memchr(p, end, delim, which);
+            if (UNLIKELY(which != 'd'))
                 throw std::runtime_error("CSV: not enough columns (single, delim expected)");
-            const char* b = p; const char* q = sep; trim_token(b, q);
-            if constexpr (std::is_same_v<NumT, double>) out[r*cols + c] = parse_f64_token(b, q);
-            else                                        out[r*cols + c] = static_cast<NumT>(parse_u64_token(b, q));
+            const char* b = p; const char* q = sep;
+            if (!likelyNoTrim) trim_token(b, q);
+
+            if constexpr (std::is_floating_point_v<NumT>) {
+                out[r*cols + c] = static_cast<NumT>(parse_f64_token(b, q));
+            } else if constexpr (std::is_signed_v<NumT>) {
+                out[r*cols + c] = static_cast<NumT>(parse_i64_token(b, q));
+            } else {
+                out[r*cols + c] = static_cast<NumT>(parse_u64_token(b, q));
+            }
             p = sep + 1;
         }
         char which = 0;
-        const char* sep = find_next_sep(p, end, delim, which);
-        if (which == 'd')
+        const char* sep = find_next_sep_memchr(p, end, delim, which);
+        if (UNLIKELY(which == 'd'))
             throw std::runtime_error("CSV: too many columns (single)");
-        const char* b = p; const char* q = sep; trim_token(b, q);
-        if constexpr (std::is_same_v<NumT, double>) out[r*cols + (cols-1)] = parse_f64_token(b, q);
-        else                                        out[r*cols + (cols-1)] = static_cast<NumT>(parse_u64_token(b, q));
+        const char* b = p; const char* q = sep;
+        if (!likelyNoTrim) trim_token(b, q);
+
+        if constexpr (std::is_floating_point_v<NumT>) {
+            out[r*cols + (cols-1)] = static_cast<NumT>(parse_f64_token(b, q));
+        } else if constexpr (std::is_signed_v<NumT>) {
+            out[r*cols + (cols-1)] = static_cast<NumT>(parse_i64_token(b, q));
+        } else {
+            out[r*cols + (cols-1)] = static_cast<NumT>(parse_u64_token(b, q));
+        }
         p = (which == 'n' && sep < end) ? sep + 1 : sep;
     }
 }
 
 static void parse_string_single(const char* p, const char* end,
                                 size_t rows, size_t cols, char delim,
-                                std::string* out)
+                                std::string* out, bool likelyNoTrim)
 {
     for (size_t r = 0; r < rows; ++r) {
         for (size_t c = 0; c + 1 < cols; ++c) {
             char which = 0;
-            const char* sep = find_next_sep(p, end, delim, which);
-            if (which != 'd')
+            const char* sep = find_next_sep_memchr(p, end, delim, which);
+            if (UNLIKELY(which != 'd'))
                 throw std::runtime_error("CSV: not enough columns (str, delim expected)");
-            const char* b = p; const char* q = sep; trim_token(b, q);
+            const char* b = p; const char* q = sep;
+            if (!likelyNoTrim) trim_token(b, q);
             out[r*cols + c].assign(b, q);
             p = sep + 1;
         }
         char which = 0;
-        const char* sep = find_next_sep(p, end, delim, which);
-        if (which == 'd')
+        const char* sep = find_next_sep_memchr(p, end, delim, which);
+        if (UNLIKELY(which == 'd'))
             throw std::runtime_error("CSV: too many columns (str)");
-        const char* b = p; const char* q = sep; trim_token(b, q);
+        const char* b = p; const char* q = sep;
+        if (!likelyNoTrim) trim_token(b, q);
         out[r*cols + (cols-1)].assign(b, q);
         p = (which == 'n' && sep < end) ? sep + 1 : sep;
     }
@@ -226,10 +253,46 @@ static void parse_string_single(const char* p, const char* end,
 
 //======================= parallel by row ranges =======================
 
-template<typename NumT>
-static void parse_numeric_rows_parallel(const char* base, const std::vector<size_t>& rowStarts,
+// Build an index of line starts (byte offsets) for exactly `rows` rows.
+template<class IndexT>
+static inline void build_line_index_t(const char* base, size_t n, size_t dataStart,
+                                      size_t rows, std::vector<IndexT>& lineStart) {
+    lineStart.clear();
+    lineStart.reserve(rows + 1);
+    size_t i = dataStart;
+    if (dataStart > std::numeric_limits<IndexT>::max())
+        throw std::runtime_error("CSV: line index requires 64-bit offsets");
+    lineStart.push_back(static_cast<IndexT>(i)); // first row starts here
+    while (lineStart.size() < rows && i < n) {
+        const void* nl = memchr(base + i, '\n', n - i);
+        if (!nl) break;
+        size_t pos = static_cast<const char*>(nl) - base;
+        size_t next = pos + 1;
+        if (next < n) {
+            if (next > std::numeric_limits<IndexT>::max())
+                throw std::runtime_error("CSV: line index requires 64-bit offsets");
+            lineStart.push_back(static_cast<IndexT>(next));
+        }
+        i = next;
+    }
+    // Final sentinel: end-of-last-line (or EOF)
+    if (i < n) {
+        const void* nl = memchr(base + i, '\n', n - i);
+        size_t sentinel = nl ? (static_cast<const char*>(nl) - base) : n;
+        if (sentinel > std::numeric_limits<IndexT>::max())
+            throw std::runtime_error("CSV: line index requires 64-bit offsets");
+        lineStart.push_back(static_cast<IndexT>(sentinel));
+    } else {
+        lineStart.push_back(static_cast<IndexT>(n));
+    }
+    if (lineStart.size() != rows + 1)
+        throw std::runtime_error("CSV: could not index requested number of rows");
+}
+
+template<typename NumT, class IndexT>
+static void parse_numeric_rows_parallel(const char* base, const std::vector<IndexT>& rowStarts,
                                         size_t rows, size_t cols, char delim,
-                                        NumT* out, size_t threads)
+                                        NumT* out, size_t threads, bool likelyNoTrim)
 {
     threads = std::max<size_t>(1, std::min(threads, rows ? rows : 1));
     auto worker = [&](size_t r0, size_t r1) {
@@ -238,19 +301,33 @@ static void parse_numeric_rows_parallel(const char* base, const std::vector<size
             const char* end = base + rowStarts[r + 1];
             for (size_t c = 0; c + 1 < cols; ++c) {
                 char which = 0;
-                const char* sep = find_next_sep(p, end, delim, which);
-                if (which != 'd') throw std::runtime_error("CSV: not enough columns (parallel)");
-                const char* b = p; const char* q = sep; trim_token(b, q);
-                if constexpr (std::is_same_v<NumT, double>) out[r*cols + c] = parse_f64_token(b, q);
-                else                                        out[r*cols + c] = static_cast<NumT>(parse_u64_token(b, q));
+                const char* sep = find_next_sep_memchr(p, end, delim, which);
+                if (UNLIKELY(which != 'd')) throw std::runtime_error("CSV: not enough columns (parallel)");
+                const char* b = p; const char* q = sep;
+                if (!likelyNoTrim) trim_token(b, q);
+
+                if constexpr (std::is_floating_point_v<NumT>) {
+                    out[r*cols + c] = static_cast<NumT>(parse_f64_token(b, q));
+                } else if constexpr (std::is_signed_v<NumT>) {
+                    out[r*cols + c] = static_cast<NumT>(parse_i64_token(b, q));
+                } else {
+                    out[r*cols + c] = static_cast<NumT>(parse_u64_token(b, q));
+                }
                 p = sep + 1;
             }
             char which = 0;
-            const char* sep = find_next_sep(p, end, delim, which);
-            if (which == 'd') throw std::runtime_error("CSV: too many columns (parallel)");
-            const char* b = p; const char* q = sep; trim_token(b, q);
-            if constexpr (std::is_same_v<NumT, double>) out[r*cols + (cols-1)] = parse_f64_token(b, q);
-            else                                        out[r*cols + (cols-1)] = static_cast<NumT>(parse_u64_token(b, q));
+            const char* sep = find_next_sep_memchr(p, end, delim, which);
+            if (UNLIKELY(which == 'd')) throw std::runtime_error("CSV: too many columns (parallel)");
+            const char* b = p; const char* q = sep;
+            if (!likelyNoTrim) trim_token(b, q);
+
+            if constexpr (std::is_floating_point_v<NumT>) {
+                out[r*cols + (cols-1)] = static_cast<NumT>(parse_f64_token(b, q));
+            } else if constexpr (std::is_signed_v<NumT>) {
+                out[r*cols + (cols-1)] = static_cast<NumT>(parse_i64_token(b, q));
+            } else {
+                out[r*cols + (cols-1)] = static_cast<NumT>(parse_u64_token(b, q));
+            }
         }
     };
 
@@ -269,6 +346,45 @@ static void parse_numeric_rows_parallel(const char* base, const std::vector<size
 //======================= plugin API =======================
 
 extern "C" {
+
+// ---------- FRAME READER (branchless per-cell via prebound column parsers) ----------
+
+struct ColParse {
+    void (*parse)(const char* b, const char* e, void* colBase, size_t r);
+    void* base = nullptr;
+};
+
+static inline ColParse make_col_parse(ValueTypeCode t, void* colBase) {
+    switch (t) {
+        case ValueTypeCode::F64:  return {+[](const char* b,const char* e,void* base,size_t r){
+            static_cast<double*>(base)[r] = parse_f64_token(b,e);
+        }, colBase};
+        case ValueTypeCode::F32:  return {+[](const char* b,const char* e,void* base,size_t r){
+            static_cast<float*>(base)[r] = static_cast<float>(parse_f64_token(b,e));
+        }, colBase};
+        case ValueTypeCode::SI64: return {+[](const char* b,const char* e,void* base,size_t r){
+            static_cast<int64_t*>(base)[r] = parse_i64_token(b,e);
+        }, colBase};
+        case ValueTypeCode::SI32: return {+[](const char* b,const char* e,void* base,size_t r){
+            static_cast<int32_t*>(base)[r] = parse_i32_token(b,e);
+        }, colBase};
+        case ValueTypeCode::SI8:  return {+[](const char* b,const char* e,void* base,size_t r){
+            static_cast<int8_t*>(base)[r] = static_cast<int8_t>(parse_i64_token(b,e));
+        }, colBase};
+        case ValueTypeCode::UI64: return {+[](const char* b,const char* e,void* base,size_t r){
+            static_cast<uint64_t*>(base)[r] = parse_u64_token(b,e);
+        }, colBase};
+        case ValueTypeCode::UI32: return {+[](const char* b,const char* e,void* base,size_t r){
+            static_cast<uint32_t*>(base)[r] = static_cast<uint32_t>(parse_u64_token(b,e));
+        }, colBase};
+        case ValueTypeCode::UI8:  return {+[](const char* b,const char* e,void* base,size_t r){
+            static_cast<uint8_t*>(base)[r] = static_cast<uint8_t>(parse_u64_token(b,e));
+        }, colBase};
+        default:                  return {+[](const char* b,const char* e,void* base,size_t r){
+            static_cast<std::string*>(base)[r].assign(b,e);
+        }, colBase};
+    }
+}
 
 void csv_read_frame(
     Frame *&res,
@@ -314,63 +430,76 @@ void csv_read_frame(
         colLabels[c] = fmd.labels[c].c_str();
 
     // 4) Allocate one rows×1 matrix per column based on fmd.schema[c]
-    std::vector<Structure*> columns(cols, nullptr);
-    std::vector<int32_t*>   colI32(cols, nullptr);
-    std::vector<uint64_t*>  colU64(cols, nullptr);
-    std::vector<double*>    colF64(cols, nullptr);
-    std::vector<std::string*> colSTR(cols, nullptr);
+    std::vector<Structure*>     columns(cols, nullptr);
+    std::vector<void*>          colBases(cols, nullptr);
 
     for (size_t c = 0; c < cols; ++c) {
         switch (fmd.schema[c]) {
+            case ValueTypeCode::F64: {
+                auto* m = DataObjectFactory::create<DenseMatrix<double>>(rows, 1, true);
+                columns[c] = m; colBases[c] = m->getValues(); break;
+            }
+            case ValueTypeCode::F32: {
+                auto* m = DataObjectFactory::create<DenseMatrix<float>>(rows, 1, true);
+                columns[c] = m; colBases[c] = m->getValues(); break;
+            }
+            case ValueTypeCode::SI64: {
+                auto* m = DataObjectFactory::create<DenseMatrix<int64_t>>(rows, 1, true);
+                columns[c] = m; colBases[c] = m->getValues(); break;
+            }
             case ValueTypeCode::SI32: {
                 auto* m = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, 1, true);
-                columns[c] = m; colI32[c] = m->getValues(); break;
+                columns[c] = m; colBases[c] = m->getValues(); break;
+            }
+            case ValueTypeCode::SI8: {
+                auto* m = DataObjectFactory::create<DenseMatrix<int8_t>>(rows, 1, true);
+                columns[c] = m; colBases[c] = m->getValues(); break;
             }
             case ValueTypeCode::UI64: {
                 auto* m = DataObjectFactory::create<DenseMatrix<uint64_t>>(rows, 1, true);
-                columns[c] = m; colU64[c] = m->getValues(); break;
+                columns[c] = m; colBases[c] = m->getValues(); break;
             }
-            case ValueTypeCode::F64: {
-                auto* m = DataObjectFactory::create<DenseMatrix<double>>(rows, 1, true);
-                columns[c] = m; colF64[c] = m->getValues(); break;
+            case ValueTypeCode::UI32: {
+                auto* m = DataObjectFactory::create<DenseMatrix<uint32_t>>(rows, 1, true);
+                columns[c] = m; colBases[c] = m->getValues(); break;
+            }
+            case ValueTypeCode::UI8: {
+                auto* m = DataObjectFactory::create<DenseMatrix<uint8_t>>(rows, 1, true);
+                columns[c] = m; colBases[c] = m->getValues(); break;
             }
             default: {
                 auto* m = DataObjectFactory::create<DenseMatrix<std::string>>(rows, 1, true);
-                columns[c] = m; colSTR[c] = m->getValues(); break;
+                columns[c] = m; colBases[c] = m->getValues(); break;
             }
         }
     }
 
-    // 5) Single-pass parse: row by row, column by column
+    // 4b) Prebind parsers (removes a hot switch per cell)
+    std::vector<ColParse> colFns(cols);
+    for (size_t c = 0; c < cols; ++c)
+        colFns[c] = make_col_parse(fmd.schema[c], colBases[c]);
+
+    // 5) Single-pass parse: row by row, column by column (branchless per cell)
+    const bool likelyNoTrim = detect_likely_no_trim(p, end, delim, cols);
     for (size_t r = 0; r < rows; ++r) {
-        // columns 0..cols-2 (must end at delimiter)
         for (size_t c = 0; c + 1 < cols; ++c) {
             char which = 0;
-            const char* sep = find_next_sep(p, end, delim, which);
-            if (which != 'd')
+            const char* sep = find_next_sep_memchr(p, end, delim, which);
+            if (UNLIKELY(which != 'd'))
                 throw std::runtime_error("CSV(Frame): not enough columns while expecting delimiter");
-            const char* b = p; const char* q = sep; trim_token(b, q);
-            switch (fmd.schema[c]) {
-                case ValueTypeCode::SI32: colI32[c][r] = parse_i32_token(b, q); break;
-                case ValueTypeCode::UI64: colU64[c][r] = parse_u64_token(b, q); break;
-                case ValueTypeCode::F64:  colF64[c][r] = parse_f64_token(b, q);  break;
-                default:                  colSTR[c][r].assign(b, q);             break;
-            }
+            const char* b = p; const char* q = sep;
+            if (!likelyNoTrim) trim_token(b, q);
+            colFns[c].parse(b, q, colFns[c].base, r);
             p = sep + 1; // move after delimiter
         }
-        // last column (must end at newline or EOF)
         char which = 0;
-        const char* sep = find_next_sep(p, end, delim, which);
-        if (which == 'd')
+        const char* sep = find_next_sep_memchr(p, end, delim, which);
+        if (UNLIKELY(which == 'd'))
             throw std::runtime_error("CSV(Frame): too many columns on row");
-        const char* b = p; const char* q = sep; trim_token(b, q);
+        const char* b = p; const char* q = sep;
+        if (!likelyNoTrim) trim_token(b, q);
         const size_t cLast = cols - 1;
-        switch (fmd.schema[cLast]) {
-            case ValueTypeCode::SI32: colI32[cLast][r] = parse_i32_token(b, q); break;
-            case ValueTypeCode::UI64: colU64[cLast][r] = parse_u64_token(b, q); break;
-            case ValueTypeCode::F64:  colF64[cLast][r] = parse_f64_token(b, q);  break;
-            default:                  colSTR[cLast][r].assign(b, q);             break;
-        }
+        colFns[cLast].parse(b, q, colFns[cLast].base, r);
         p = (which == 'n' && sep < end) ? sep + 1 : sep; // next row
     }
 
@@ -384,6 +513,8 @@ void csv_read_frame(
         ctx
     );
 }
+
+// ---------- MATRIX READER (single-/multi-thread like before, faster scan, lighter index) ----------
 
 void csv_read(Structure*& res,
               const FileMetaData& fmd,
@@ -409,10 +540,17 @@ void csv_read(Structure*& res,
     // --- type rule (built-in parity) ---
     ValueTypeCode vtc = ValueTypeCode::STR;
     if (fmd.isSingleValueType && !fmd.schema.empty()) {
-        if (fmd.schema[0] == ValueTypeCode::F64)       vtc = ValueTypeCode::F64;
-        else if (fmd.schema[0] == ValueTypeCode::UI64) vtc = ValueTypeCode::UI64;
-        else if (fmd.schema[0] == ValueTypeCode::SI32) vtc = ValueTypeCode::SI32;  // <-- add this
-        else                                           vtc = ValueTypeCode::STR;
+        switch (fmd.schema[0]) {
+            case ValueTypeCode::F64:  vtc = ValueTypeCode::F64;  break;
+            case ValueTypeCode::F32:  vtc = ValueTypeCode::F32;  break;
+            case ValueTypeCode::SI64: vtc = ValueTypeCode::SI64; break;
+            case ValueTypeCode::SI32: vtc = ValueTypeCode::SI32; break;
+            case ValueTypeCode::SI8:  vtc = ValueTypeCode::SI8;  break;
+            case ValueTypeCode::UI64: vtc = ValueTypeCode::UI64; break;
+            case ValueTypeCode::UI32: vtc = ValueTypeCode::UI32; break;
+            case ValueTypeCode::UI8:  vtc = ValueTypeCode::UI8;  break;
+            default:                  vtc = ValueTypeCode::STR;  break;
+        }
     }
 
     // --- rows/cols are guaranteed by you ---
@@ -431,53 +569,173 @@ void csv_read(Structure*& res,
     const size_t dataStart = hasHeader ? header_end(base, n) : 0;
     if (dataStart >= n) throw std::runtime_error("CSV: no data region found");
 
+    // --- detect trim behavior once ---
+    const char* p0 = base + dataStart;
+    const char* e0 = base + n;
+    const bool likelyNoTrim = detect_likely_no_trim(p0, e0, delim, cols);
+
     // --- ultra-fast single-thread path (no extra indexing) ---
     if (threads == 1) {
-        const char* p = base + dataStart;
-        const char* end = base + n;
-        if (vtc == ValueTypeCode::F64) {
-            auto* mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, false);
-            parse_numeric_single<double>(p, end, rows, cols, delim, mat->getValues());
-            res = mat; return;
-        } else if (vtc == ValueTypeCode::UI64) {
-            auto* mat = DataObjectFactory::create<DenseMatrix<uint64_t>>(rows, cols, false);
-            parse_numeric_single<uint64_t>(p, end, rows, cols, delim, mat->getValues());
-            res = mat; return;
-        } else if (vtc == ValueTypeCode::SI32) {
-            auto* mat = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, cols, false);
-            parse_numeric_single<int32_t>(p, end, rows, cols, delim, mat->getValues());
-            res = mat; return;
-        } else {
-            auto* mat = DataObjectFactory::create<DenseMatrix<std::string>>(rows, cols, false);
-            parse_string_single(p, end, rows, cols, delim, mat->getValues());
-            res = mat; return;
+        const char* p = p0;
+        const char* end = e0;
+
+        switch (vtc) {
+            case ValueTypeCode::F64: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, false);
+                parse_numeric_single<double>(p, end, rows, cols, delim, mat->getValues(), likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::F32: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<float>>(rows, cols, false);
+                parse_numeric_single<float>(p, end, rows, cols, delim, mat->getValues(), likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::SI64: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<int64_t>>(rows, cols, false);
+                parse_numeric_single<int64_t>(p, end, rows, cols, delim, mat->getValues(), likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::SI32: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, cols, false);
+                parse_numeric_single<int32_t>(p, end, rows, cols, delim, mat->getValues(), likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::SI8: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<int8_t>>(rows, cols, false);
+                parse_numeric_single<int8_t>(p, end, rows, cols, delim, mat->getValues(), likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::UI64: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<uint64_t>>(rows, cols, false);
+                parse_numeric_single<uint64_t>(p, end, rows, cols, delim, mat->getValues(), likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::UI32: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<uint32_t>>(rows, cols, false);
+                parse_numeric_single<uint32_t>(p, end, rows, cols, delim, mat->getValues(), likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::UI8: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<uint8_t>>(rows, cols, false);
+                parse_numeric_single<uint8_t>(p, end, rows, cols, delim, mat->getValues(), likelyNoTrim);
+                res = mat; return;
+            }
+            default: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<std::string>>(rows, cols, false);
+                parse_string_single(p, end, rows, cols, delim, mat->getValues(), likelyNoTrim);
+                res = mat; return;
+            }
         }
     }
 
     // --- multi-thread: build a row-start index ONCE, then split by rows ---
-    std::vector<size_t> rowStarts;
-    build_line_index(base, n, dataStart, rows, rowStarts);
-
-    if (vtc == ValueTypeCode::F64) {
-        auto* mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, false);
-        parse_numeric_rows_parallel<double>(base, rowStarts, rows, cols, delim, mat->getValues(), threads);
-        res = mat; return;
-    } else if (vtc == ValueTypeCode::UI64) {
-        auto* mat = DataObjectFactory::create<DenseMatrix<uint64_t>>(rows, cols, false);
-        parse_numeric_rows_parallel<uint64_t>(base, rowStarts, rows, cols, delim, mat->getValues(), threads);
-        res = mat; return;
-    }  else if (vtc == ValueTypeCode::SI32) {
-        auto* mat = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, cols, false);
-        parse_numeric_rows_parallel<int32_t>(base, rowStarts, rows, cols, delim, mat->getValues(), threads);
-        res = mat; return;
+    // Optimize memory: use 32-bit offsets if addressable.
+    const bool canUse32 = (n <= std::numeric_limits<uint32_t>::max());
+    if (canUse32) {
+        std::vector<uint32_t> rowStarts32;
+        build_line_index_t(base, n, dataStart, rows, rowStarts32);
+        switch (vtc) {
+            case ValueTypeCode::F64: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, false);
+                parse_numeric_rows_parallel<double>(base, rowStarts32, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::F32: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<float>>(rows, cols, false);
+                parse_numeric_rows_parallel<float>(base, rowStarts32, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::SI64: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<int64_t>>(rows, cols, false);
+                parse_numeric_rows_parallel<int64_t>(base, rowStarts32, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::SI32: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, cols, false);
+                parse_numeric_rows_parallel<int32_t>(base, rowStarts32, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::SI8: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<int8_t>>(rows, cols, false);
+                parse_numeric_rows_parallel<int8_t>(base, rowStarts32, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::UI64: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<uint64_t>>(rows, cols, false);
+                parse_numeric_rows_parallel<uint64_t>(base, rowStarts32, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::UI32: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<uint32_t>>(rows, cols, false);
+                parse_numeric_rows_parallel<uint32_t>(base, rowStarts32, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::UI8: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<uint8_t>>(rows, cols, false);
+                parse_numeric_rows_parallel<uint8_t>(base, rowStarts32, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            default: {
+                // strings keep single-thread (typically bound by allocations)
+                const char* p = base + dataStart;
+                const char* end = base + n;
+                auto* mat = DataObjectFactory::create<DenseMatrix<std::string>>(rows, cols, false);
+                parse_string_single(p, end, rows, cols, delim, mat->getValues(), likelyNoTrim);
+                res = mat; return;
+            }
+        }
     } else {
-        // strings: parallelization often regresses due to allocations;
-        // if you still want it, implement a rows-parallel variant like numeric.
-        const char* p = base + dataStart;
-        const char* end = base + n;
-        auto* mat = DataObjectFactory::create<DenseMatrix<std::string>>(rows, cols, false);
-        parse_string_single(p, end, rows, cols, delim, mat->getValues());
-        res = mat; return;
+        std::vector<size_t> rowStarts;
+        build_line_index_t(base, n, dataStart, rows, rowStarts);
+        switch (vtc) {
+            case ValueTypeCode::F64: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, false);
+                parse_numeric_rows_parallel<double>(base, rowStarts, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::F32: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<float>>(rows, cols, false);
+                parse_numeric_rows_parallel<float>(base, rowStarts, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::SI64: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<int64_t>>(rows, cols, false);
+                parse_numeric_rows_parallel<int64_t>(base, rowStarts, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::SI32: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, cols, false);
+                parse_numeric_rows_parallel<int32_t>(base, rowStarts, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::SI8: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<int8_t>>(rows, cols, false);
+                parse_numeric_rows_parallel<int8_t>(base, rowStarts, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::UI64: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<uint64_t>>(rows, cols, false);
+                parse_numeric_rows_parallel<uint64_t>(base, rowStarts, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::UI32: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<uint32_t>>(rows, cols, false);
+                parse_numeric_rows_parallel<uint32_t>(base, rowStarts, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            case ValueTypeCode::UI8: {
+                auto* mat = DataObjectFactory::create<DenseMatrix<uint8_t>>(rows, cols, false);
+                parse_numeric_rows_parallel<uint8_t>(base, rowStarts, rows, cols, delim, mat->getValues(), threads, likelyNoTrim);
+                res = mat; return;
+            }
+            default: {
+                const char* p = base + dataStart;
+                const char* end = base + n;
+                auto* mat = DataObjectFactory::create<DenseMatrix<std::string>>(rows, cols, false);
+                parse_string_single(p, end, rows, cols, delim, mat->getValues(), likelyNoTrim);
+                res = mat; return;
+            }
+        }
     }
 }
 
@@ -500,11 +758,15 @@ void csv_write(const Structure* matrix,
 
     FILE* f = std::fopen(filename, "wb");
     if (!f) throw std::runtime_error(std::string("Failed to open for writing: ") + filename);
+    // Big stdio buffer to reduce syscalls
+    setvbuf(f, nullptr, _IOFBF, 1 << 20);
 
     auto write_rows = [&](auto* m) {
         using T = std::decay_t<decltype(*m->getValues())>;
         const size_t R = m->getNumRows(), C = m->getNumCols();
         const T* v = m->getValues();
+
+        char numbuf[128];
 
         for (size_t i = 0; i < R; ++i) {
             for (size_t j = 0; j < C; ++j) {
@@ -512,33 +774,24 @@ void csv_write(const Structure* matrix,
                     const auto &s = v[i*C + j];
                     std::fwrite(s.data(), 1, s.size(), f);
                 } else {
-                    char buf[64];
-                    int n = 0;
-
-                    if constexpr (std::is_same_v<T, double>) {
-                        n = std::snprintf(buf, sizeof(buf), "%.17g", v[i*C + j]);
-                    } else if constexpr (std::is_same_v<T, float>) {
-                        n = std::snprintf(buf, sizeof(buf), "%.9g", v[i*C + j]);
-                    } else if constexpr (std::is_same_v<T, int64_t>) {
-                        n = std::snprintf(buf, sizeof(buf), "%" PRId64, static_cast<int64_t>(v[i*C + j]));
-                    } else if constexpr (std::is_same_v<T, uint64_t>) {
-                        n = std::snprintf(buf, sizeof(buf), "%" PRIu64, static_cast<uint64_t>(v[i*C + j]));
-                    } else if constexpr (std::is_same_v<T, int32_t>) {
-                        n = std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(v[i*C + j]));
-                    } else if constexpr (std::is_same_v<T, uint32_t>) {
-                        n = std::snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(v[i*C + j]));
-                    } else if constexpr (std::is_same_v<T, int8_t>) {
-                        n = std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(v[i*C + j]));
-                    } else if constexpr (std::is_same_v<T, uint8_t>) {
-                        n = std::snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(v[i*C + j]));
+                    // Prefer to_chars for ints; snprintf for floats
+                    size_t n = 0;
+                    if constexpr (std::is_floating_point_v<T>) {
+                        if constexpr (std::is_same_v<T, double>) {
+                            n = static_cast<size_t>(std::snprintf(numbuf, sizeof(numbuf), "%.17g", v[i*C + j]));
+                        } else {
+                            n = static_cast<size_t>(std::snprintf(numbuf, sizeof(numbuf), "%.9g", v[i*C + j]));
+                        }
+                    } else if constexpr (std::is_integral_v<T>) {
+                        auto [ptr, ec] = std::to_chars(numbuf, numbuf + sizeof(numbuf), v[i*C + j]);
+                        if (ec != std::errc()) throw std::runtime_error("csv_write: to_chars failed");
+                        n = static_cast<size_t>(ptr - numbuf);
                     } else {
                         static_assert(!sizeof(T*), "csv_write: unsupported element type");
                     }
-
-                    std::fwrite(buf, 1, static_cast<size_t>(n), f);
+                    std::fwrite(numbuf, 1, n, f);
                 }
-
-                if (j + 1 < C) std::fputc(delim, f);  // use custom delimiter
+                if (j + 1 < C) std::fputc(delim, f);
             }
             std::fputc('\n', f);
         }

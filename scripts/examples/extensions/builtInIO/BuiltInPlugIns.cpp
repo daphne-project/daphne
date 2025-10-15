@@ -32,8 +32,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
-#include <limits>
 #include <queue>
 #include <sstream>
 #include <stdexcept>
@@ -693,6 +691,32 @@ extern "C" void ReadMM_Dense(void* &res, const FileMetaData& fmd, const char* fi
     }
 }
 
+extern "C" void ReadMM_CSR(void* &res, const FileMetaData& fmd,
+                           const char* filename, IOOptions &opts, DaphneContext* ctx) {
+    // Choose VT by schema (single value type), default to double
+    ValueTypeCode vt = ValueTypeCode::F64;
+    if (fmd.isSingleValueType && !fmd.schema.empty())
+        vt = fmd.schema[0];
+
+    switch (vt) {
+        case ValueTypeCode::F64:
+            ReadMM<CSRMatrix<double>>::apply(reinterpret_cast<CSRMatrix<double>*&>(res), fmd, filename, opts, ctx);
+            break;
+        case ValueTypeCode::F32:
+            ReadMM<CSRMatrix<float>>::apply(reinterpret_cast<CSRMatrix<float>*&>(res), fmd, filename, opts, ctx);
+            break;
+        case ValueTypeCode::SI64:
+            ReadMM<CSRMatrix<int64_t>>::apply(reinterpret_cast<CSRMatrix<int64_t>*&>(res), fmd, filename, opts, ctx);
+            break;
+        case ValueTypeCode::SI32:
+            ReadMM<CSRMatrix<int32_t>>::apply(reinterpret_cast<CSRMatrix<int32_t>*&>(res), fmd, filename, opts, ctx);
+            break;
+        default:
+            // You can extend with UI* if needed. For now, keep it simple:
+            ReadMM<CSRMatrix<double>>::apply(reinterpret_cast<CSRMatrix<double>*&>(res), fmd, filename, opts, ctx);
+            break;
+    }
+}
 
 
 //#############################################################
@@ -746,8 +770,6 @@ static inline void dumpDenseToCsv_inline(const DenseMatrix<VT>* arg, File *file)
 template<typename VT>
 static inline void writeCsvDenseBuiltin_inline(const DenseMatrix<VT>* arg, const char* filename) {
     File *file = openFileForWrite(filename);
-    FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
-    MetaDataParser::writeMetaData(filename, metaData);
     dumpDenseToCsv_inline(arg, file);
     closeFile(file);
 }
@@ -876,4 +898,77 @@ extern "C" void WriteCsv_Frame( void const *arg, const FileMetaData &fmd, const 
 
     dumpFrameToCsv_inline(fr, file);
     closeFile(file);
+}
+
+// ======================= Matrix<VT> writers  ============================
+
+template<typename VT>
+static inline void dumpMatrixToCsv_inline(const Matrix<VT>* arg, File *file) {
+    if (file == nullptr)
+        throw std::runtime_error("WriteCsv: File required");
+
+    const size_t numRows = arg->getNumRows();
+    const size_t numCols = arg->getNumCols();
+
+    for (size_t r = 0; r < numRows; ++r) {
+        for (size_t c = 0; c < numCols; ++c) {
+            fprintf(file->identifier,
+                    std::is_floating_point<VT>::value ? "%f"
+                    : (std::is_same<VT, long int>::value ? "%ld" : "%d"),
+                    arg->get(r, c));
+            if (c < (numCols - 1))
+                fprintf(file->identifier, ",");
+            else
+                fprintf(file->identifier, "\n");
+        }
+    }
+}
+
+template<typename VT>
+static inline void writeCsvMatrixBuiltin_inline(const Matrix<VT>* arg, const char* filename) {
+    File *file = openFileForWrite(filename);
+    dumpMatrixToCsv_inline(arg, file);
+    closeFile(file);
+}
+
+extern "C" void WriteCsv_Matrix(void const *arg,
+                                const FileMetaData &fmd,
+                                const char *filename,
+                                IOOptions &opts,
+                                DaphneContext *ctx)
+{
+    if(!arg)
+        throw std::runtime_error("WriteCsv_Matrix: arg == nullptr");
+
+    if(!fmd.isSingleValueType || fmd.schema.empty())
+        throw std::runtime_error("WriteCsv_Matrix: expected single value type schema");
+
+    switch(fmd.schema[0]) {
+        case ValueTypeCode::F64:
+            writeCsvMatrixBuiltin_inline(reinterpret_cast<const Matrix<double>*>(arg), filename);
+            break;
+        case ValueTypeCode::F32:
+            writeCsvMatrixBuiltin_inline(reinterpret_cast<const Matrix<float>*>(arg), filename);
+            break;
+        case ValueTypeCode::SI64:
+            writeCsvMatrixBuiltin_inline(reinterpret_cast<const Matrix<int64_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::SI32:
+            writeCsvMatrixBuiltin_inline(reinterpret_cast<const Matrix<int32_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::UI64:
+            writeCsvMatrixBuiltin_inline(reinterpret_cast<const Matrix<uint64_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::UI32:
+            writeCsvMatrixBuiltin_inline(reinterpret_cast<const Matrix<uint32_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::UI8:
+            writeCsvMatrixBuiltin_inline(reinterpret_cast<const Matrix<uint8_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::SI8:
+            writeCsvMatrixBuiltin_inline(reinterpret_cast<const Matrix<int8_t>*>(arg), filename);
+            break;
+        default:
+            throw std::runtime_error("WriteCsv_Matrix: unsupported VT in schema[0]");
+    }
 }

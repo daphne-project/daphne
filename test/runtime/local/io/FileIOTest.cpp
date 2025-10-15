@@ -218,7 +218,7 @@ TEST_CASE("FileIOCatalogParser parses options correctly", "[io][catalog]") {
     REQUIRE(opts.extra.size() == 4);
     CHECK(opts.extra.at("delimiter") == ",");
     CHECK(opts.extra.at("hasHeader") == "false");
-    CHECK(opts.extra.at("threads") == "16");
+    CHECK(opts.extra.at("threads") == "1");
     CHECK(opts.extra.at("dateFormat") == "YYYY-MM-DD");
     FileIORegistry::instance().resetToBaseline();
 }
@@ -300,7 +300,6 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO ReadParquet, DenseMatrix", TAG_IO, (DenseMatr
 }
 
 TEST_CASE("FileIOw parquet_write_frame writes Frame to Parquet", "[parquet][write][frame]") {
-    // ---------- Arrange ----------
     const size_t rows = 2;
     const size_t cols = 3;
 
@@ -565,19 +564,21 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO_parquetProbe_1_thread",
 }
 
 TEST_CASE("FileIO_csvProbe_1_thread", "[FileIO][Parquet][Probe]") {
-    using DT = DenseMatrix<double>;
+    using DT = DenseMatrix<std::string>;
 
     FileIORegistry::instance().resetToBaseline();
     const std::string path =
-        "scripts/examples/extensions/csv/random_data.csv";
+        "scripts/examples/extensions/csv/data.csv";
 
     DT *m = nullptr;
+    DT *m4 = nullptr;
 
     auto t00 = std::chrono::steady_clock::now();
-    read(m, path.c_str(), emptyFrame, ctx);            // your existing call
+    read(m, path.c_str(), emptyFrame, ctx);
     auto t10 = std::chrono::steady_clock::now();
     REQUIRE(m != nullptr);
-
+    read(m4, path.c_str(), emptyFrame, ctx);
+    REQUIRE(*m4 == *m);
     const size_t rows0 = m->getNumRows();
     const size_t cols0 = m->getNumCols();
 
@@ -585,7 +586,7 @@ TEST_CASE("FileIO_csvProbe_1_thread", "[FileIO][Parquet][Probe]") {
     const size_t peak_bytes0 = peak_rss_bytes();
 
     nlohmann::json j0{
-        {"tool","daphne"},
+        {"tool","builtin"},
         {"file",path},
         {"rows",rows0},
         {"cols",cols0},
@@ -603,7 +604,7 @@ TEST_CASE("FileIO_csvProbe_1_thread", "[FileIO][Parquet][Probe]") {
     DT *m1 = nullptr;
 
     auto t0 = std::chrono::steady_clock::now();
-    read(m1, path.c_str(), emptyFrame, ctx);            // your existing call
+    read(m1, path.c_str(), emptyFrame, ctx);
     auto t1 = std::chrono::steady_clock::now();
     REQUIRE(m1 != nullptr);
 
@@ -626,7 +627,7 @@ TEST_CASE("FileIO_csvProbe_1_thread", "[FileIO][Parquet][Probe]") {
     DT *m2 = nullptr;
 
     auto t000 = std::chrono::steady_clock::now();
-    read(m2, path.c_str(), emptyFrame, ctx);            // your existing call
+    read(m2, path.c_str(), emptyFrame, ctx);    
     auto t111 = std::chrono::steady_clock::now();
     REQUIRE(m2 != nullptr);
 
@@ -637,7 +638,7 @@ TEST_CASE("FileIO_csvProbe_1_thread", "[FileIO][Parquet][Probe]") {
     const size_t peak_bytes1 = peak_rss_bytes();
 
     nlohmann::json j2{
-        {"tool","daphne"},
+        {"tool","daphne_again_to_check_first-use_overhead"},
         {"file",path},
         {"rows",rows1},
         {"cols",cols1},
@@ -647,8 +648,8 @@ TEST_CASE("FileIO_csvProbe_1_thread", "[FileIO][Parquet][Probe]") {
     std::cout << "PROBE " << j2.dump() << "\n";
 
     //f1->print(std::cout);
-
-    //REQUIRE(*m == *m1);
+    //REQUIRE(*m2 == *m1);
+    REQUIRE(*m == *m2);
     DataObjectFactory::destroy(m);
     DataObjectFactory::destroy(m1);
     DataObjectFactory::destroy(m2);

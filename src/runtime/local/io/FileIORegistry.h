@@ -211,7 +211,6 @@ public:
         return *this;
     }
 
-        // In FileIORegistry (public):
     void dumpReaders(std::ostream& os = std::cerr) const {
         std::lock_guard<std::mutex> lk(mtx);
 
@@ -333,6 +332,13 @@ public:
         lazySpecs  = baseline_lazy;
     }
 
+    void clear(){
+        readers.clear(); 
+        writers.clear(); 
+        optionsMap.clear(); 
+        lazySpecs.clear();
+    }
+
 
 private:
     using Key4 = std::tuple<std::string /*ext*/,
@@ -341,10 +347,7 @@ private:
                             int         /*priority*/>;
 
     template<class MapT>
-    static const Key4* findBestKey(const MapT &m,
-                                   const std::string &ext,
-                                   size_t dt,
-                                   const std::string &engine /* "" = any */) {
+    static const Key4* findBestKey(const MapT &m, const std::string &ext, size_t dt, const std::string &engine /* "" = any */) {
         const Key4* best = nullptr;
         for (auto &kv : m) {
             const auto &k = kv.first;

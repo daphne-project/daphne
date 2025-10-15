@@ -44,12 +44,7 @@ static Frame *dummyFrame = DataObjectFactory::create<Frame>(0, 0, nullptr, nullp
 // ****************************************************************************
 // Helper: Merge a Frame* of column-label → single-row-value into IOOptions
 // ****************************************************************************
-static IOOptions mergeOptionsFromFrame(const std::string &ext,
-                                       IODataType         dt,
-                                       const std::string &engine, // NEW
-                                       Frame             *optsFrame,
-                                       DCTX(ctx))
-{
+static IOOptions mergeOptionsFromFrame(const std::string &ext, IODataType dt, const std::string &engine, Frame *optsFrame, DCTX(ctx)){
     auto& reg = ctx ? ctx->config.registry : FileIORegistry::instance();
 
     // Ask the registry for defaults for this (ext, dt, engine).
@@ -157,24 +152,17 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
     // ------------------------------------------------------------------------
     // Overload: DenseMatrix with an options‐Frame
     // ------------------------------------------------------------------------
-    static void apply(DenseMatrix<VT> *&res,
-                      const char       *filename,
-                      Frame            *optsFrame,
-                      DCTX(ctx))
-    {
+    static void apply(DenseMatrix<VT> *&res, const char *filename, Frame *optsFrame, DCTX(ctx)){
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
         IODataType typeHash = DENSEMATRIX;
         try {
             auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();
 
-            //registry.dumpReaders();
-            //registry.dumpWriters();
-
-            // NEW: get the engine (may be "")
+            // Get the engine (may be "")
             std::string engine = extractEngineFromFrame(optsFrame);
 
-            // NEW: select reader with engine hint
+            // Select reader with engine hint
             auto reader = registry.getReader(ext, typeHash, engine);
 
             // Merge user overrides using defaults for that engine
@@ -218,21 +206,17 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
     // ------------------------------------------------------------------------
     // Overload: CSRMatrix with an options‐Frame
     // ------------------------------------------------------------------------
-    static void apply(CSRMatrix<VT> *&res,
-                      const char     *filename,
-                      Frame          *optsFrame,
-                      DCTX(ctx))
-    {
+    static void apply(CSRMatrix<VT> *&res, const char *filename, Frame *optsFrame, DCTX(ctx)){
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
         IODataType typeHash = CSRMATRIX;
         try {
             auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();
 
-            // NEW: get the engine (may be "")
+            // Get the engine (may be "")
             std::string engine = extractEngineFromFrame(optsFrame);
 
-            // NEW: select reader with engine hint
+            // Select reader with engine hint
             auto reader = registry.getReader(ext, typeHash, engine);
 
             // Merge user overrides using defaults for that engine
@@ -277,25 +261,18 @@ template <> struct Read<Frame> {
     // ------------------------------------------------------------------------
     // Overload: Frame with an options‐Frame
     // ------------------------------------------------------------------------
-    static void apply(Frame *&res,
-                      const char *filename,
-                      Frame      *optsFrame,
-                      DCTX(ctx))
-    {
+    static void apply(Frame *&res, const char *filename, Frame *optsFrame, DCTX(ctx)){
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
         IODataType typeHash = FRAME;
         std::string engine;
         try {
             auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();
-
-            //registry.dumpReaders();
-            //registry.dumpWriters();
             
-            // NEW: get the engine (may be "")
+            // Get the engine (may be "")
             engine = extractEngineFromFrame(optsFrame);
 
-            // NEW: select reader with engine hint
+            // Select reader with engine hint
             auto reader = registry.getReader(ext, typeHash, engine);
 
             // Merge user overrides using defaults for that engine
@@ -306,8 +283,6 @@ template <> struct Read<Frame> {
         } catch (const std::out_of_range &) {
             throw std::runtime_error("No suitable reader found in the registry");
         }
-        //std::cout << "d";
-
     }
 }; // end Read<Frame>
 

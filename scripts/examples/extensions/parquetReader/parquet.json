@@ -6,6 +6,7 @@
     "libPath": "libparquetPlugIn.so",
     "type": "DenseMatrix",
     "engine": "Daphne",
+    "priority": 100,
     "options": {
       "delimiter": ",",
       "threads": "1"

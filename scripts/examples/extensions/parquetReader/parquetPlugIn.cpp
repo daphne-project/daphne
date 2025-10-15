@@ -24,6 +24,7 @@
 #include <parquet/arrow/reader.h>
 #include <parquet/file_reader.h>
 #include <parquet/arrow/writer.h>
+#include <arrow/compute/api.h>
 
 #include <thread>
 #include <vector>
@@ -33,6 +34,121 @@
 #include <string>
 #include <mutex>
 #include <exception>
+
+// Cast an Arrow Array to target type if needed (returns original if already matching).
+static std::shared_ptr<arrow::Array> cast_array_if_needed(
+    const std::shared_ptr<arrow::Array>& arr,
+    const std::shared_ptr<arrow::DataType>& target_type,
+    arrow::MemoryPool* pool)
+{
+    if (arr->type()->Equals(target_type)) {
+        return arr;
+    }
+    arrow::compute::CastOptions copts;
+    copts.to_type = target_type;
+    copts.allow_int_overflow = true;
+    copts.allow_time_truncate = true;
+    auto res = arrow::compute::Cast(arr, copts);
+    if (!res.ok()) {
+        throw std::runtime_error("Arrow cast failed: " + res.status().ToString());
+    }
+    return res.ValueOrDie().make_array();
+}
+
+// Return Parquet leaf column names in canonical (left-to-right) order as dot paths, e.g. "a.b.c".
+static std::vector<std::string> parquet_leaf_names(const parquet::FileMetaData* meta) {
+    std::vector<std::string> names;
+    auto sch = meta->schema(); // parquet::schema::SchemaDescriptor
+    const int leaves = sch->num_columns();
+    names.reserve(leaves);
+    for (int i = 0; i < leaves; ++i) {
+        names.emplace_back(sch->Column(i)->path()->ToDotString());
+    }
+    return names;
+}
+
+// Materialize a value from a dictionary's data array at 'code' as std::string.
+static std::string materialize_dict_value(const std::shared_ptr<arrow::Array>& dict, int64_t code) {
+    using T = arrow::Type;
+    switch (dict->type_id()) {
+        case T::STRING: {
+            auto d = std::static_pointer_cast<arrow::StringArray>(dict);
+            return (code >= 0 && code < d->length() && d->IsValid(code)) ? d->GetString(code) : std::string{};
+        }
+        case T::LARGE_STRING: {
+            auto d = std::static_pointer_cast<arrow::LargeStringArray>(dict);
+            return (code >= 0 && code < d->length() && d->IsValid(code)) ? d->GetString(code) : std::string{};
+        }
+        case T::BINARY: {
+            auto d = std::static_pointer_cast<arrow::BinaryArray>(dict);
+            if (!(code >= 0 && code < d->length()) || !d->IsValid(code)) return {};
+            auto v = d->GetView(code);
+            return std::string(v.data(), v.size());
+        }
+        case T::LARGE_BINARY: {
+            auto d = std::static_pointer_cast<arrow::LargeBinaryArray>(dict);
+            if (!(code >= 0 && code < d->length()) || !d->IsValid(code)) return {};
+            auto v = d->GetView(code);
+            return std::string(v.data(), v.size());
+        }
+        default: {
+            auto sres = dict->GetScalar(code);
+            if (sres.ok() && sres.ValueOrDie()) return sres.ValueOrDie()->ToString();
+            return {};
+        }
+    }
+}
+
+// Extract a single row i from arbitrary Arrow array as std::string (handles DICTIONARY safely).
+static std::string get_string_at_any(const std::shared_ptr<arrow::Array>& arr, int64_t i, arrow::MemoryPool* pool) {
+    using T = arrow::Type;
+    if (!arr->IsValid(i)) return {}; // empty for nulls
+
+    switch (arr->type_id()) {
+        case T::STRING: {
+            auto a = std::static_pointer_cast<arrow::StringArray>(arr);
+            return a->GetString(i);
+        }
+        case T::LARGE_STRING: {
+            auto a = std::static_pointer_cast<arrow::LargeStringArray>(arr);
+            return a->GetString(i);
+        }
+        case T::BINARY: {
+            auto a = std::static_pointer_cast<arrow::BinaryArray>(arr);
+            auto v = a->GetView(i);
+            return std::string(v.data(), v.size());
+        }
+        case T::LARGE_BINARY: {
+            auto a = std::static_pointer_cast<arrow::LargeBinaryArray>(arr);
+            auto v = a->GetView(i);
+            return std::string(v.data(), v.size());
+        }
+        case T::DICTIONARY: {
+            auto dict_arr = std::static_pointer_cast<arrow::DictionaryArray>(arr);
+
+            // Cast indices to int32 (supports int8/16/32/64 signed/unsigned)
+            arrow::compute::CastOptions copts;
+            copts.to_type = arrow::int32();
+            copts.allow_int_overflow = true;
+
+            auto casted_idx_res = arrow::compute::Cast(dict_arr->indices(), copts);
+            if (!casted_idx_res.ok()) {
+                // fallback: stringify index scalar if casting fails
+                auto s = dict_arr->indices()->GetScalar(i);
+                return (s.ok() && s.ValueOrDie()) ? s.ValueOrDie()->ToString() : std::string{};
+            }
+            auto idx32 = std::static_pointer_cast<arrow::Int32Array>(casted_idx_res.ValueOrDie().make_array());
+            if (!idx32->IsValid(i)) return {};
+            int32_t code = idx32->Value(i);
+            return materialize_dict_value(dict_arr->dictionary(), code);
+        }
+        default: {
+            // Numeric/bool/timestamp/nested: fallback to Scalar::ToString()
+            auto sres = arr->GetScalar(i);
+            return (sres.ok() && sres.ValueOrDie()) ? sres.ValueOrDie()->ToString() : std::string{};
+        }
+    }
+}
 
 extern "C" {
 
@@ -47,88 +163,140 @@ void parquet_read(
     using arrow::io::FileMode;
     using parquet::ParquetFileReader;
 
-
     // 1) mmap + metadata
     auto mmr = MemoryMappedFile::Open(filename, FileMode::READ);
     if (!mmr.ok())
         throw std::runtime_error("mmap failed: " + mmr.status().ToString());
-    auto infile = *mmr;
+    std::shared_ptr<arrow::io::RandomAccessFile> infile = *mmr;
 
     std::unique_ptr<ParquetFileReader> pf = ParquetFileReader::Open(infile);
     if (!pf)
         throw std::runtime_error("ParquetFileReader::Open failed");
-    auto meta = pf->metadata();
+    std::shared_ptr<parquet::FileMetaData> meta = pf->metadata();
 
-    int numRG = meta->num_row_groups();
-    int cols  = meta->num_columns();
-    int64_t rows = fmd.numRows;
-    if (cols != (int)fmd.numCols)
-        throw std::runtime_error("column count mismatch");
+    const int numRG = meta->num_row_groups();
+    const int cols  = meta->num_columns();           // PARQUET LEAF COLUMNS
+    const int64_t rows = fmd.numRows;
 
-    // 2) compute row-group offsets
-    std::vector<int64_t> rgOffset(numRG+1, 0);
+    if (cols != static_cast<int>(fmd.numCols)) {
+        throw std::runtime_error("column count mismatch: parquet(leaves)=" + std::to_string(cols) +
+                                 " expected(meta)=" + std::to_string(fmd.numCols));
+    }
+
+    // 2) row-group offsets
+    std::vector<int64_t> rgOffset(numRG + 1, 0);
     for (int rg = 0; rg < numRG; ++rg)
-        rgOffset[rg+1] = rgOffset[rg] + meta->RowGroup(rg)->num_rows();
+        rgOffset[rg + 1] = rgOffset[rg] + meta->RowGroup(rg)->num_rows();
     if (rgOffset[numRG] != rows)
-        throw std::runtime_error("row count mismatch");
+        throw std::runtime_error("row count mismatch: parquet=" +
+                                 std::to_string(rgOffset[numRG]) + " expected(meta)=" + std::to_string(rows));
+
+    // Canonical leaf names in Parquet order; used to align RGs with differing visible fields
+    const auto leafNames = parquet_leaf_names(meta.get()); // size == cols
 
     // 3) thread count
     int threads = 1;
     if (auto it = opts.extra.find("threads"); it != opts.extra.end())
         threads = std::max(1, std::stoi(it->second));
 
-    // 4) dispatch by type
-    if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::SI32) {
-        // allocate one big row-major matrix
+    const bool is_si32 = (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::SI32);
+    const bool is_f64  = (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F64);
+
+    // ---------- INT32 path ----------
+    if (is_si32) {
         auto *mat = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, cols, false);
         int32_t *data = mat->getValues();
 
-        // parallel RG scatter
         std::mutex  mx; std::exception_ptr err;
-        int rgPer = (numRG + threads - 1) / threads;
+        const int rgPer = (numRG + threads - 1) / threads;
         std::vector<std::thread> workers;
 
         for (int t = 0; t < threads; ++t) {
-            int rg0 = t * rgPer;
-            int rg1 = std::min(numRG, rg0 + rgPer);
+            const int rg0 = t * rgPer;
+            const int rg1 = std::min(numRG, rg0 + rgPer);
             if (rg0 >= rg1) break;
 
-            workers.emplace_back([&, rg0, rg1](){
+            workers.emplace_back([&, rg0, rg1]() {
                 try {
-                    // each thread opens its own Arrow FileReader
                     arrow::MemoryPool *pool = arrow::default_memory_pool();
                     std::unique_ptr<parquet::arrow::FileReader> rdr;
-                    PARQUET_THROW_NOT_OK(
-                        parquet::arrow::OpenFile(infile, pool, &rdr)
-                    );
+                    PARQUET_THROW_NOT_OK(parquet::arrow::OpenFile(infile, pool, &rdr));
+                    rdr->set_use_threads(false);
 
-                    // prepare column list
+                    // We will read all LEAF columns; later we align by leafNames
                     std::vector<int> all_cols(cols);
                     std::iota(all_cols.begin(), all_cols.end(), 0);
 
-                    // read & scatter
                     for (int rg = rg0; rg < rg1; ++rg) {
                         std::shared_ptr<arrow::Table> tbl;
-                        PARQUET_THROW_NOT_OK(
-                            rdr->ReadRowGroup(rg, all_cols, &tbl)
-                        );
-                        int64_t base = rgOffset[rg];
-                        int64_t nRG  = tbl->num_rows();
+                        PARQUET_THROW_NOT_OK(rdr->ReadRowGroup(rg, all_cols, &tbl));
+                        if (!tbl) throw std::runtime_error("ReadRowGroup returned null Table");
 
-                        // for each column, memcpy into row-major buffer
+                        // Combine chunks + flatten (structs -> leaves as fields)
+                        {
+                            auto cc = tbl->CombineChunks(pool);
+                            if (!cc.ok()) throw std::runtime_error("CombineChunks failed: " + cc.status().ToString());
+                            tbl = cc.ValueOrDie();
+
+                            auto fl = tbl->Flatten();
+                            if (!fl.ok()) throw std::runtime_error("Flatten failed: " + fl.status().ToString());
+                            tbl = fl.ValueOrDie();
+                        }
+
+                        const int64_t base = rgOffset[rg];
+                        const int64_t nRG  = tbl->num_rows();
+
+                        // Map present field names -> index
+                        std::unordered_map<std::string, int> name2idx;
+                        name2idx.reserve(static_cast<size_t>(tbl->num_columns()));
+                        for (int j = 0; j < tbl->num_columns(); ++j) {
+                            name2idx.emplace(tbl->field(j)->name(), j);
+                        }
+
+                        // Iterate canonical Parquet leaves
                         for (int c = 0; c < cols; ++c) {
-                            auto arr = std::static_pointer_cast<arrow::Int32Array>(
-                                           tbl->column(c)->chunk(0));
-                            const int32_t *src = arr->raw_values();
-                            int32_t *dst = data + base*cols + c;
-                            // now we need to copy nRG values at stride=cols:
-                            for (int64_t i = 0; i < nRG; ++i) {
-                                dst[i*cols] = src[i];
+                            auto it = name2idx.find(leafNames[c]);
+                            if (it == name2idx.end()) {
+                                // Missing in this RG: fill zeros
+                                for (int64_t i = 0; i < nRG; ++i)
+                                    data[(base + i) * cols + c] = 0;
+                                continue;
                             }
+
+                            auto chunked = tbl->column(it->second);
+                            if (!chunked) {
+                                for (int64_t i = 0; i < nRG; ++i)
+                                    data[(base + i) * cols + c] = 0;
+                                continue;
+                            }
+
+                            int64_t logical_row = 0;
+                            const int n_chunks = chunked->num_chunks();
+                            for (int k = 0; k < n_chunks; ++k) {
+                                auto arr = chunked->chunk(k);
+                                if (!arr) continue;
+
+                                auto arr32 = std::static_pointer_cast<arrow::Int32Array>(
+                                    cast_array_if_needed(arr, arrow::int32(), pool)
+                                );
+
+                                const int64_t len = arr32->length();
+                                const int32_t* src = arr32->raw_values();
+                                int32_t *dst_col0 = data + (base + logical_row) * cols + c;
+
+                                if (arr32->null_count() == 0) {
+                                    for (int64_t i = 0; i < len; ++i) dst_col0[i * cols] = src[i];
+                                } else {
+                                    for (int64_t i = 0; i < len; ++i)
+                                        dst_col0[i * cols] = arr32->IsValid(i) ? src[i] : 0;
+                                }
+                                logical_row += len;
+                            }
+                            if (logical_row != nRG)
+                                throw std::runtime_error("RG row mismatch after chunking (int32)");
                         }
                     }
-                }
-                catch(...) {
+                } catch (...) {
                     std::lock_guard<std::mutex> guard(mx);
                     if (!err) err = std::current_exception();
                 }
@@ -137,109 +305,206 @@ void parquet_read(
 
         for (auto &w : workers) w.join();
         if (err) std::rethrow_exception(err);
-
         res = mat;
+        return;
     }
-    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F64) {
+
+    // ---------- DOUBLE path ----------
+    if (is_f64) {
         auto *mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, false);
         double *data = mat->getValues();
 
-        std::mutex mx; std::exception_ptr err;
-        int rgPer = (numRG + threads - 1) / threads;
+        std::mutex  mx; std::exception_ptr err;
+        const int rgPer = (numRG + threads - 1) / threads;
         std::vector<std::thread> workers;
 
         for (int t = 0; t < threads; ++t) {
-            int rg0 = t*rgPer, rg1 = std::min(numRG, rg0+rgPer);
+            const int rg0 = t * rgPer, rg1 = std::min(numRG, rg0 + rgPer);
             if (rg0 >= rg1) break;
-            workers.emplace_back([&, rg0, rg1](){
+
+            workers.emplace_back([&, rg0, rg1]() {
                 try {
                     arrow::MemoryPool *pool = arrow::default_memory_pool();
                     std::unique_ptr<parquet::arrow::FileReader> rdr;
-                    PARQUET_THROW_NOT_OK(
-                        parquet::arrow::OpenFile(infile, pool, &rdr)
-                    );
+                    PARQUET_THROW_NOT_OK(parquet::arrow::OpenFile(infile, pool, &rdr));
+                    rdr->set_use_threads(false);
 
                     std::vector<int> all_cols(cols);
                     std::iota(all_cols.begin(), all_cols.end(), 0);
 
                     for (int rg = rg0; rg < rg1; ++rg) {
                         std::shared_ptr<arrow::Table> tbl;
-                        PARQUET_THROW_NOT_OK(
-                            rdr->ReadRowGroup(rg, all_cols, &tbl)
-                        );
-                        int64_t base = rgOffset[rg];
-                        int64_t nRG  = tbl->num_rows();
+                        PARQUET_THROW_NOT_OK(rdr->ReadRowGroup(rg, all_cols, &tbl));
+                        if (!tbl) throw std::runtime_error("ReadRowGroup returned null Table");
+
+                        // Combine chunks + flatten
+                        {
+                            auto cc = tbl->CombineChunks(pool);
+                            if (!cc.ok()) throw std::runtime_error("CombineChunks failed: " + cc.status().ToString());
+                            tbl = cc.ValueOrDie();
+
+                            auto fl = tbl->Flatten();
+                            if (!fl.ok()) throw std::runtime_error("Flatten failed: " + fl.status().ToString());
+                            tbl = fl.ValueOrDie();
+                        }
+
+                        const int64_t base = rgOffset[rg];
+                        const int64_t nRG  = tbl->num_rows();
+
+                        std::unordered_map<std::string, int> name2idx;
+                        name2idx.reserve(static_cast<size_t>(tbl->num_columns()));
+                        for (int j = 0; j < tbl->num_columns(); ++j) {
+                            name2idx.emplace(tbl->field(j)->name(), j);
+                        }
 
                         for (int c = 0; c < cols; ++c) {
-                            auto arr = std::static_pointer_cast<arrow::DoubleArray>(
-                                           tbl->column(c)->chunk(0));
-                            const double *src = arr->raw_values();
-                            double *dst = data + base*cols + c;
-                            for (int64_t i = 0; i < nRG; ++i)
-                                dst[i*cols] = src[i];
+                            auto it = name2idx.find(leafNames[c]);
+                            if (it == name2idx.end()) {
+                                for (int64_t i = 0; i < nRG; ++i)
+                                    data[(base + i) * cols + c] = std::nan("");
+                                continue;
+                            }
+
+                            auto chunked = tbl->column(it->second);
+                            if (!chunked) {
+                                for (int64_t i = 0; i < nRG; ++i)
+                                    data[(base + i) * cols + c] = std::nan("");
+                                continue;
+                            }
+
+                            int64_t logical_row = 0;
+                            const int n_chunks = chunked->num_chunks();
+                            for (int k = 0; k < n_chunks; ++k) {
+                                auto arr = chunked->chunk(k);
+                                if (!arr) continue;
+
+                                auto arr64 = std::static_pointer_cast<arrow::DoubleArray>(
+                                    cast_array_if_needed(arr, arrow::float64(), pool)
+                                );
+
+                                const int64_t len = arr64->length();
+                                const double* src = arr64->raw_values();
+                                double *dst_col0 = data + (base + logical_row) * cols + c;
+
+                                if (arr64->null_count() == 0) {
+                                    for (int64_t i = 0; i < len; ++i) dst_col0[i * cols] = src[i];
+                                } else {
+                                    for (int64_t i = 0; i < len; ++i)
+                                        dst_col0[i * cols] = arr64->IsValid(i) ? src[i] : std::nan("");
+                                }
+                                logical_row += len;
+                            }
+                            if (logical_row != nRG)
+                                throw std::runtime_error("RG row mismatch after chunking (double)");
                         }
                     }
-                }
-                catch(...) {
+                } catch (...) {
                     std::lock_guard<std::mutex> guard(mx);
                     if (!err) err = std::current_exception();
                 }
             });
         }
+
         for (auto &w : workers) w.join();
         if (err) std::rethrow_exception(err);
-
         res = mat;
+        return;
     }
-    else {
-        // string case: unchanged per-element copy
+
+    // ---------- STRING (robust) path ----------
+    {
         auto *mat = DataObjectFactory::create<DenseMatrix<std::string>>(rows, cols, false);
         std::string *data = mat->getValues();
 
         std::mutex mx; std::exception_ptr err;
-        int rgPer = (numRG + threads - 1) / threads;
+        const int rgPer = (numRG + threads - 1) / threads;
         std::vector<std::thread> workers;
 
         for (int t = 0; t < threads; ++t) {
-            int rg0 = t * rgPer, rg1 = std::min(numRG, rg0 + rgPer);
+            const int rg0 = t * rgPer, rg1 = std::min(numRG, rg0 + rgPer);
             if (rg0 >= rg1) break;
-            workers.emplace_back([&, rg0, rg1](){
+
+            workers.emplace_back([&, rg0, rg1]() {
                 try {
                     arrow::MemoryPool *pool = arrow::default_memory_pool();
                     std::unique_ptr<parquet::arrow::FileReader> rdr;
-                    PARQUET_THROW_NOT_OK(
-                        parquet::arrow::OpenFile(infile, pool, &rdr)
-                    );
+                    PARQUET_THROW_NOT_OK(parquet::arrow::OpenFile(infile, pool, &rdr));
+                    rdr->set_use_threads(false); // external parallelism
 
                     std::vector<int> all_cols(cols);
                     std::iota(all_cols.begin(), all_cols.end(), 0);
 
                     for (int rg = rg0; rg < rg1; ++rg) {
                         std::shared_ptr<arrow::Table> tbl;
-                        PARQUET_THROW_NOT_OK(
-                            rdr->ReadRowGroup(rg, all_cols, &tbl)
-                        );
-                        int64_t base = rgOffset[rg];
-                        int64_t nRG  = tbl->num_rows();
+                        PARQUET_THROW_NOT_OK(rdr->ReadRowGroup(rg, all_cols, &tbl));
+                        if (!tbl) throw std::runtime_error("ReadRowGroup returned null Table");
 
+                        // 1) Merge chunks; 2) Flatten structs into leaves
+                        {
+                            auto cc = tbl->CombineChunks(pool);
+                            if (!cc.ok()) throw std::runtime_error("CombineChunks failed: " + cc.status().ToString());
+                            tbl = cc.ValueOrDie();
+
+                            auto fl = tbl->Flatten();
+                            if (!fl.ok()) throw std::runtime_error("Flatten failed: " + fl.status().ToString());
+                            tbl = fl.ValueOrDie();
+                        }
+
+                        const int64_t base = rgOffset[rg];
+                        const int64_t nRG  = tbl->num_rows();
+
+                        // Build name -> index for present fields in this RG (flattened)
+                        std::unordered_map<std::string, int> name2idx;
+                        name2idx.reserve(static_cast<size_t>(tbl->num_columns()));
+                        for (int j = 0; j < tbl->num_columns(); ++j) {
+                            name2idx.emplace(tbl->field(j)->name(), j);
+                        }
+
+                        // Iterate canonical Parquet leaf names (len == meta->num_columns())
                         for (int c = 0; c < cols; ++c) {
-                            auto arr = std::static_pointer_cast<arrow::StringArray>(
-                                           tbl->column(c)->chunk(0));
-                            for (int64_t i = 0; i < nRG; ++i)
-                                data[(base + i)*cols + c] = arr->GetString(i);
+                            auto it = name2idx.find(leafNames[c]);
+                            if (it == name2idx.end()) {
+                                // Missing column in this RG -> fill empties
+                                for (int64_t i = 0; i < nRG; ++i) {
+                                    data[(base + i) * cols + c].clear();
+                                }
+                                continue;
+                            }
+
+                            auto chunked = tbl->column(it->second);
+                            if (!chunked) {
+                                for (int64_t i = 0; i < nRG; ++i) data[(base + i) * cols + c].clear();
+                                continue;
+                            }
+
+                            int64_t logical_row = 0;
+                            const int n_chunks = chunked->num_chunks();
+                            for (int k = 0; k < n_chunks; ++k) {
+                                auto arr = chunked->chunk(k);
+                                if (!arr) continue;
+
+                                const int64_t len = arr->length();
+                                for (int64_t i = 0; i < len; ++i) {
+                                    data[(base + logical_row + i) * cols + c] = get_string_at_any(arr, i, pool);
+                                }
+                                logical_row += len;
+                            }
+                            if (logical_row != nRG)
+                                throw std::runtime_error("RG row mismatch after chunking (string)");
                         }
                     }
-                }
-                catch(...) {
-                    std::lock_guard<std::mutex> guard(mx);
+                } catch (...) {
+                    std::lock_guard<std::mutex> g(mx);
                     if (!err) err = std::current_exception();
                 }
             });
         }
+
         for (auto &w : workers) w.join();
         if (err) std::rethrow_exception(err);
 
         res = mat;
+        return;
     }
 }
 

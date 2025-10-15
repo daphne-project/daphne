@@ -631,13 +631,53 @@ int startDAPHNE(int argc, const char **argv, DaphneLibResult *daphneLibRes, int 
     // ************************************************************************
     // Populate FileIO extension catalog
     // ************************************************************************
+    
+    // Discover and parse the built-in and custom catalog
     FileIOCatalogParser fileIOParser;
     FileIORegistry& registry = executor.getUserConfig().registry;
+
     try {
-        fileIOParser.parseFileIOCatalog("scripts/examples/extensions/builtInIO/BuiltIns.json", registry);
+        // Built-ins first (no override)
+        fileIOParser.parseFileIOCatalog(
+            "scripts/examples/extensions/builtInIO/BuiltIns.json", registry, std::nullopt);
         registry.captureBaseline();
+
         if (!FileIOExt.empty()) {
-            fileIOParser.parseFileIOCatalog(FileIOExt, registry); 
+            std::string extCatalogFile;
+            int64_t extPriorityValue = 0;
+            bool hasPriority = false;
+
+            const std::string prioritySep = ":";
+            const size_t pos = FileIOExt.rfind(prioritySep);
+            if (pos != std::string::npos) { // a priority was specified for the extension
+                extCatalogFile = FileIOExt.substr(0, pos);
+                const std::string extPriorityStr(FileIOExt.substr(pos + prioritySep.size()));
+                try {
+                    size_t idx;
+                    extPriorityValue = std::stoll(extPriorityStr, &idx);
+                    if (idx != extPriorityStr.size()) {
+                        // stoll() did not consume all characters → non-integer tail present
+                        throw std::runtime_error("");
+                    }
+                    hasPriority = true;
+                } catch (std::exception &) {
+                    throw std::runtime_error(
+                        "invalid priority for FileIO extension, expected an integer after the '"
+                        + prioritySep + "', but found '" + extPriorityStr + "': '" + FileIOExt + "'"
+                    );
+                }
+            } else { // no priority was specified for the extension
+                extCatalogFile = FileIOExt;
+            }
+
+            // If a priority was specified, override JSON per-entry priorities.
+            // If not, let JSON "priority" (or default 0) take effect.
+            if (hasPriority) {
+                fileIOParser.parseFileIOCatalog(extCatalogFile, registry,
+                                                std::optional<int>{static_cast<int>(extPriorityValue)});
+            } else {
+                fileIOParser.parseFileIOCatalog(extCatalogFile, registry, std::nullopt);
+            }
         }
     }
     catch (const std::exception &e) {

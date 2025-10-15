@@ -146,15 +146,25 @@ template <> struct Write<Frame> {
 template <typename VT> struct Write<Matrix<VT>> {
     static void apply(const Matrix<VT> *arg, const char *filename, Frame *optsFrame, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
+        try {
+            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
+            IODataType typeHash = CSRMATRIX;
+            std::string engine = extractEngineFromFrame(optsFrame);
+            auto writer = registry.getWriter(ext, typeHash, engine);
+            FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
 
-        if (ext == ".csv") {
-            File *file = openFileForWrite(filename);
-            FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
-            MetaDataParser::writeMetaData(filename, metaData);
-            writeCsv(arg, file);
-            closeFile(file);
-        } else
+            MetaDataParser::writeMetaData(filename, fmd);
+
+            // Merge user overrides from optsFrame
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
+            
+            writer(arg, fmd, filename, mergedOpts, ctx);
+            return;
+        }
+        catch (const std::out_of_range &e) {
             throw std::runtime_error("no suitable writer found in the registry");
+        }
+            
     }
 };
 
