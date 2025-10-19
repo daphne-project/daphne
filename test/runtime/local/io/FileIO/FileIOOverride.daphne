@@ -1,6 +1,6 @@
-opts = {"engine": ["Daphne"], "threads": ["4"]};
+opts = {"engine": ["Daphne"], "threads": ["1"],"hasHeader": ["false"],"useCols": ["Name,Email"]};
 
 
-f = readMatrix("scripts/examples/extensions/builtInIO/random_data.csv");
+f = readFrame("scripts/examples/extensions/csv/random_data.csv",opts);
 
-//print(f);
+print(f);

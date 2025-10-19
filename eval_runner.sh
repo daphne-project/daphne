@@ -238,6 +238,12 @@ fetch_off_as_csv_noempties() { # url outpath min_mb max_mb
   echo "[convert] OFF (TSV -> CSV; quote-free; sanitize commas) -> $(basename "$out") [${min_mb}-${max_mb} MB]"
   python3 - "$tmp_tsv" "$out" "$min_mb" "$max_mb" <<'PY'
 import sys, csv, io, os
+# Allow very large fields (OFF has huge text columns)
+try:
+  csv.field_size_limit(sys.maxsize)
+except (OverflowError, ValueError):
+  # Fallback for platforms with smaller caps 
+  csv.field_size_limit(2**31 - 1)
 tsv_path, out_csv, min_mb, max_mb = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
 MIN = min_mb * 1024 * 1024
 MAX = max_mb * 1024 * 1024
@@ -477,7 +483,7 @@ if (( SKIP_KNOWN == 0 )); then
     case "$f" in
       csv)
         out="$DATA_DIR/known_off_clean.csv"
-        fetch_off_as_csv_noempties "$OFF_URL" "$out" 1000 2000
+        fetch_off_as_csv_noempties "$OFF_URL" "$out" 3800 4096
         KNOWN_PATH[csv]="$out"
         "$GEN_META_BIN" "$out"
         ;;

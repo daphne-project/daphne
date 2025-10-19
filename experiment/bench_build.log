@@ -1,0 +1,4 @@
+/daphne/experiment/bench_io_harness.cpp:30:10: fatal error: runtime/local/io/FileIOCatalogParser.h: No such file or directory
+   30 | #include "runtime/local/io/FileIOCatalogParser.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.

@@ -53,8 +53,6 @@ static IOOptions mergeOptionsFromFrame(const std::string &ext, IODataType dt, co
 
     IOOptions merged = defaults;
 
-    //reg.dumpReaders();
-
     if(optsFrame != nullptr && optsFrame->getLabels()[0] != "dummy") {
         const size_t nRows = optsFrame->getNumRows();
         const size_t nCols = optsFrame->getNumCols();

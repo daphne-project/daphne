@@ -1,7 +1,6 @@
 {
   "numRows": 1000000,
   "numCols": 6,
-  "numNonZeros": 0,
   "schema": [
         {
             "label": "col_0",
