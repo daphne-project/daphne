@@ -1,0 +1,5 @@
+t1=now();
+m = readMatrix("experiment/data.csv");
+t2=now();
+
+print(t2-t1);

@@ -1,0 +1,5 @@
+t3 = now();
+m = readMatrix("experiment/ReadParquet1.parquet");
+t4 = now();
+
+print(t4-t3);

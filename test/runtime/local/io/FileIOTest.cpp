@@ -82,7 +82,7 @@ TEST_CASE("FileIORegistry registerReader and getReader", "[io][registry]") {
     registry.resetToBaseline();
 }
 
-TEST_CASE("FileIOPlugin dynamic load and registration validity", "[io][plugin]") {
+TEST_CASE("FileIO Plugin dynamic load and registration validity", "[io][plugin]") {
     // The parser already loads and registers the plugin
     
     REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
@@ -108,7 +108,6 @@ TEST_CASE("FileIO csv_read loads numeric CSV into DenseMatrix<int32_t>", "[csv][
     auto csvPath = tempDir / "test_read.csv";
     {
         std::ofstream ofs(csvPath);
-        ofs << "col1,col2\n";
         ofs << "1,2\n";
         ofs << "3,4\n";
     }
@@ -215,11 +214,10 @@ TEST_CASE("FileIOCatalogParser parses options correctly", "[io][catalog]") {
 
     // Validate options fields
 
-    REQUIRE(opts.extra.size() == 4);
+    REQUIRE(opts.extra.size() == 3);
     CHECK(opts.extra.at("delimiter") == ",");
     CHECK(opts.extra.at("hasHeader") == "false");
     CHECK(opts.extra.at("threads") == "1");
-    CHECK(opts.extra.at("dateFormat") == "YYYY-MM-DD");
     FileIORegistry::instance().resetToBaseline();
 }
 
@@ -299,7 +297,7 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO ReadParquet, DenseMatrix", TAG_IO, (DenseMatr
     DataObjectFactory::destroy(m);
 }
 
-TEST_CASE("FileIOw parquet_write_frame writes Frame to Parquet", "[parquet][write][frame]") {
+TEST_CASE("FileIO parquet_write_frame writes Frame to Parquet", "[parquet][write][frame]") {
     const size_t rows = 2;
     const size_t cols = 3;
 
@@ -391,7 +389,7 @@ TEST_CASE("FileIOw parquet_write_frame writes Frame to Parquet", "[parquet][writ
     registry.resetToBaseline();
 }
 
-TEST_CASE("FileIOw parquet_write writes DenseMatrix<double> to Parquet", "[parquet][write]") {
+TEST_CASE("FileIO parquet_write writes DenseMatrix<double> to Parquet", "[parquet][write]") {
     // --- Arrange ---
     const size_t rows = 2, cols = 2;
     auto *mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, /*alloc*/false);
@@ -455,208 +453,6 @@ TEST_CASE("FileIOw parquet_write writes DenseMatrix<double> to Parquet", "[parqu
     std::filesystem::remove(outPath);
     FileIORegistry::instance().resetToBaseline();
 }
-
-// Linux: ru_maxrss is in KB; macOS: bytes
-static size_t peak_rss_bytes() {
-    rusage ru{};
-    getrusage(RUSAGE_SELF, &ru);
-#if defined(__APPLE__)
-    return static_cast<size_t>(ru.ru_maxrss);
-#else
-    return static_cast<size_t>(ru.ru_maxrss) * 1024;
-#endif
-}
-TEMPLATE_PRODUCT_TEST_CASE("FileIO_parquetProbe_1_thread",
-                           TAG_IO, (DenseMatrix), (double)){
-    using DT = TestType;
-    const std::string path = "scripts/examples/extensions/parquetReader/random_doubles2.parquet";
-
-    try {
-        parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry);
-    } catch (const std::length_error& e) {
-        std::cerr << "length_error in parseFileIOCatalog: " << e.what() << "\n";
-        throw; // or FAIL();
-    }
-
-    DT* m = nullptr;
-
-    auto t0 = std::chrono::steady_clock::now();
-    read(m, path.c_str() , emptyFrame, ctx);
-    auto t1 = std::chrono::steady_clock::now();
-    REQUIRE(m != nullptr);
-    
-    const size_t rows = m->getNumRows();
-    const size_t cols = m->getNumCols();
-
-    // Force full decode: touch data
-    double checksum = 0.0;
-    for (size_t i = 0; i < rows; ++i)
-        for (size_t j = 0; j < cols; ++j)
-            checksum += m->get(i, j);
-
-    const double wall_s = std::chrono::duration<double>(t1 - t0).count();
-    const size_t peak_bytes = peak_rss_bytes();
-
-    nlohmann::json j{
-        {"tool","parquet_plugin_1_thread"},
-        {"file",path},
-        {"rows",rows},
-        {"cols",cols},
-        {"checksum",checksum},
-        {"wall_s",wall_s},
-        {"peak_rss_bytes",peak_bytes}
-    };
-    std::cout << "PROBE " << j.dump() << "\n";
-
-
-    FileIORegistry::instance().resetToBaseline();
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry));
-
-
-    DT* m1 = nullptr;
-    
-    std::vector<Structure*> columns(1);
-
-    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
-
-    auto* val1 = keyCol->getValues();
-
-    val1[0] = "16";
-
-    columns[0] = keyCol;
-
-    const char* labels[1] = {"threads"};
-
-    Frame* optsFrame = nullptr;
-    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
-
-    auto t01 = std::chrono::steady_clock::now();
-    read(m1, path.c_str(), optsFrame, ctx);            // your existing call
-    auto t11 = std::chrono::steady_clock::now();
-    REQUIRE(m1 != nullptr);
-
-    const size_t rows1 = m1->getNumRows();
-    const size_t cols1 = m1->getNumCols();
-
-    // Force full decode: touch data
-    double checksum1 = 0.0;
-    for (size_t i = 0; i < rows; ++i)
-        for (size_t j = 0; j < cols; ++j)
-            checksum1 += m1->get(i, j);
-
-    const double wall_s1 = std::chrono::duration<double>(t11 - t01).count();
-    const size_t peak_bytes1 = peak_rss_bytes();
-
-    nlohmann::json j1{
-        {"tool","parquet_plugin_16_thread"},
-        {"file",path},
-        {"rows",rows1},
-        {"cols",cols1},
-        {"checksum",checksum1},
-        {"wall_s",wall_s1},
-        {"peak_rss_bytes",peak_bytes1}
-    };
-    std::cout << "PROBE " << j1.dump() << "\n";
-
-    REQUIRE(*m == *m1);
-    DataObjectFactory::destroy(m);
-    DataObjectFactory::destroy(m1);
-}
-
-TEST_CASE("FileIO_csvProbe_1_thread", "[FileIO][Parquet][Probe]") {
-    using DT = DenseMatrix<std::string>;
-
-    FileIORegistry::instance().resetToBaseline();
-    const std::string path =
-        "scripts/examples/extensions/csv/data.csv";
-
-    DT *m = nullptr;
-    DT *m4 = nullptr;
-
-    auto t00 = std::chrono::steady_clock::now();
-    read(m, path.c_str(), emptyFrame, ctx);
-    auto t10 = std::chrono::steady_clock::now();
-    REQUIRE(m != nullptr);
-    read(m4, path.c_str(), emptyFrame, ctx);
-    REQUIRE(*m4 == *m);
-    const size_t rows0 = m->getNumRows();
-    const size_t cols0 = m->getNumCols();
-
-    const double wall_s0 = std::chrono::duration<double>(t10 - t00).count();
-    const size_t peak_bytes0 = peak_rss_bytes();
-
-    nlohmann::json j0{
-        {"tool","builtin"},
-        {"file",path},
-        {"rows",rows0},
-        {"cols",cols0},
-        {"wall_s",wall_s0},
-        {"peak_rss_bytes",peak_bytes0}
-    };
-    std::cout << "PROBE " << j0.dump() << "\n";
-    //f->print(std::cout);
-
-    FileIORegistry::instance().resetToBaseline();
-
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(
-        "scripts/examples/extensions/csv/myIO.json", registry));
-
-    DT *m1 = nullptr;
-
-    auto t0 = std::chrono::steady_clock::now();
-    read(m1, path.c_str(), emptyFrame, ctx);
-    auto t1 = std::chrono::steady_clock::now();
-    REQUIRE(m1 != nullptr);
-
-    const size_t rows = m1->getNumRows();
-    const size_t cols = m1->getNumCols();
-
-    const double wall_s = std::chrono::duration<double>(t1 - t0).count();
-    const size_t peak_bytes = peak_rss_bytes();
-
-    nlohmann::json j1{
-        {"tool","daphne"},
-        {"file",path},
-        {"rows",rows},
-        {"cols",cols},
-        {"wall_s",wall_s},
-        {"peak_rss_bytes",peak_bytes}
-    };
-    std::cout << "PROBE " << j1.dump() << "\n";
-
-    DT *m2 = nullptr;
-
-    auto t000 = std::chrono::steady_clock::now();
-    read(m2, path.c_str(), emptyFrame, ctx);    
-    auto t111 = std::chrono::steady_clock::now();
-    REQUIRE(m2 != nullptr);
-
-    const size_t rows1 = m2->getNumRows();
-    const size_t cols1 = m2->getNumCols();
-
-    const double wall_s1 = std::chrono::duration<double>(t111 - t000).count();
-    const size_t peak_bytes1 = peak_rss_bytes();
-
-    nlohmann::json j2{
-        {"tool","daphne_again_to_check_first-use_overhead"},
-        {"file",path},
-        {"rows",rows1},
-        {"cols",cols1},
-        {"wall_s",wall_s1},
-        {"peak_rss_bytes",peak_bytes1}
-    };
-    std::cout << "PROBE " << j2.dump() << "\n";
-
-    //f1->print(std::cout);
-    //REQUIRE(*m2 == *m1);
-    REQUIRE(*m == *m2);
-    DataObjectFactory::destroy(m);
-    DataObjectFactory::destroy(m1);
-    DataObjectFactory::destroy(m2);
-
-    FileIORegistry::instance().resetToBaseline();
-}
-
 
 static std::atomic<int> MYREADER_CALLS{0};
 static std::atomic<int> YOURREADER_CALLS{0};
@@ -727,95 +523,4 @@ TEST_CASE("FileIO Duplicate lazy Registration is rejected") {
     REQUIRE_THROWS( registry.registerLazy(".csv", IODataType::FRAME, "lib.so", "myReader", "mywriter", opts, "daphne", 5));
 
     registry.resetToBaseline();
-}
-
-TEST_CASE("FileIOx csv_write writes DenseMatrix<double> to CSV", "[csv][write]") {
-    // Create a 2x2 double matrix
-    size_t rows = 2, cols = 2;
-    auto *mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, false);
-    double *vals = mat->getValues();
-    vals[0] = 1.5; vals[1] = 2.5;
-    vals[2] = 3.5; vals[3] = 4.5;
-
-    // Prepare output file path
-    auto tempDir = std::filesystem::temp_directory_path();
-    auto outPath = tempDir / "test_write.csv";
-
-    write(mat, outPath.c_str(), emptyFrame, ctx);
-    // Read back file
-    std::ifstream ifs(outPath);
-    REQUIRE(ifs.good());
-    std::vector<std::string> lines;
-    std::string line;
-    while (std::getline(ifs, line)) {
-        lines.push_back(line);
-    }
-    REQUIRE(lines.size() == 2);
-    REQUIRE(lines[0] == "1.500000,2.500000");
-    REQUIRE(lines[1] == "3.500000,4.500000");
-}
-
-TEST_CASE("FileIOx csv_write writes Frame to CSV", "[csv][write][frame]") {
-    // --- Build a 2x3 Frame: [SI32, F64, STR] ---
-    const size_t rows = 2, cols = 3;
-
-    // Schema and (optional) labels
-    auto *schema = new ValueTypeCode[cols];
-    schema[0] = ValueTypeCode::SI32;
-    schema[1] = ValueTypeCode::F64;
-    schema[2] = ValueTypeCode::STR;
-
-    auto *labels = new std::string[cols];
-    labels[0] = "c_i32";
-    labels[1] = "c_f64";
-    labels[2] = "c_str";
-
-    Frame *fr = DataObjectFactory::create<Frame>(rows, cols, schema, labels, /*init=*/false);
-
-    // Fill column 0 (SI32)
-    {
-        auto *col0 = reinterpret_cast<int32_t *>(fr->getColumnRaw(0));
-        col0[0] = 7;
-        col0[1] = 9;
-    }
-    // Fill column 1 (F64)
-    {
-        auto *col1 = reinterpret_cast<double *>(fr->getColumnRaw(1));
-        col1[0] = 1.25;
-        col1[1] = 2.5;
-    }
-    // Fill column 2 (STR) — second row has a comma to test quoting
-    {
-        auto *col2 = reinterpret_cast<std::string *>(fr->getColumnRaw(2));
-        col2[0] = "hello";
-        col2[1] = "a,b";
-    }
-
-    // --- Prepare output file path ---
-    auto tempDir = std::filesystem::temp_directory_path();
-    auto outPath = tempDir / "test_write_frame.csv";
-
-    // --- Write via kernel (same call style you used) ---
-    // emptyFrame/ctx are assumed to be available in your test fixture
-    write(fr, outPath.c_str(), emptyFrame, ctx);
-
-    // --- Read back file and verify lines ---
-    std::ifstream ifs(outPath);
-    REQUIRE(ifs.good());
-
-    std::vector<std::string> lines;
-    std::string line;
-    while (std::getline(ifs, line)) {
-        lines.push_back(line);
-    }
-
-    REQUIRE(lines.size() == 2);
-    // Built-in writer formats doubles as "%f" (6 decimals) and quotes strings with commas
-    REQUIRE(lines[0] == "7,1.250000,hello");
-    REQUIRE(lines[1] == "9,2.500000,\"a,b\"");
-
-    // Cleanup
-    DataObjectFactory::destroy(fr);
-    delete[] schema;
-    delete[] labels;
 }

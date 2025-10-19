@@ -9,7 +9,9 @@
     "priority": 100,
     "options": {
       "delimiter": ",",
-      "threads": "1"
+      "threads": "1",
+      "large_strings": "true",
+      "compression": "snappy"
     }
   },
   {

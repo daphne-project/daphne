@@ -19,7 +19,6 @@
     "libPath": "libBuiltInPlugIns.so",
     "type": "DenseMatrix",
     "engine": "builtin",
-    "priority": 5,
     "options": {
       "delimiter": ",",
       "sorted": "false",

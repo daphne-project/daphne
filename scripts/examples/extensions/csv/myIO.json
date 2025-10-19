@@ -10,14 +10,13 @@
     "options": {
       "delimiter": ",",
       "hasHeader": "false",
-      "threads": "1",
-      "dateFormat": "YYYY-MM-DD"
+      "threads": "1"
     }
   },
   {
     "extension": ".csv",
     "readerFuncName": "csv_read_frame",
-    "writerFuncName": "",
+    "writerFuncName": "csv_write_frame",
     "libPath": "libCsvIO.so",
     "type": "Frame",
     "engine": "Daphne",
@@ -26,7 +25,7 @@
       "delimiter": ",",
       "hasHeader": "false",
       "threads": "1",
-      "dateFormat": "YYYY-MM-DD"
+      "useCols": ""
     }
   }
 ]

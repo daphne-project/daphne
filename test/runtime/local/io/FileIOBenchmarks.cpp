@@ -115,7 +115,7 @@ TEMPLATE_PRODUCT_TEST_CASE(
 
 // 2) Frame parquet benchmark (1 thread vs 16 threads)
 TEMPLATE_PRODUCT_TEST_CASE(
-    "FileIO3 Benchmark double parquet into a Frame",
+    "FileIO Benchmark double parquet into a Frame",
     TAG_IO "[.bench]",
     (DenseMatrix),
     (double)
