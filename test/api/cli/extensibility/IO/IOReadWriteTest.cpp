@@ -29,7 +29,7 @@ const std::string dirCheckPath = "test/api/cli/io/";
 
 // Extra catalog flag (passed to every DAPHNE invocation)
 static const char* kExtFlag = "--FileIO-ext";
-static const char* kExtPath = "scripts/examples/extensions/csv/myIO.json";
+static const char* kExtPath = "scripts/examples/extensions/csv/csv.json";
 
 #include <fstream>
 #include <string>

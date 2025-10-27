@@ -10,19 +10,7 @@
 #include <optional>  
 
 /**
- * @brief Parses a JSON catalog of I/O plugins, dynamically loads each shared
- * library, discovers its reader/writer functions by name, and registers them
- * directly in FileIORegistry (no plugin-side registration required).
- * JSON format:
- * [
- *   {
- *     "extension": ".csv",
- *     "readerFuncName": "csv_read",
- *     "writerFuncName": "csv_write",
- *     "libPath": "libcsvio.so"
- *   },
- *   ...
- * ]
+ * @brief Parses a JSON catalog of I/O plugins, discovers its reader/writer functions by name, and registers them as lazy
  */
 class FileIOCatalogParser {
 public:

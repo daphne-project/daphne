@@ -1,0 +1,30 @@
+{
+  "numRows": 10000,
+  "numCols": 6,
+  "schema": [
+        {
+            "label": "Name",
+            "valueType": "f64"
+        },
+        {
+            "label": "Address",
+            "valueType": "f64"
+        },
+        {
+            "label": "Email",
+            "valueType": "str"
+        },
+        {
+            "label": "Date",
+            "valueType": "f64"
+        },
+        {
+            "label": "JobTitle",
+            "valueType": "f64"
+        },
+        {
+            "label": "Salary",
+            "valueType": "str"
+        }
+    ]  
+}

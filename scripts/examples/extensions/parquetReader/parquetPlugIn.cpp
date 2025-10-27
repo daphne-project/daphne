@@ -1,14 +1,3 @@
-// parquetPlugIn.cpp
-// Compile with:
-//   g++ -std=c++17 -fPIC -shared \
-//     parquetPlugIn.cpp -o libparquetPlugIn.so \
-//     -I/home/yazan/daphneFork/daphne/src \
-//     -I/home/yazan/daphneFork/daphne/thirdparty/installed/include \
-//     -L/home/yazan/daphneFork/daphne/thirdparty/installed/lib \
-//     -larrow -lparquet -lMLIRIR -lMLIRSupport -lLLVMOption \
-//     -lLLVMSupport -lLLVMDemangle -lLLVMCore \
-//     -lDataStructures -lspdlog -lfmt
-
 #include <iostream>
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
@@ -1215,7 +1204,6 @@ extern "C" void parquet_write(
     const auto tag = tag_from_schema(fmd);
 
     auto add_numeric_column = [&](auto *mat, std::shared_ptr<DataType> dtype, auto builder_mk, auto getter) {
-        using MatT = std::decay_t<decltype(*mat)>;
         const auto *vals = mat->getValues();
         const int64_t C = static_cast<int64_t>(mat->getNumCols());
 

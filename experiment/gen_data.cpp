@@ -250,9 +250,9 @@ int main(int argc, char** argv){
     const std::string pq_path  = outdir + "/gen.parquet";
 
     try {
-        std::cout << "[gen] Parquet -> " << pq_path << " (~" << target_mb << " MB)\n";
+        /*std::cout << "[gen] Parquet -> " << pq_path << " (~" << target_mb << " MB)\n";
         long long pq_rows = gen_parquet_arrow(pq_path, target_mb, cols);
-        write_meta(pq_path, pq_rows, cols, "f64");
+        write_meta(pq_path, pq_rows, cols, "f64");*/
 
         std::cout << "[gen] CSV -> " << csv_path << " (~" << target_mb << " MB)\n";
         long long csv_rows = gen_csv_linesafe(csv_path, target_mb, cols);
@@ -261,8 +261,8 @@ int main(int argc, char** argv){
         /*
         std::cout << "[gen] MM  -> " << mm_path  << " (~" << target_mb << " MB)\n";
         int mm_n = gen_mm_linesafe(mm_path, target_mb);
-        write_meta(mm_path, mm_n, mm_n, "f64");
-        */
+        write_meta(mm_path, mm_n, mm_n, "f64");*/
+        
 
         std::cout << "[done]\n" << csv_path << "\n" << pq_path << "\n" << mm_path << "\n";
     } catch (const std::exception& ex){

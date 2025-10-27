@@ -9,12 +9,9 @@
 #include <string>
 #include <tuple>
 
-
-// Forward decls from your codebase
 struct FileMetaData;
 class DaphneContext;
 
-// Supported I/O data object categories
 enum IODataType {
     FRAME,
     DENSEMATRIX,
@@ -103,8 +100,6 @@ public:
         registerWriter(ext, dt, "default", 0, opts, std::move(fn));
     }
 
-    // Lazy registration (entries may have reader, writer, or both)
-    // Lazy registration (reject duplicates outright)
     void registerLazy(const std::string& ext,
                     IODataType dt,
                     const std::string& libPath,
@@ -430,6 +425,5 @@ private:
     std::map<Key4, LazySpec>      baseline_lazy;
     bool baselineCaptured = false;
 
-    // Keep lib handles alive (once per libPath)
     std::map<std::string, void*>  libHandles;
 };

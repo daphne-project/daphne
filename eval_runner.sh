@@ -35,7 +35,7 @@ SCRIPT_ROOT="${SCRIPT_ROOT:-$REPO_ROOT/scripts/examples/extensions/experiment}"
 DSL_DIR_MATRIX="$SCRIPT_ROOT/matrix"
 [[ -d "$DSL_DIR_MATRIX" ]] || { echo "[error] DSL folder not found at $DSL_DIR_MATRIX"; exit 1; }
 
-CSV_EXT_JSON="${CSV_EXT_JSON:-$REPO_ROOT/scripts/examples/extensions/csv/myIO.json}"
+CSV_EXT_JSON="${CSV_EXT_JSON:-$REPO_ROOT/scripts/examples/extensions/csv/csv.json}"
 PARQUET_EXT_JSON="${PARQUET_EXT_JSON:-$REPO_ROOT/scripts/examples/extensions/parquetReader/parquet.json}"
 
 # CSV
@@ -57,7 +57,6 @@ PARQUET_SCRIPTS_PLUGIN=(
   "$DSL_DIR_MATRIX/parquet_single_thread_eval.daphne"
   "$DSL_DIR_MATRIX/parquet_multi_thread_eval.daphne"
 )
-
 
 # ------------------------------------------------------------
 # Generator + Meta binaries (live in /daphne/experiment)
@@ -220,107 +219,97 @@ rm -f "$WORKDIR/.time_test" "$WORKDIR/.time_test2" "$WORKDIR/.time_test3"
 echo "[measure] using: ${TIME_BIN:-ps sampler} (${TIME_MODE})"
 
 # ------------------------------------------------------------
-# OFF → CSV (no empties) with dynamic column selection (cached)
+# OFF → CSV (no quotes, no internal commas, fixed column count)
+# - Preserves all rows
+# - Sanitizes cells: ','→';', remove '"', CR/LF/TAB→space, strip
+# - Enforces constant #columns: trims trailing empties, folds overflow
+# - Emits CSV with QUOTE_NONE (no quotes)
 # ------------------------------------------------------------
-fetch_off_as_csv_noempties() { # url outpath min_mb max_mb
-  local url="$1" out="$2" min_mb="$3" max_mb="$4"
+fetch_off_as_csv_noquotes_fixedcols() { # url outpath
+  local url="$1" out="$2"
 
-  # If final output exists and non-empty, skip entire step
   if [[ -s "$out" ]]; then
     echo "[cache] found $(basename "$out") ($(mb "$(bytes "$out")") MB) – skip OFF conversion"
     return 0
   fi
 
-  local tmp_tsv="$DATA_DIR/off.tmp.tsv"
-  echo "[download] OFF raw -> $(basename "$tmp_tsv")"
-  download "$url" "$tmp_tsv"
+  local raw_path="$DATA_DIR/off_raw.tmp"
+  echo "[download] OFF raw -> $(basename "$raw_path")"
+  download "$url" "$raw_path"
 
-  echo "[convert] OFF (TSV -> CSV; quote-free; sanitize commas) -> $(basename "$out") [${min_mb}-${max_mb} MB]"
-  python3 - "$tmp_tsv" "$out" "$min_mb" "$max_mb" <<'PY'
-import sys, csv, io, os
-# Allow very large fields (OFF has huge text columns)
+  echo "[convert] OFF (TSV/CSV -> CSV, NO QUOTES, sanitized, fixed cols) -> $(basename "$out")"
+  python3 - "$raw_path" "$out" <<'PY'
+import sys, csv, re
+
+src, dst = sys.argv[1], sys.argv[2]
+
+# Large field support
 try:
-  csv.field_size_limit(sys.maxsize)
-except (OverflowError, ValueError):
-  # Fallback for platforms with smaller caps 
-  csv.field_size_limit(2**31 - 1)
-tsv_path, out_csv, min_mb, max_mb = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-MIN = min_mb * 1024 * 1024
-MAX = max_mb * 1024 * 1024
-SAMPLE_ROWS = 200000
-K_COLS       = 12
-CHUNK_TARGET = 64 * 1024 * 1024
+    csv.field_size_limit(sys.maxsize)
+except Exception:
+    pass
+
+def sniff_delimiter(path):
+    with open(path, 'r', encoding='utf-8', errors='replace', newline='') as f:
+        head = f.read(131072)
+    if head.count('\t') >= head.count(',') and '\t' in head:
+        return '\t'
+    return ','
+
+src_delim = sniff_delimiter(src)
+_ws_re = re.compile(r'[\r\n\t]+')
+
 def sanitize(cell: str) -> str:
-    return cell.replace('\r',' ').replace('\n',' ').replace(',', ';').strip()
-def pass1_select_columns():
-    with open(tsv_path, newline='', encoding='utf-8', errors='ignore') as f:
-        r = csv.reader(f, delimiter='\t')
-        header = next(r, None)
-        if not header:
-            return [], []
-        n = len(header)
-        nonempty = [0]*n
-        seen = [0]*n
-        for i, row in enumerate(r):
-            if i >= SAMPLE_ROWS: break
-            if len(row) != n: continue
-            for j, cell in enumerate(row):
-                seen[j] += 1
-                if cell.strip() != "": nonempty[j] += 1
-        ratios = [(nonempty[j]/seen[j] if seen[j] else 0.0, j) for j in range(n)]
-        ratios.sort(key=lambda x: (-x[0], x[1]))
-        for thr in (0.999, 0.995, 0.990, 0.975, 0.950, 0.900, 0.800, 0.700, 0.0):
-            cand = [j for (ratio,j) in ratios if ratio >= thr]
-            if len(cand) >= K_COLS:
-                sel = cand[:K_COLS]
-                break
-        else:
-            sel = [j for (_,j) in ratios[:K_COLS]]
-        sel.sort()
-        return header, sel
-header, sel = pass1_select_columns()
-if not header or not sel:
-    open(out_csv, 'w', encoding='utf-8').close()
-    raise SystemExit(0)
-written = 0
-chunk_buf = io.StringIO()
-chunk_written = 0
-with open(tsv_path, newline='', encoding='utf-8', errors='ignore') as f, \
-     open(out_csv, 'w', newline='', encoding='utf-8') as g:
-    r = csv.reader(f, delimiter='\t')
-    _hdr = next(r, None)
-    out_header = [sanitize(header[j]) for j in sel]
-    line = ','.join(out_header) + '\n'
-    g.write(line); written += len(line.encode('utf-8'))
-    for row in r:
-        if len(row) < len(header):
+    if not isinstance(cell, str):
+        cell = '' if cell is None else str(cell)
+    cell = _ws_re.sub(' ', cell)   # normalize CR/LF/TAB to space
+    cell = cell.replace('"', '')   # remove quotes
+    cell = cell.replace(',', ';')  # remove commas (preserve delimiter safety)
+    return cell.strip()
+
+with open(src, 'r', encoding='utf-8', errors='replace', newline='') as fin, \
+     open(dst, 'w', encoding='utf-8', newline='') as fout:
+
+    reader = csv.reader(fin, delimiter=src_delim)
+    writer = csv.writer(
+        fout, delimiter=',', quotechar='"',
+        quoting=csv.QUOTE_NONE, escapechar='\\', lineterminator='\n'
+    )
+
+    # Read header to lock column count
+    try:
+        raw_header = next(reader)
+    except StopIteration:
+        # empty file: still emit empty file
+        sys.exit(0)
+
+    header = [sanitize(c) for c in raw_header]
+    ncols = len(header)
+    writer.writerow(header)
+
+    for raw_row in reader:
+        row = [sanitize(c) for c in raw_row]
+        if len(row) == ncols:
+            writer.writerow(row)
             continue
-        out_row = [sanitize(row[j]) for j in sel]
-        if any(c == "" for c in out_row):
-            continue
-        s = ','.join(out_row) + '\n'
-        b = s.encode('utf-8')
-        if written + len(b) > MAX:
-            break
-        g.write(s); written += len(b)
-        if chunk_written < CHUNK_TARGET:
-            chunk_buf.write(s); chunk_written += len(b)
-if written < MIN and chunk_written > 0:
-    with open(out_csv, 'a', newline='', encoding='utf-8') as g:
-        chunk = chunk_buf.getvalue(); cb = chunk.encode('utf-8')
-        while written + len(cb) <= MAX and written < MIN:
-            g.write(chunk); written += len(cb)
-        if written < MIN:
-            for line in chunk.splitlines(True):
-                lb = line.encode('utf-8')
-                if written + len(lb) > MAX: break
-                g.write(line); written += len(lb)
-with open(out_csv, 'ab+') as g:
-    g.seek(0,2); sz=g.tell()
-    if sz>0:
-        g.seek(max(sz-1,0)); last=g.read(1)
-        if last!=b'\n': g.write(b'\n')
-print(f"[csv-known] wrote {(written/1024/1024):.1f} MB to {out_csv}")
+
+        if len(row) > ncols:
+            # If the overflow cells are all empty → drop them (handles trailing delimiters)
+            overflow = row[ncols:]
+            if all(c == '' for c in overflow):
+                row = row[:ncols]
+            else:
+                # fold non-empty overflow back into the last column using ';'
+                keep = row[:ncols-1]
+                last = row[ncols-1]
+                folded = last + (';' if last and overflow else '') + ';'.join(x for x in overflow if x != '')
+                row = keep + [folded]
+        else:  # len(row) < ncols → pad with empties
+            row.extend([''] * (ncols - len(row)))
+
+        writer.writerow(row)
+
+print("[csv-known] wrote sanitized, unquoted, fixed-cols CSV:", dst)
 PY
 }
 
@@ -483,7 +472,8 @@ if (( SKIP_KNOWN == 0 )); then
     case "$f" in
       csv)
         out="$DATA_DIR/known_off_clean.csv"
-        fetch_off_as_csv_noempties "$OFF_URL" "$out" 3800 4096
+        # Lossless conversion (no trimming); works for TSV or CSV source.
+        fetch_off_as_csv_noquotes_fixedcols "$OFF_URL" "$out"
         KNOWN_PATH[csv]="$out"
         "$GEN_META_BIN" "$out"
         ;;

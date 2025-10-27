@@ -82,13 +82,8 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
         catch (const std::out_of_range &e) {
              std::cerr << "no suitable writer found in the registry";
         }
-
-        if (ext == ".dbdf") {
-            FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
-            MetaDataParser::writeMetaData(filename, metaData);
-            writeDaphne(arg, filename);
 #if USE_HDFS
-        } else if (ext == ".hdfs") {
+        if (ext == ".hdfs") {
             HDFSMetaData hdfs = {true, filename};
             FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>, -1, hdfs);
             // Get file extension before .hdfs (e.g. file.csv.hdfs)
@@ -99,9 +94,10 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
 
             // call WriteHDFS
             writeHDFS(arg, filename, ctx);
+            return;
+        }
 #endif
-        } else
-            throw std::runtime_error("no suitable writer found in the registry");
+        throw std::runtime_error("no suitable writer found in the registry");
     }
 };
 

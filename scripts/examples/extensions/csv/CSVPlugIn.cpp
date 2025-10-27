@@ -297,11 +297,9 @@ struct FastCSVOut {
 };
 
 //======================= plugin API =======================
-
-extern "C" {
-
+namespace {
 // ------------------------ NEW FRAME READER ------------------------
-void csv_read_frame(Frame*& outFrame,
+static void csv_read_frame_impl(Frame*& outFrame,
                     const FileMetaData& fmd,
                     const char* filename,
                     IOOptions& opts,
@@ -460,7 +458,7 @@ void csv_read_frame(Frame*& outFrame,
 
 // ---------- MATRIX READER ----------
 
-void csv_read(Structure*& res,
+static void csv_read_impl(Structure*& res,
               const FileMetaData& fmd,
               const char* filename,
               IOOptions& opts,
@@ -544,11 +542,7 @@ void csv_read(Structure*& res,
 
 // ---------- MATRIX WRITER ----------
 
-void csv_write(const Structure* matrix,
-               const FileMetaData& /*fmd*/,
-               const char* filename,
-               IOOptions& opts,
-               DaphneContext* /*ctx*/)
+static void csv_write_impl(const Structure* matrix, const FileMetaData& /*fmd*/, const char* filename, IOOptions& opts, DaphneContext* /*ctx*/)
 {
     char delim = ',';
     if (auto it = opts.extra.find("delimiter"); it != opts.extra.end()) {
@@ -599,7 +593,7 @@ void csv_write(const Structure* matrix,
 
 // ---------- FRAME WRITER ----------
 
-void csv_write_frame(const Frame* fr,
+static void csv_write_frame_impl(const Frame* fr,
                      const FileMetaData& fmd,
                      const char* filename,
                      IOOptions& opts,
@@ -668,5 +662,50 @@ void csv_write_frame(const Frame* fr,
 
     out.flush(); std::fclose(f);
 }
+}
 
-} // extern "C"
+
+
+// export macro
+#if defined(__GNUC__) || defined(__clang__)
+#  define DAPHNE_PLUGIN_API __attribute__((visibility("default")))
+#else
+#  define DAPHNE_PLUGIN_API
+#endif
+
+// Only the 4 entry points use extern "C"
+extern "C" DAPHNE_PLUGIN_API
+void csv_read(Structure*& res,
+              const FileMetaData& fmd,
+              const char* filename,
+              IOOptions& opts,
+              DaphneContext* ctx) {
+  csv_read_impl(res, fmd, filename, opts, ctx);  // 3) thin wrapper
+}
+
+extern "C" DAPHNE_PLUGIN_API
+void csv_read_frame(Frame*& outFrame,
+                    const FileMetaData& fmd,
+                    const char* filename,
+                    IOOptions& opts,
+                    DaphneContext* ctx) {
+  csv_read_frame_impl(outFrame, fmd, filename, opts, ctx);
+}
+
+extern "C" DAPHNE_PLUGIN_API
+void csv_write(const Structure* matrix,
+               const FileMetaData& fmd,
+               const char* filename,
+               IOOptions& opts,
+               DaphneContext* ctx) {
+  csv_write_impl(matrix, fmd, filename, opts, ctx);
+}
+
+extern "C" DAPHNE_PLUGIN_API
+void csv_write_frame(const Frame* fr,
+                     const FileMetaData& fmd,
+                     const char* filename,
+                     IOOptions& opts,
+                     DaphneContext* ctx) {
+  csv_write_frame_impl(fr, fmd, filename, opts, ctx);
+}
