@@ -1,2 +1,1 @@
-opts = {"hasHeader": ["false"]};
-m = readMatrix($filePath,opts);
+m = readMatrix($filePath);

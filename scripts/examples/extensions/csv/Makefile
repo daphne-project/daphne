@@ -6,17 +6,19 @@ DS_LIB_DIR    := $(DAPHNE_ROOT)/build/src/runtime/local/datastructures
 
 # Compiler & flags
 CXX           := g++
-CXXFLAGS      := -std=c++17 -O3 -mavx2 -fPIC  \
-                  -I$(DAPHNE_ROOT)/src \
-                  -I$(TP_INC_DIR) \
-                  -I$(DAPHNE_ROOT)/src/runtime/local/io \
-                  -DSPDLOG_FMT_EXTERNAL 
+CXXFLAGS := -std=c++17 -O3 -march=native -DNDEBUG \
+            -fPIC -fvisibility=hidden -fno-semantic-interposition -fno-plt \
+            -I$(DAPHNE_ROOT)/src \
+            -I$(TP_INC_DIR) \
+            -I$(DAPHNE_ROOT)/src/runtime/local/io \
+            -DSPDLOG_FMT_EXTERNAL
+
 
 # Linker & libraries
 LDFLAGS       := -shared -Wl,-rpath=$(TP_LIB_DIR)
 LDLIBS        := \
     -L$(DS_LIB_DIR)    -lDataStructures \
-    -L$(TP_LIB_DIR)    -larrow -lparquet -lMLIRIR -lMLIRSupport -lLLVMOption -lLLVMSupport -lLLVMDemangle -lLLVMCore -lspdlog -lfmt      
+    -L$(TP_LIB_DIR)    -lMLIRIR -lMLIRSupport -lLLVMOption -lLLVMSupport -lLLVMDemangle -lLLVMCore -lspdlog -lfmt      
 
 # Source files
 SRC           := CSVPlugIn.cpp

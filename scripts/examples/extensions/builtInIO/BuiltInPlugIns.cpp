@@ -23,6 +23,7 @@
 #include <runtime/local/datastructures/CSRMatrix.h>
 #include <runtime/local/datastructures/Frame.h>
 #include <parser/metadata/MetaDataParser.h>
+#include <runtime/local/io/DaphneSerializer.h>
 
 #include <util/preprocessor_defs.h>
 #include <runtime/local/io/File.h>
@@ -35,6 +36,7 @@
 #include <queue>
 #include <sstream>
 #include <stdexcept>
+#include <fstream>
 
 #include <arrow/api.h>
 #include <arrow/csv/api.h>
@@ -46,6 +48,16 @@
 #include <unordered_map>
 #include <cstring>      // for memcpy
 #include <cstdlib>      // for malloc, free
+
+// one header/toggle for all your plugins
+#ifndef DAPHNE_PLUGIN_API
+#  if defined(__GNUC__) || defined(__clang__)
+#    define DAPHNE_PLUGIN_API __attribute__((visibility("default")))
+#  else
+#    define DAPHNE_PLUGIN_API
+#  endif
+#endif
+
 
 static std::unordered_map<struct File*, void*> g_csvBackings;
 
@@ -157,9 +169,9 @@ struct ReadCsvFile<DenseMatrix<std::string>> {
                 throw std::runtime_error("ReadCsvFile::apply: getFileLine failed");
             size_t pos = 0;
             for (size_t c = 0; c < numCols; ++c) {
-                std::string val;
+                std::string val("");
                 pos = setCString(file, pos, &val, delim) + 1;
-                valuesRes[cell++] = std::move(val);
+                valuesRes[cell++] = val;
             }
         }
     }
@@ -602,11 +614,42 @@ struct ReadMM<Frame> {
 
 
 
-extern "C" void readCsvFromPath_Frame(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
+extern "C" DAPHNE_PLUGIN_API void readCsvFromPath_Frame(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
     readCsvFromPath<Frame>(reinterpret_cast<Frame*&>(res), fmd, filename, opts, ctx);
 }
 
-extern "C" void readCsvFromPath_Dense(void* &res, const FileMetaData &fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
+extern "C" DAPHNE_PLUGIN_API void readCsvFromPath_CSR(void* &res, const FileMetaData &fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
+    // e.g. check an opts.extra flag, or peek at the file, etc.
+
+    if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F32) {
+        readCsvFromPath<CSRMatrix<float>>(reinterpret_cast<CSRMatrix<float>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::UI64) {
+        readCsvFromPath<CSRMatrix<uint64_t>>(reinterpret_cast<CSRMatrix<uint64_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::UI32) {
+        readCsvFromPath<CSRMatrix<uint32_t>>(reinterpret_cast<CSRMatrix<uint32_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::UI8) {
+        readCsvFromPath<CSRMatrix<uint8_t>>(reinterpret_cast<CSRMatrix<uint8_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::SI64) {
+        readCsvFromPath<CSRMatrix<int64_t>>(reinterpret_cast<CSRMatrix<int64_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::SI32) {
+        readCsvFromPath<CSRMatrix<int32_t>>(reinterpret_cast<CSRMatrix<int32_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::SI8) {
+        readCsvFromPath<CSRMatrix<int8_t>>(reinterpret_cast<CSRMatrix<int8_t>*&>(res), fmd, filename, opts, ctx);
+    }
+    else {
+        // Fallback: treat as double
+        readCsvFromPath<CSRMatrix<double>>(reinterpret_cast<CSRMatrix<double>*&>(res), fmd, filename, opts, ctx);
+    }
+
+}
+
+extern "C" DAPHNE_PLUGIN_API void readCsvFromPath_Dense(void* &res, const FileMetaData &fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
     // e.g. check an opts.extra flag, or peek at the file, etc.
 
     if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F64) {
@@ -645,19 +688,96 @@ extern "C" void readCsvFromPath_Dense(void* &res, const FileMetaData &fmd, const
 
 
 
-extern "C" void ReadParquet_Frame(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
+extern "C" DAPHNE_PLUGIN_API void ReadParquet_Frame(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
     ReadParquet<Frame>::apply(reinterpret_cast<Frame*&>(res), fmd, filename, opts, ctx);
 }
 
-extern "C" void ReadParquet_Dense(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
-    ReadParquet<DenseMatrix<double>>::apply(reinterpret_cast<DenseMatrix<double>*&>(res), fmd, filename, opts, ctx);
+extern "C" DAPHNE_PLUGIN_API void ReadParquet_CSR(
+    void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx)
+{
+    // Choose VT by schema (single value type), default to double.
+    ValueTypeCode vt = ValueTypeCode::F64;
+    if (fmd.isSingleValueType && !fmd.schema.empty())
+        vt = fmd.schema[0];
+
+    switch (vt) {
+        case ValueTypeCode::F64:
+            ReadParquet<CSRMatrix<double>>::apply(reinterpret_cast<CSRMatrix<double>*&>(res), fmd, filename, opts, ctx);
+            break;
+        case ValueTypeCode::F32:
+            ReadParquet<CSRMatrix<float>>::apply(reinterpret_cast<CSRMatrix<float>*&>(res), fmd, filename, opts, ctx);
+            break;
+        case ValueTypeCode::SI64:
+            ReadParquet<CSRMatrix<int64_t>>::apply(reinterpret_cast<CSRMatrix<int64_t>*&>(res), fmd, filename, opts, ctx);
+            break;
+        case ValueTypeCode::SI32:
+            ReadParquet<CSRMatrix<int32_t>>::apply(reinterpret_cast<CSRMatrix<int32_t>*&>(res), fmd, filename, opts, ctx);
+            break;
+
+        // Optional: enable unsigned types if your kernel supports them.
+        case ValueTypeCode::UI64:
+            ReadParquet<CSRMatrix<uint64_t>>::apply(reinterpret_cast<CSRMatrix<uint64_t>*&>(res), fmd, filename, opts, ctx);
+            break;
+        case ValueTypeCode::UI32:
+            ReadParquet<CSRMatrix<uint32_t>>::apply(reinterpret_cast<CSRMatrix<uint32_t>*&>(res), fmd, filename, opts, ctx);
+            break;
+
+        case ValueTypeCode::STR:
+            throw std::runtime_error("ReadParquet_CSR: string-valued sparse matrices are not supported");
+        default:
+            // Sensible default
+            ReadParquet<CSRMatrix<double>>::apply(reinterpret_cast<CSRMatrix<double>*&>(res), fmd, filename, opts, ctx);
+            break;
+    }
 }
 
-extern "C" void ReadMM_Frame(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
+
+extern "C" DAPHNE_PLUGIN_API void ReadParquet_Dense(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
+    if (fmd.isSingleValueType) {
+        if (fmd.schema[0] == ValueTypeCode::F64) {
+            ReadParquet<DenseMatrix<double>>::apply(reinterpret_cast<DenseMatrix<double>*&>(res), fmd, filename, opts, ctx);
+        }
+        else if (fmd.schema[0] == ValueTypeCode::F32) {
+            ReadParquet<DenseMatrix<float>>::apply(reinterpret_cast<DenseMatrix<float>*&>(res), fmd, filename, opts, ctx);
+        }
+        else if (fmd.schema[0] == ValueTypeCode::UI64) {
+            ReadParquet<DenseMatrix<uint64_t>>::apply(reinterpret_cast<DenseMatrix<uint64_t>*&>(res), fmd, filename, opts, ctx);
+        }
+        else if (fmd.schema[0] == ValueTypeCode::UI32) {
+            ReadParquet<DenseMatrix<uint32_t>>::apply(reinterpret_cast<DenseMatrix<uint32_t>*&>(res), fmd, filename, opts, ctx);
+        }
+        else if (fmd.schema[0] == ValueTypeCode::UI8) {
+            ReadParquet<DenseMatrix<uint8_t>>::apply(reinterpret_cast<DenseMatrix<uint8_t>*&>(res), fmd, filename, opts, ctx);
+        }
+        else if (fmd.schema[0] == ValueTypeCode::SI64) {
+            ReadParquet<DenseMatrix<int64_t>>::apply(reinterpret_cast<DenseMatrix<int64_t>*&>(res), fmd, filename, opts, ctx);
+        }
+        else if (fmd.schema[0] == ValueTypeCode::SI32) {
+            ReadParquet<DenseMatrix<int32_t>>::apply(reinterpret_cast<DenseMatrix<int32_t>*&>(res), fmd, filename, opts, ctx);
+        }
+        else if (fmd.schema[0] == ValueTypeCode::SI8) {
+            ReadParquet<DenseMatrix<int8_t>>::apply(reinterpret_cast<DenseMatrix<int8_t>*&>(res), fmd, filename, opts, ctx);
+        }
+        else if (fmd.schema[0] == ValueTypeCode::STR) {
+            ReadParquet<DenseMatrix<std::string>>::apply(reinterpret_cast<DenseMatrix<std::string>*&>(res), fmd, filename, opts, ctx);
+        }
+        else {
+            // Default: treat as string matrix
+            ReadParquet<DenseMatrix<std::string>>::apply(reinterpret_cast<DenseMatrix<std::string>*&>(res), fmd, filename, opts, ctx);
+        }
+    }
+    else {
+        // Not a single value type? Fall back to a string matrix by default.
+        ReadParquet<DenseMatrix<std::string>>::apply(reinterpret_cast<DenseMatrix<std::string>*&>(res), fmd, filename, opts, ctx);
+    }
+}
+
+
+extern "C" DAPHNE_PLUGIN_API void ReadMM_Frame(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
     ReadMM<Frame>::apply(reinterpret_cast<Frame*&>(res), fmd, filename, opts, ctx);
 }
 
-extern "C" void ReadMM_Dense(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
+extern "C" DAPHNE_PLUGIN_API void ReadMM_Dense(void* &res, const FileMetaData& fmd, const char* filename, IOOptions &opts, DaphneContext* ctx) {
     if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F64) {
     ReadMM<DenseMatrix<double>>::apply(reinterpret_cast<DenseMatrix<double>*&>(res), fmd, filename, opts, ctx);
     }
@@ -691,7 +811,7 @@ extern "C" void ReadMM_Dense(void* &res, const FileMetaData& fmd, const char* fi
     }
 }
 
-extern "C" void ReadMM_CSR(void* &res, const FileMetaData& fmd,
+extern "C" DAPHNE_PLUGIN_API void ReadMM_CSR(void* &res, const FileMetaData& fmd,
                            const char* filename, IOOptions &opts, DaphneContext* ctx) {
     // Choose VT by schema (single value type), default to double
     ValueTypeCode vt = ValueTypeCode::F64;
@@ -774,14 +894,12 @@ static inline void writeCsvDenseBuiltin_inline(const DenseMatrix<VT>* arg, const
     closeFile(file);
 }
 
-extern "C" void WriteCsv_Dense(void const *arg,
+extern "C" DAPHNE_PLUGIN_API void WriteCsv_Dense(void const *arg,
                                const FileMetaData &fmd,
                                const char *filename,
                                IOOptions &opts,
                                DaphneContext *ctx)
 {
-    // Mirror your readCsvFromPath_Dense logic:
-    // choose VT by the single-value schema in fmd
 
     if(!arg)
         throw std::runtime_error("WriteCsv_Dense: arg == nullptr");
@@ -875,7 +993,7 @@ static inline void dumpFrameToCsv_inline(const Frame* arg, File *file) {
     }
 }
 
-extern "C" void WriteCsv_Frame( void const *arg, const FileMetaData &fmd, const char *filename, IOOptions &opts, DaphneContext *ctx) {
+extern "C" DAPHNE_PLUGIN_API void WriteCsv_Frame( void const *arg, const FileMetaData &fmd, const char *filename, IOOptions &opts, DaphneContext *ctx) {
     auto fr = reinterpret_cast<const Frame*>(arg);
 
     File *file = openFileForWrite(filename);
@@ -931,7 +1049,7 @@ static inline void writeCsvMatrixBuiltin_inline(const Matrix<VT>* arg, const cha
     closeFile(file);
 }
 
-extern "C" void WriteCsv_Matrix(void const *arg,
+extern "C" DAPHNE_PLUGIN_API void WriteCsv_Matrix(void const *arg,
                                 const FileMetaData &fmd,
                                 const char *filename,
                                 IOOptions &opts,
@@ -971,4 +1089,472 @@ extern "C" void WriteCsv_Matrix(void const *arg,
         default:
             throw std::runtime_error("WriteCsv_Matrix: unsupported VT in schema[0]");
     }
+}
+
+
+//#########################################################################################
+//                            Daphne Binary read
+//######################################################################################### 
+template <class DTRes> struct ReadDaphne {
+    static void apply(DTRes *&res, const char *filename) = delete;
+};
+
+template <typename VT> struct ReadDaphne<DenseMatrix<VT>> {
+    static void apply(DenseMatrix<VT> *&res, const char *filename) {
+        std::ifstream f;
+        f.open(filename, std::ios::in | std::ios::binary);
+        // TODO: check f.good()
+
+        auto deser = DaphneDeserializerChunks<DenseMatrix<VT>>(
+            &res, DaphneSerializer<DenseMatrix<VT>>::DEFAULT_SERIALIZATION_BUFFER_SIZE);
+        for (auto it = deser.begin(); it != deser.end(); ++it) {
+            it->first = DaphneSerializer<DenseMatrix<VT>>::DEFAULT_SERIALIZATION_BUFFER_SIZE;
+            f.read(it->second->data(), it->first);
+            // in case we read less than that
+            it->first = f.gcount();
+        }
+
+        f.close();
+        return;
+    }
+};
+
+template <typename VT> struct ReadDaphne<CSRMatrix<VT>> {
+    static void apply(CSRMatrix<VT> *&res, const char *filename) {
+        std::ifstream f;
+        f.open(filename, std::ios::in | std::ios::binary);
+        // TODO: check f.good()
+
+        auto deser = DaphneDeserializerChunks<CSRMatrix<VT>>(
+            &res, DaphneSerializer<CSRMatrix<VT>>::DEFAULT_SERIALIZATION_BUFFER_SIZE);
+        for (auto it = deser.begin(); it != deser.end(); ++it) {
+            it->first = DaphneSerializer<CSRMatrix<VT>>::DEFAULT_SERIALIZATION_BUFFER_SIZE;
+            f.read(it->second->data(), it->first);
+            // in case we read less than that
+            it->first = f.gcount();
+        }
+
+        f.close();
+        return;
+    }
+};
+
+template <> struct ReadDaphne<Frame> {
+    static void apply(Frame *&res, const char *filename) {
+        std::ifstream f;
+        f.open(filename, std::ios::in | std::ios::binary);
+        // TODO: check f.good()
+
+        // read commong part of the header
+        DF_header h;
+        f.read((char *)&h, sizeof(h));
+
+        if (h.dt == (uint8_t)DF_data_t::Frame_t) {
+            // read rest of the header
+            ValueTypeCode *schema = new ValueTypeCode[h.nbcols];
+            for (uint64_t c = 0; c < h.nbcols; c++) {
+                f.read((char *)&(schema[c]), sizeof(ValueTypeCode));
+            }
+
+            std::string *labels = new std::string[h.nbcols];
+            for (uint64_t c = 0; c < h.nbcols; c++) {
+                uint16_t len;
+                f.read((char *)&len, sizeof(len));
+                f.read((char *)&(labels[c]), len);
+            }
+
+            DF_body b;
+            f.read((char *)&b, sizeof(b));
+            // b is ignored for now - assumed to be 0,0
+            // TODO: consider multiple blocks
+            // Assuming a dense block representation
+            // TODO: Consider alternative representations for frames
+
+            if (res == nullptr) {
+                res = DataObjectFactory::create<Frame>(h.nbrows, h.nbcols, schema, nullptr, false);
+            }
+
+            uint8_t **rawCols = new uint8_t *[h.nbcols];
+            for (size_t i = 0; i < h.nbcols; i++) {
+                rawCols[i] = reinterpret_cast<uint8_t *>(res->getColumnRaw(i));
+            }
+
+            for (size_t r = 0; r < h.nbrows; r++) {
+                for (size_t c = 0; c < h.nbcols; c++) {
+                    switch (schema[c]) {
+                    case ValueTypeCode::SI8:
+                        int8_t val_si8;
+                        f.read((char *)&val_si8, sizeof(val_si8));
+                        reinterpret_cast<int8_t *>(rawCols[c])[r] = val_si8;
+                        break;
+                    case ValueTypeCode::SI32:
+                        int32_t val_si32;
+                        f.read((char *)&val_si32, sizeof(val_si32));
+                        reinterpret_cast<int32_t *>(rawCols[c])[r] = val_si32;
+                        break;
+                    case ValueTypeCode::SI64:
+                        int64_t val_si64;
+                        f.read((char *)&val_si64, sizeof(val_si64));
+                        reinterpret_cast<int64_t *>(rawCols[c])[r] = val_si64;
+                        break;
+                    case ValueTypeCode::UI8:
+                        uint8_t val_ui8;
+                        f.read((char *)&val_ui8, sizeof(val_ui8));
+                        reinterpret_cast<uint8_t *>(rawCols[c])[r] = val_ui8;
+                        break;
+                    case ValueTypeCode::UI32:
+                        uint32_t val_ui32;
+                        f.read((char *)&val_ui32, sizeof(val_ui32));
+                        reinterpret_cast<uint32_t *>(rawCols[c])[r] = val_ui32;
+                        break;
+                    case ValueTypeCode::UI64:
+                        uint64_t val_ui64;
+                        f.read((char *)&val_ui64, sizeof(val_ui64));
+                        reinterpret_cast<uint64_t *>(rawCols[c])[r] = val_ui64;
+                        break;
+                    case ValueTypeCode::F32:
+                        float val_f32;
+                        f.read((char *)&val_f32, sizeof(val_f32));
+                        reinterpret_cast<float *>(rawCols[c])[r] = val_f32;
+                        break;
+                    case ValueTypeCode::F64:
+                        double val_f64;
+                        f.read((char *)&val_f64, sizeof(val_f64));
+                        reinterpret_cast<double *>(rawCols[c])[r] = val_f64;
+                        break;
+                    default:
+                        throw std::runtime_error("ReadDaphne::apply: unknown value type code");
+                    }
+                }
+            }
+
+            delete[] rawCols;
+            delete[] schema;
+        }
+        f.close();
+        return;
+    }
+};
+// ---------- Dense ----------
+extern "C" DAPHNE_PLUGIN_API void ReadDaphne_Dense(
+    void* &res, const FileMetaData& fmd, const char* filename, IOOptions&, DaphneContext*)
+{
+    // default to strings (safe)
+    ValueTypeCode vt = (fmd.isSingleValueType && !fmd.schema.empty())
+                       ? fmd.schema[0] : ValueTypeCode::STR;
+
+    switch (vt) {
+        case ValueTypeCode::F64:
+            ReadDaphne<DenseMatrix<double>>::apply(reinterpret_cast<DenseMatrix<double>*&>(res), filename);
+            break;
+        case ValueTypeCode::F32:
+            ReadDaphne<DenseMatrix<float>>::apply(reinterpret_cast<DenseMatrix<float>*&>(res), filename);
+            break;
+        case ValueTypeCode::SI64:
+            ReadDaphne<DenseMatrix<int64_t>>::apply(reinterpret_cast<DenseMatrix<int64_t>*&>(res), filename);
+            break;
+        case ValueTypeCode::SI32:
+            ReadDaphne<DenseMatrix<int32_t>>::apply(reinterpret_cast<DenseMatrix<int32_t>*&>(res), filename);
+            break;
+        case ValueTypeCode::UI64:
+            ReadDaphne<DenseMatrix<uint64_t>>::apply(reinterpret_cast<DenseMatrix<uint64_t>*&>(res), filename);
+            break;
+        case ValueTypeCode::UI32:
+            ReadDaphne<DenseMatrix<uint32_t>>::apply(reinterpret_cast<DenseMatrix<uint32_t>*&>(res), filename);
+            break;
+        case ValueTypeCode::UI8:
+            ReadDaphne<DenseMatrix<uint8_t>>::apply(reinterpret_cast<DenseMatrix<uint8_t>*&>(res), filename);
+            break;
+        case ValueTypeCode::SI8:
+            ReadDaphne<DenseMatrix<int8_t>>::apply(reinterpret_cast<DenseMatrix<int8_t>*&>(res), filename);
+            break;
+        case ValueTypeCode::STR:
+            ReadDaphne<DenseMatrix<std::string>>::apply(reinterpret_cast<DenseMatrix<std::string>*&>(res), filename);
+            break;
+        default:
+            // fallback: string
+            ReadDaphne<DenseMatrix<std::string>>::apply(reinterpret_cast<DenseMatrix<std::string>*&>(res), filename);
+            break;
+    }
+}
+
+// ---------- CSR ----------
+extern "C" DAPHNE_PLUGIN_API void ReadDaphne_CSR(
+    void* &res, const FileMetaData& fmd, const char* filename, IOOptions&, DaphneContext*)
+{
+    // default to double
+    ValueTypeCode vt = (fmd.isSingleValueType && !fmd.schema.empty())
+                       ? fmd.schema[0] : ValueTypeCode::F64;
+
+    switch (vt) {
+        case ValueTypeCode::F64:
+            ReadDaphne<CSRMatrix<double>>::apply(reinterpret_cast<CSRMatrix<double>*&>(res), filename);
+            break;
+        case ValueTypeCode::F32:
+            ReadDaphne<CSRMatrix<float>>::apply(reinterpret_cast<CSRMatrix<float>*&>(res), filename);
+            break;
+        case ValueTypeCode::SI64:
+            ReadDaphne<CSRMatrix<int64_t>>::apply(reinterpret_cast<CSRMatrix<int64_t>*&>(res), filename);
+            break;
+        case ValueTypeCode::SI32:
+            ReadDaphne<CSRMatrix<int32_t>>::apply(reinterpret_cast<CSRMatrix<int32_t>*&>(res), filename);
+            break;
+        // enable unsigned if your serializer supports it:
+        case ValueTypeCode::UI64:
+            ReadDaphne<CSRMatrix<uint64_t>>::apply(reinterpret_cast<CSRMatrix<uint64_t>*&>(res), filename);
+            break;
+        case ValueTypeCode::UI32:
+            ReadDaphne<CSRMatrix<uint32_t>>::apply(reinterpret_cast<CSRMatrix<uint32_t>*&>(res), filename);
+            break;
+        case ValueTypeCode::STR:
+            throw std::runtime_error("ReadDaphne_CSR: sparse string matrices not supported");
+        default:
+            ReadDaphne<CSRMatrix<double>>::apply(reinterpret_cast<CSRMatrix<double>*&>(res), filename);
+            break;
+    }
+}
+
+// ---------- Frame ----------
+extern "C" DAPHNE_PLUGIN_API void ReadDaphne_Frame(
+    void* &res, const FileMetaData&, const char* filename, IOOptions&, DaphneContext*)
+{
+    // Frame header carries its own schema; fmd not required.
+    ReadDaphne<Frame>::apply(reinterpret_cast<Frame*&>(res), filename);
+}
+
+
+//#########################################################################################
+//                            Daphne Binary write
+//######################################################################################### 
+
+template <class DTArg> struct WriteDaphne {
+    static void apply(const DTArg *arg, const char *filename) = delete;
+};
+
+// ****************************************************************************
+// Convenience function
+// ****************************************************************************
+
+template <class DTArg> void writeDaphne(const DTArg *arg, const char *filename) {
+    WriteDaphne<DTArg>::apply(arg, filename);
+}
+
+// ****************************************************************************
+// (Partial) template specializations for different data/value types
+// ****************************************************************************
+
+// ----------------------------------------------------------------------------
+// DenseMatrix
+// ----------------------------------------------------------------------------
+
+template <typename VT> struct WriteDaphne<DenseMatrix<VT>> {
+    static void apply(const DenseMatrix<VT> *arg, const char *filename) {
+        std::ofstream f;
+        f.open(filename, std::ios::out | std::ios::binary);
+        // TODO: check f.good()
+
+        auto ser = DaphneSerializerChunks<const DenseMatrix<VT>>(
+            arg, DaphneSerializer<DenseMatrix<VT>>::DEFAULT_SERIALIZATION_BUFFER_SIZE);
+        for (auto it = ser.begin(); it != ser.end(); ++it) {
+            f.write(it->second->data(), it->first);
+        }
+
+        f.close();
+        return;
+    }
+};
+
+// ----------------------------------------------------------------------------
+// CSRMatrix
+// ----------------------------------------------------------------------------
+
+template <typename VT> struct WriteDaphne<CSRMatrix<VT>> {
+    static void apply(const CSRMatrix<VT> *arg, const char *filename) {
+        std::ofstream f;
+        f.open(filename, std::ios::out | std::ios::binary);
+        // TODO: check f.good()
+
+        auto ser = DaphneSerializerChunks<const CSRMatrix<VT>>(
+            arg, DaphneSerializer<CSRMatrix<VT>>::DEFAULT_SERIALIZATION_BUFFER_SIZE);
+        for (auto it = ser.begin(); it != ser.end(); ++it) {
+            f.write(it->second->data(), it->first);
+        }
+
+        f.close();
+        return;
+    }
+};
+
+// ----------------------------------------------------------------------------
+// Frame
+// ----------------------------------------------------------------------------
+
+template <> struct WriteDaphne<Frame> {
+    static void apply(const Frame *arg, const char *filename) {
+
+        std::ofstream f;
+        f.open(filename, std::ios::out | std::ios::binary);
+        // TODO: check f.good()
+
+        // write header
+        DF_header h;
+        h.version = 1;
+        h.dt = (uint8_t)DF_data_t::Frame_t;
+        h.nbrows = (uint64_t)arg->getNumRows();
+        h.nbcols = (uint64_t)arg->getNumCols();
+        f.write((const char *)&h, sizeof(h));
+
+        const ValueTypeCode *schema = arg->getSchema();
+        const std::string *labels = arg->getLabels();
+
+        for (uint64_t c = 0; c < h.nbcols; c++) {
+            f.write((const char *)&(schema[c]), sizeof(ValueTypeCode));
+        }
+
+        for (uint64_t c = 0; c < h.nbcols; c++) {
+            uint16_t len = (labels[c]).length();
+            f.write((const char *)&len, sizeof(len));
+            f.write((const char *)&(labels[c]), len);
+        }
+
+        DF_body b;
+        b.rx = 0;
+        b.cx = 0;
+        f.write((char *)&b, sizeof(b));
+        // TODO: consider multiple blocks
+        //  Assuming a dense block representation
+        //  TODO: Consider alternative representations for frames
+
+        void *vals[h.nbcols];
+        for (size_t c = 0; c < h.nbcols; c++) {
+            vals[c] = const_cast<void *>(arg->getColumnRaw(c));
+        }
+
+        for (size_t r = 0; r < h.nbrows; r++) {
+            for (size_t c = 0; c < h.nbcols; c++) {
+                switch (schema[c]) {
+                case ValueTypeCode::SI8:
+                    f.write((char *)&(reinterpret_cast<int8_t *>(vals[c])[r]), sizeof(int8_t));
+                    break;
+                case ValueTypeCode::SI32:
+                    f.write((char *)&(reinterpret_cast<int32_t *>(vals[c])[r]), sizeof(int32_t));
+                    break;
+                case ValueTypeCode::SI64:
+                    f.write((char *)&(reinterpret_cast<int64_t *>(vals[c])[r]), sizeof(int64_t));
+                    break;
+                case ValueTypeCode::UI8:
+                    f.write((char *)&(reinterpret_cast<uint8_t *>(vals[c])[r]), sizeof(uint8_t));
+                    break;
+                case ValueTypeCode::UI32:
+                    f.write((char *)&(reinterpret_cast<uint32_t *>(vals[c])[r]), sizeof(uint32_t));
+                    break;
+                case ValueTypeCode::UI64:
+                    f.write((char *)&(reinterpret_cast<uint64_t *>(vals[c])[r]), sizeof(uint64_t));
+                    break;
+                case ValueTypeCode::F32:
+                    f.write((char *)&(reinterpret_cast<float *>(vals[c])[r]), sizeof(float));
+                    break;
+                case ValueTypeCode::F64:
+                    f.write((char *)&(reinterpret_cast<double *>(vals[c])[r]), sizeof(double));
+                    break;
+                default:
+                    throw std::runtime_error("WriteDaphne::apply: unknown value type code");
+                }
+            }
+        }
+
+        f.close();
+        return;
+    }
+};
+
+
+
+extern "C" DAPHNE_PLUGIN_API void WriteDaphne_Dense(
+    void const *arg, const FileMetaData &fmd, const char *filename, IOOptions &, DaphneContext *)
+{
+    if(!arg) throw std::runtime_error("WriteDaphne_Dense: arg == nullptr");
+    if(!fmd.isSingleValueType || fmd.schema.empty())
+        throw std::runtime_error("WriteDaphne_Dense: expected single value type schema");
+
+    switch (fmd.schema[0]) {
+        case ValueTypeCode::F64:
+            writeDaphne(reinterpret_cast<const DenseMatrix<double>*>(arg), filename);
+            break;
+        case ValueTypeCode::F32:
+            writeDaphne(reinterpret_cast<const DenseMatrix<float>*>(arg), filename);
+            break;
+        case ValueTypeCode::SI64:
+            writeDaphne(reinterpret_cast<const DenseMatrix<int64_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::SI32:
+            writeDaphne(reinterpret_cast<const DenseMatrix<int32_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::SI8:
+            writeDaphne(reinterpret_cast<const DenseMatrix<int8_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::UI64:
+            writeDaphne(reinterpret_cast<const DenseMatrix<uint64_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::UI32:
+            writeDaphne(reinterpret_cast<const DenseMatrix<uint32_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::UI8:
+            writeDaphne(reinterpret_cast<const DenseMatrix<uint8_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::STR:
+            writeDaphne(reinterpret_cast<const DenseMatrix<std::string>*>(arg), filename);
+            break;
+        default:
+            throw std::runtime_error("WriteDaphne_Dense: unsupported VT in schema[0]");
+    }
+}
+
+// ========================= CSRMatrix writers =======================
+extern "C" DAPHNE_PLUGIN_API void WriteDaphne_CSR(
+    void const *arg, const FileMetaData &fmd, const char *filename, IOOptions &, DaphneContext *)
+{
+    if(!arg) throw std::runtime_error("WriteDaphne_CSR: arg == nullptr");
+    if(!fmd.isSingleValueType || fmd.schema.empty())
+        throw std::runtime_error("WriteDaphne_CSR: expected single value type schema");
+
+    switch (fmd.schema[0]) {
+        case ValueTypeCode::F64:
+            writeDaphne(reinterpret_cast<const CSRMatrix<double>*>(arg), filename);
+            break;
+        case ValueTypeCode::F32:
+            writeDaphne(reinterpret_cast<const CSRMatrix<float>*>(arg), filename);
+            break;
+        case ValueTypeCode::SI64:
+            writeDaphne(reinterpret_cast<const CSRMatrix<int64_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::SI32:
+            writeDaphne(reinterpret_cast<const CSRMatrix<int32_t>*>(arg), filename);
+            break;
+        // enable if your serializer handles them:
+        case ValueTypeCode::UI64:
+            writeDaphne(reinterpret_cast<const CSRMatrix<uint64_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::UI32:
+            writeDaphne(reinterpret_cast<const CSRMatrix<uint32_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::UI8:
+            writeDaphne(reinterpret_cast<const CSRMatrix<uint8_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::SI8:
+            writeDaphne(reinterpret_cast<const CSRMatrix<int8_t>*>(arg), filename);
+            break;
+        case ValueTypeCode::STR:
+            throw std::runtime_error("WriteDaphne_CSR: sparse string matrices not supported");
+        default:
+            throw std::runtime_error("WriteDaphne_CSR: unsupported VT in schema[0]");
+    }
+}
+
+// ============================== Frame writer =======================
+extern "C" DAPHNE_PLUGIN_API void WriteDaphne_Frame(
+    void const *arg, const FileMetaData &, const char *filename, IOOptions &, DaphneContext *)
+{
+    if(!arg) throw std::runtime_error("WriteDaphne_Frame: arg == nullptr");
+    writeDaphne(reinterpret_cast<const Frame*>(arg), filename);
 }

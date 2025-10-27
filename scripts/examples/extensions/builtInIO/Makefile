@@ -6,14 +6,17 @@ DS_LIB_DIR    := $(DAPHNE_ROOT)/build/src/runtime/local/datastructures
 
 # Compiler & flags
 CXX           := g++
-CXXFLAGS      := -std=c++17 -O3 -mavx2 -fPIC \
+CXXFLAGS      := -std=c++17 -O3 -march=native -DNDEBUG -flto \
+                 -fPIC -fvisibility=hidden -fno-semantic-interposition -fno-plt \
+                 -ffunction-sections -fdata-sections \
                   -I$(DAPHNE_ROOT)/src \
                   -I$(TP_INC_DIR) \
                   -I$(DAPHNE_ROOT)/src/runtime/local/io \
                   -DSPDLOG_FMT_EXTERNAL
 
 # Linker & libraries
-LDFLAGS       := -shared -Wl,-rpath=$(TP_LIB_DIR)
+LDFLAGS       := -shared -Wl,-rpath=$(TP_LIB_DIR) -Wl,--as-needed -Wl,-O2 \
+                 -Wl,--gc-sections -Wl,-Bsymbolic
 LDLIBS        := \
     -L$(DS_LIB_DIR)    -lDataStructures \
     -L$(TP_LIB_DIR)    -larrow -lparquet -lspdlog -lfmt -lLLVMSupport

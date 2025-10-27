@@ -8,8 +8,7 @@
     "engine": "Daphne",
     "priority": 100,
     "options": {
-      "delimiter": ",",
-      "threads": "1",
+      "threads": "16",
       "large_strings": "true",
       "compression": "snappy"
     }
@@ -22,8 +21,7 @@
     "type": "Frame",
     "engine": "Daphne",
     "options": {
-      "delimiter": ",",
-      "threads": "1"
+      "threads": "16"
     }
   }
 ]

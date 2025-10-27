@@ -1,6 +1,2 @@
-opts = {"engine": ["Daphne"], "threads": ["1"],"hasHeader": ["false"],"useCols": ["Name,Email"]};
-
-
-f = readFrame("scripts/examples/extensions/csv/random_data.csv",opts);
-
-print(f);
+#f = readFrame("scripts/examples/extensions/csv/random_data");
+#print(f);

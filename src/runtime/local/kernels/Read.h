@@ -172,27 +172,19 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
         catch (const std::out_of_range &e) {
             std::cerr << "no suitable reader found in the registry";
         }
-        //std::cout << "d";
-
-        if (ext == ".dbdf") {
-            if constexpr (std::is_same<VT, std::string>::value)
-                throw std::runtime_error("reading string-valued DAPHNE binary format files is not supported (yet)");
-            else
-                readDaphne(res, filename);
-        }
 #if USE_HDFS
-        else if (ext == ".hdfs") {
+        if (ext == ".hdfs") {
             if constexpr (std::is_same<VT, std::string>::value)
                 throw std::runtime_error("reading string-valued HDFS files is not supported (yet)");
             else {
                 if (res == nullptr)
                     res = DataObjectFactory::create<DenseMatrix<VT>>(fmd.numRows, fmd.numCols, false);
                 readHDFS(res, filename, ctx);
+                return;
             }
         }
 #endif
-        else
-            throw std::runtime_error("no suitable reader found in the registry");
+        throw std::runtime_error("no suitable reader found");
     }
 }; // end Read<DenseMatrix<VT>>
 
@@ -224,29 +216,7 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
             return;
         }
         catch (const std::out_of_range &) {
-            // no plugin, fall back to built-in
-        }
-        //std::cout << "using default";
-
-        if (ext == ".csv") {
-            if (fmd.numNonZeros == -1)
-                throw std::runtime_error("currently reading of sparse matrices requires a number of "
-                                         "non zeros to be defined");
-
-            if (res == nullptr)
-                res = DataObjectFactory::create<CSRMatrix<VT>>(fmd.numRows, fmd.numCols, fmd.numNonZeros, false);
-
-            readCsv(res, filename, fmd.numRows, fmd.numCols, ',', fmd.numNonZeros, true);
-        } else if (ext == ".mtx") {
-            readMM(res, filename);
-        } else if (ext == ".parquet") {
-            if (res == nullptr)
-                res = DataObjectFactory::create<CSRMatrix<VT>>(fmd.numRows, fmd.numCols, fmd.numNonZeros, false);
-            readParquet(res, filename, fmd.numRows, fmd.numCols, fmd.numNonZeros, false);
-        } else if (ext == ".dbdf") {
-            readDaphne(res, filename);
-        } else {
-            throw std::runtime_error("file extension not supported: '" + ext + "'");
+            throw std::runtime_error("no suitable reader found in the registry");
         }
     }
 }; // end Read<CSRMatrix<VT>>

@@ -27,7 +27,7 @@
 using namespace std;
 
 // Hard-coded path to the example JSON catalog
-static const string JSON_PATH = "scripts/examples/extensions/csv/myIO.json";
+static const string JSON_PATH = "scripts/examples/extensions/csv/csv.json";
 IODataType frameHash = FRAME;
 IODataType matrixHash = DENSEMATRIX;
 
