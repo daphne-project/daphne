@@ -15,6 +15,7 @@
  */
 
 #include "runtime/local/datastructures/IAllocationDescriptor.h"
+#include "runtime/local/io/FileIORegistry.h"
 
 #ifdef USE_MPI
 #include "runtime/distributed/worker/MPIWorker.h"
@@ -27,6 +28,7 @@
 #include <api/internal/daphne_internal.h>
 #include <compiler/utils/CompilerUtils.h>
 #include <parser/catalog/KernelCatalogParser.h>
+#include <runtime/local/io/FileIOCatalogParser.h>
 #include <parser/config/ConfigParser.h>
 #include <parser/daphnedsl/DaphneDSLParser.h>
 #include <runtime/local/vectorized/LoadPartitioningDefs.h>
@@ -61,6 +63,57 @@ static std::unique_ptr<DaphneLogger> logger;
 using namespace std;
 using namespace mlir;
 using namespace llvm::cl;
+
+#include <filesystem>
+#include <fstream>
+#include <optional>
+
+namespace fs = std::filesystem;
+
+static std::optional<fs::path> readRepoRootMarker() {
+    try {
+        fs::path exeDir = fs::canonical("/proc/self/exe").parent_path();
+        fs::path marker = exeDir / ".daphne_repo_root";
+        if (fs::exists(marker)) {
+            std::ifstream in(marker);
+            std::string line; std::getline(in, line);
+            if (!line.empty() && fs::exists(line))
+                return fs::canonical(fs::path(line));
+        }
+    } catch (...) {}
+    return std::nullopt;
+}
+
+static std::string resolveRepoPathAuto(const std::string &rel) {
+    fs::path r(rel);
+    if (r.is_absolute())
+        return fs::canonical(r).string();
+
+    if (auto rr = readRepoRootMarker()) {
+        fs::path p = *rr / r;
+        if (fs::exists(p)) return fs::canonical(p).string();
+    }
+
+    if (fs::exists(r))  // CWD
+        return fs::canonical(r).string();
+
+    try {
+        fs::path exeDir = fs::canonical("/proc/self/exe").parent_path();
+        for (fs::path cur = exeDir; !cur.empty(); cur = cur.parent_path()) {
+            fs::path p = cur / r;
+            if (fs::exists(p)) return fs::canonical(p).string();
+            if (cur == cur.parent_path()) break;
+        }
+    } catch (...) {}
+
+    if (const char *env = std::getenv("DAPHNE_REPO")) {
+        fs::path p = fs::path(env) / r;
+        if (fs::exists(p)) return fs::canonical(p).string();
+    }
+
+    throw std::runtime_error("Could not resolve repo-relative path: " + rel);
+}
+
 
 void parseScriptArgs(const llvm::cl::list<string> &scriptArgsCli, unordered_map<string, string> &scriptArgsFinal) {
     for (const std::string &pair : scriptArgsCli) {
@@ -291,6 +344,9 @@ int startDAPHNE(int argc, const char **argv, DaphneLibResult *daphneLibRes, int 
     static opt<string> kernelExt("kernel-ext", cat(daphneOptions),
                                  desc("Additional kernel extension to register "
                                       "(path to a kernel catalog JSON file)."));
+    static opt<std::string> FileIOExt("FileIO-ext",cat(daphneOptions),
+                                        desc("Load an additional FileIO extention JSON file" 
+                                            "path to a FileIO extention JSON file"));
 
     enum ExplainArgs {
         columnar,
@@ -622,6 +678,44 @@ int startDAPHNE(int argc, const char **argv, DaphneLibResult *daphneLibRes, int 
     // Creates an MLIR context and loads the required MLIR dialects.
     DaphneIrExecutor executor(selectMatrixRepr, user_config);
     mlir::MLIRContext *mctx = executor.getContext();
+
+    // ************************************************************************
+    // Populate FileIO extension catalog
+    // ************************************************************************
+    // --- FileIO catalogs (fully automatic) ---
+    FileIOCatalogParser fileIOParser;
+    FileIORegistry &registry = executor.getUserConfig().registry;
+
+    try{
+        const std::string builtinsRel =
+            "scripts/examples/extensions/builtInIO/BuiltIns.json";
+
+        // resolve and load built-ins
+        fileIOParser.parseFileIOCatalog(resolveRepoPathAuto(builtinsRel), registry, std::nullopt);
+        registry.captureBaseline();
+
+        // resolve and load optional --FileIO-ext <path[:prio]>
+        if (!FileIOExt.empty()) {
+            std::string arg = FileIOExt;
+            std::optional<int> prio = std::nullopt;
+
+            if (auto pos = arg.rfind(':'); pos != std::string::npos) {
+                size_t idx = 0; long long v = std::stoll(arg.substr(pos+1), &idx);
+                if (idx != arg.size() - (pos+1))
+                    throw std::runtime_error("invalid priority in --FileIO-ext: " + FileIOExt);
+                prio = static_cast<int>(v);
+                arg.resize(pos);
+            }
+
+            const std::string path = resolveRepoPathAuto(arg);
+            fileIOParser.parseFileIOCatalog(path, registry, prio);
+        }
+    }
+    catch (const std::exception &e) {
+        std::cerr << "Error parsing FileIO catalog: " << e.what() << "\n";
+        return 1;
+    }
+
 
     // ************************************************************************
     // Populate kernel extension catalog

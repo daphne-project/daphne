@@ -1,0 +1,6 @@
+// Use of unrecognised engine would lead to failure
+opts = {"engine": ["noEngine"]};
+
+m = readMatrix("scripts/examples/extensions/csv/data.csv", opts);
+
+print(m);

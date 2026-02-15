@@ -1,0 +1,31 @@
+[
+  {
+    "extension": ".csv",
+    "readerFuncName": "csv_read",
+    "writerFuncName": "csv_write",
+    "libPath": "libCsvIO.so",
+    "type": "DenseMatrix",
+    "engine": "Daphne",
+    "priority": 10,
+    "options": {
+      "delimiter": ",",
+      "hasHeader": "false",
+      "threads": "1"
+    }
+  },
+  {
+    "extension": ".csv",
+    "readerFuncName": "csv_read_frame",
+    "writerFuncName": "csv_write_frame",
+    "libPath": "libCsvIO.so",
+    "type": "Frame",
+    "engine": "Daphne",
+    "priority": 10,
+    "options": {
+      "delimiter": ",",
+      "hasHeader": "false",
+      "threads": "1",
+      "useCols": ""
+    }
+  }
+]

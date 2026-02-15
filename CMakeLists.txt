@@ -27,6 +27,10 @@ endif()
 
 project(daphne-prototype LANGUAGES CXX C)
 
+# Write the absolute repo root next to the daphne binary at build time
+file(WRITE ${CMAKE_BINARY_DIR}/bin/.daphne_repo_root "${PROJECT_SOURCE_DIR}\n")
+
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard to conform to")

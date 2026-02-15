@@ -1,0 +1,3 @@
+opts = {"engine": ["Daphne"]};
+
+m = readMatrix("experiment/ReadParquet1.parquet", opts);

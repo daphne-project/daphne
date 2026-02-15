@@ -1,0 +1,15 @@
+opts = {"engine": ["Daphne"], "threads": ["16"]};
+t1 = now();
+m = readFrame("experiment/data/known_off_clean.csv",opts);
+t2 = now();
+
+opts2 = {"engine": ["builtin"]};
+t3 = now();
+m2 = readFrame("experiment/data/known_off_clean.csv",opts2);
+t4 = now();
+
+print(t2-t1);
+
+print(t4-t3);
+
+//print(m == m2);

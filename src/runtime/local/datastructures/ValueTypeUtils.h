@@ -51,6 +51,7 @@ struct ValueTypeUtils {
     static const std::string irNameForCode(ValueTypeCode type);
 };
 
+template <> const ValueTypeCode ValueTypeUtils::codeFor<bool>;
 template <> const ValueTypeCode ValueTypeUtils::codeFor<int8_t>;
 template <> const ValueTypeCode ValueTypeUtils::codeFor<int32_t>;
 template <> const ValueTypeCode ValueTypeUtils::codeFor<int64_t>;

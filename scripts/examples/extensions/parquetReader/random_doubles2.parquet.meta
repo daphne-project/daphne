@@ -1,0 +1,5 @@
+{
+  "numRows": 3000000,
+  "numCols": 16,
+  "valueType": "f64"
+}

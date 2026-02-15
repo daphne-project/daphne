@@ -1,0 +1,134 @@
+[
+  {
+    "extension": ".csv",
+    "readerFuncName": "readCsvFromPath_Frame",
+    "writerFuncName": "WriteCsv_Frame",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "Frame",
+    "engine": "builtin",
+    "options": {
+      "delimiter": ",",
+      "sorted": "false",
+      "hasHeader": "false",
+      "useCols": ""
+    }
+  },
+  {
+    "extension": ".csv",
+    "readerFuncName": "readCsvFromPath_Dense",
+    "writerFuncName": "WriteCsv_Dense",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "DenseMatrix",
+    "engine": "builtin",
+    "options": {
+      "delimiter": ",",
+      "hasHeader": "false"         
+    }
+  },
+  {
+    "extension": ".csv",
+    "readerFuncName": "readCsvFromPath_CSR",
+    "writerFuncName": "WriteCsv_Matrix",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "CSRMatrix",
+    "engine": "builtin",
+    "options": {
+      "delimiter": ",",
+      "sorted": "false",
+      "hasHeader": "false"         
+    }
+  },
+  {
+    "extension": ".parquet",
+    "readerFuncName": "ReadParquet_Frame",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "Frame",
+    "engine": "builtin",
+    "options": {
+      "threads": "1"
+    }
+  },
+  {
+    "extension": ".parquet",
+    "readerFuncName": "ReadParquet_CSR",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "CSRMatrix",
+    "engine": "builtin",
+    "options": {
+      "threads": "1"
+    }
+  },
+  {
+    "extension": ".parquet",
+    "readerFuncName": "ReadParquet_Dense",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "DenseMatrix",
+    "engine": "builtin",
+    "options": {
+      "threads": "1"
+    }
+  },
+  {
+    "extension": ".mtx",
+    "readerFuncName": "ReadMM_Dense",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "DenseMatrix",
+    "engine": "builtin",
+    "options": {
+    }
+  },
+  {
+    "extension": ".mtx",
+    "readerFuncName": "ReadMM_Frame",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "Frame",
+    "engine": "builtin",
+    "options": {
+    }
+  },
+  {
+    "extension": ".mtx",
+    "readerFuncName": "ReadMM_CSR",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "CSRMatrix",
+    "engine": "builtin",
+    "options": {
+    }
+  },
+  {
+    "extension": ".dbdf",
+    "readerFuncName": "ReadDaphne_Dense",
+    "writerFuncName": "WriteDaphne_Dense",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "DenseMatrix",
+    "engine": "builtin",
+    "options": {
+    }
+  },
+  {
+    "extension": ".dbdf",
+    "readerFuncName": "ReadDaphne_CSR",
+    "writerFuncName": "WriteDaphne_CSR",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "CSRMatrix",
+    "engine": "builtin",
+    "options": {
+    }
+  },
+  {
+    "extension": ".dbdf",
+    "readerFuncName": "ReadDaphne_Frame",
+    "writerFuncName": "WriteDaphne_Frame",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "Frame",
+    "engine": "builtin",
+    "options": {
+    }
+  }
+]
