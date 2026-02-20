@@ -1,0 +1,25 @@
+import "LSH.daph";
+
+SAVE_RESULTS = true;
+
+NUM_BANDS = 3;
+
+signatures = readMatrix("test/data/LSH/signaturesSmall.csv");
+num_of_sig = as.scalar<si64>(nrow(signatures));
+
+buckets = LSH.init_buckets(NUM_BANDS, num_of_sig);
+
+#TODO: For loop does not work for this, possibly because list parameters cant be type defined in UDF's.
+buckets = LSH.add_hash(signatures[0,:], NUM_BANDS, buckets, 0);
+buckets = LSH.add_hash(signatures[1,:], NUM_BANDS, buckets, 1);
+buckets = LSH.add_hash(signatures[2,:], NUM_BANDS, buckets, 2);
+
+
+candidates = LSH.check_candidates(buckets);
+
+
+LSH.print_candidates_result(candidates);
+
+if (SAVE_RESULTS){
+    writeMatrix(candidates, "candidates_results.csv");
+}

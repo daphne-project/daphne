@@ -1,0 +1,9 @@
+// Replacing an element in a list functions.
+//The original list remains unchanged.
+//The old element is correctly returned.
+
+l1 = createList([0],[1],[2],[3],[4]);
+l2, e = replaceElementInList(l1, 2, [933]);
+print(l1);
+print(l2);
+print(e);

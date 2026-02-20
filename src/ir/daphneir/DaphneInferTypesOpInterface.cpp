@@ -745,6 +745,27 @@ std::vector<Type> daphne::RemoveOp::inferTypes() {
                                           "RemoveOp expects a list as its first argument");
 }
 
+std::vector<Type> daphne::ReplaceElementInListOp::inferTypes() {
+    // The type of the first result is the same as that of the argument list.
+    // The type of the second result is the element type of the argument list.
+    Type argListTy = getArgList().getType();
+    if (auto lt = argListTy.dyn_cast<daphne::ListType>())
+        return {lt, lt.getElementType()};
+    else
+        throw ErrorHandler::compilerError(getLoc(), "InferTypesOpInterface",
+                                          "ReplaceElementInListOp expects a list as its first argument");
+}
+
+std::vector<Type> daphne::GetElementInListOp::inferTypes() {
+    // The type of the result is the element type of the argument list.
+    Type argListTy = getArgList().getType();
+    if (auto lt = argListTy.dyn_cast<daphne::ListType>())
+        return {lt.getElementType()};
+    else
+        throw ErrorHandler::compilerError(getLoc(), "InferTypesOpInterface",
+                                          "GetElementInListOp expects a list as its first argument");
+}
+
 // ****************************************************************************
 // Type inference function
 // ****************************************************************************

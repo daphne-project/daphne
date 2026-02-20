@@ -6413,6 +6413,110 @@
 
     {
         "kernelTemplate": {
+            "header": "ReplaceElementInList.h",
+            "opName": "replaceElementInList",
+            "returnType": "void",
+            "templateParams": [
+                {
+                    "name": "DT",
+                    "isDataType": true
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "List<DT> *&",
+                    "name": "resList"
+                },
+                {
+                    "type": "DT *&",
+                    "name": "elem"
+                },
+                {
+                    "type": "const List<DT> *",
+                    "name": "argList"
+                },
+                {
+                    "type": "size_t",
+                    "name": "idx"
+                },
+                {
+                    "type": "const DT *",
+                    "name": "newElem"
+                }
+            ]
+        },
+        "instantiations": [
+            [["DenseMatrix", "double"]],
+            [["DenseMatrix", "float"]],
+            [["DenseMatrix", "int64_t"]],
+            [["DenseMatrix", "int32_t"]],
+            [["DenseMatrix", "int8_t"]],
+            [["DenseMatrix", "uint64_t"]],
+            [["DenseMatrix", "uint32_t"]],
+            [["DenseMatrix", "uint8_t"]],
+            [["DenseMatrix", "size_t"]],
+            [["CSRMatrix", "double"]],
+            [["CSRMatrix", "float"]],
+            [["CSRMatrix", "int64_t"]],
+            [["CSRMatrix", "int32_t"]],
+            [["CSRMatrix", "int8_t"]],
+            [["CSRMatrix", "uint64_t"]],
+            [["CSRMatrix", "uint32_t"]],
+            [["CSRMatrix", "uint8_t"]],
+            [["CSRMatrix", "size_t"]]
+        ]
+    },
+
+    {
+        "kernelTemplate": {
+            "header": "GetElementInList.h",
+            "opName": "getElementInList",
+            "returnType": "void",
+            "templateParams": [
+                {
+                    "name": "DT",
+                    "isDataType": true
+                }
+            ],
+            "runtimeParams": [
+                {
+                    "type": "DT *&",
+                    "name": "elem"
+                },
+                {
+                    "type": "const List<DT> *",
+                    "name": "argList"
+                },
+                {
+                    "type": "size_t",
+                    "name": "idx"
+                }
+            ]
+        },
+        "instantiations": [
+            [["DenseMatrix", "double"]],
+            [["DenseMatrix", "float"]],
+            [["DenseMatrix", "int64_t"]],
+            [["DenseMatrix", "int32_t"]],
+            [["DenseMatrix", "int8_t"]],
+            [["DenseMatrix", "uint64_t"]],
+            [["DenseMatrix", "uint32_t"]],
+            [["DenseMatrix", "uint8_t"]],
+            [["DenseMatrix", "size_t"]],
+            [["CSRMatrix", "double"]],
+            [["CSRMatrix", "float"]],
+            [["CSRMatrix", "int64_t"]],
+            [["CSRMatrix", "int32_t"]],
+            [["CSRMatrix", "int8_t"]],
+            [["CSRMatrix", "uint64_t"]],
+            [["CSRMatrix", "uint32_t"]],
+            [["CSRMatrix", "uint8_t"]],
+            [["CSRMatrix", "size_t"]]
+        ]
+    },
+
+    {
+        "kernelTemplate": {
             "header": "Conv2DForward.h",
             "opName": "conv2DForward",
             "returnType": "void",
