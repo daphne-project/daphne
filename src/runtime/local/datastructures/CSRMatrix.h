@@ -395,8 +395,10 @@ template <typename ValueType> class CSRMatrix : public Matrix<ValueType> {
            << std::endl;
         os << "maxNumNonZeros: \t" << maxNumNonZeros << std::endl;
         os << "values: \t";
-        for (size_t i = 0; i < maxNumNonZeros; i++)
-            os << values.get()[i] << ", ";
+        for (size_t i = 0; i < maxNumNonZeros; i++) {
+            printValue(os, values.get()[i]);
+            os << ", ";
+        }
         os << std::endl;
         os << "colIdxs: \t";
         for (size_t i = 0; i < maxNumNonZeros; i++)
