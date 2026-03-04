@@ -26,7 +26,12 @@ add_library(DataStructures
         MetaDataObject.cpp
         ChunkedTensor.cpp
         ContiguousTensor.cpp
-        ValueTypeUtils.cpp)
+        ValueTypeUtils.cpp
+        MncSketch.h
+        MncSketchBuild.cpp
+        MncSketchPropagate.cpp
+        MncSketchEstimate.cpp
+        )
 
 target_link_libraries(DataStructures PUBLIC Proto)
 if(USE_CUDA AND CMAKE_CUDA_COMPILER)

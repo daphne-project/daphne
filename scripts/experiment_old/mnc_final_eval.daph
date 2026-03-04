@@ -1,0 +1,26 @@
+r = 4000;
+c = 4000;
+s = 0.005;
+
+A = rand(r, c, 0.0, 1.0, s, 42);
+B = rand(c, r, 0.0, 1.0, s, 24);
+C = A @ B;
+
+est_mnc = sparsity(C);
+actual = as.f64(sum(C != 0)) / (nrow(C) * ncol(C));
+old_naive = 1.0;
+threshold = 0.25;
+
+print("--- RESULTS ---");
+print("MNC Estimate:  " + est_mnc);
+print("Naive Estimate: " + old_naive);
+print("Actual:         " + actual);
+print("--- ERRORS ---");
+print("MNC Error: " + (est_mnc - actual));
+print("Naive Error: " + (old_naive - actual));
+
+if (est_mnc > threshold) {
+    print("Decision: DENSE");
+} else {
+    print("Decision: SPARSE");
+}

@@ -1,0 +1,25 @@
+# Final Benchmark for MNC Sparsity Prediction
+# 1. Setup (Large Scale)
+r = 5000;
+c = 5000;
+s = 0.01; # 1% sparsity
+
+print("--- Step 1: Generating 5000x5000 Matrices ---");
+A = rand(r, c, 0.0, 1.0, s, 42);
+B = rand(c, r, 0.0, 1.0, s, 24);
+
+# 2. Matrix Multiplication Experiment
+print("--- Step 2: Testing Matrix Multiplication (A @ B) ---");
+C = A @ B;
+print("MNC Predicted Sparsity:");
+print(sparsity(C));
+print("Actual Measured Sparsity:");
+print(as.f64(sum(C != 0)) / (nrow(C) * ncol(C)));
+
+# 3. Transpose Experiment
+print("--- Step 3: Testing Transpose t(A) ---");
+D = t(A);
+print("MNC Predicted Sparsity:");
+print(sparsity(D));
+print("Actual Measured Sparsity:");
+print(as.f64(sum(D != 0)) / (nrow(D) * ncol(D)));

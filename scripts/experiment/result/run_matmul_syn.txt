@@ -1,0 +1,14 @@
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.221429
+real_nnz:31
+MNC:
+Sparsity:0.202808
+mnc_nnz:28.3931
+Relative error:1.09182
+Same Rep
+Estimator:
+Sparsity:0.287359
+estimator_nnz:40.2302
+Relative error:1.29775
+Diff Rep
+-------------------------------End-------------------------

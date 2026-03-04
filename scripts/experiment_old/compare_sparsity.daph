@@ -1,0 +1,21 @@
+# compare_sparsity.daph - STRESS TEST FOR ACCURACY
+r = 2000;
+c = 2000;
+s = 0.005; # 0.5% sparsity - very empty
+
+print("--- Sparsity Estimation Experiment (Ultra-Sparse) ---");
+A = rand(r, c, 0.0, 1.0, s, 42);
+B = rand(c, r, 0.0, 1.0, s, 24);
+
+C = A @ B;
+
+print("Results for Matrix C (A @ B):");
+print("Estimated Sparsity (MNC):");
+print(sparsity(C));
+
+print("Actual Sparsity:");
+real_s = as.f64(sum(C != 0)) / (nrow(C) * ncol(C));
+print(real_s);
+D = t(C); # Transpose
+E = rbind(C, C); # Row-bind
+print("Sparsity Transpose: " + sparsity(D));

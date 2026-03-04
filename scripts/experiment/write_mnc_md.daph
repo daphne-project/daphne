@@ -1,0 +1,22 @@
+/*
+ * Copyright 2021 The DAPHNE Consortium
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// bin/daphne --explain property_inference scripts/experiment/matmul_cases.daph M1_WITHOUT_MNC=\"./data/real/bp__1000.mtx\" M1_WITH_MNC=\"./data/real/withmnc/bp__1000.csv\" M1_O=\"./data/real/withmnc/bp__1000.csv\"
+// all works 
+
+m1_without_mnc = readMatrix($M1_WITHOUT_MNC);
+// To save meta data with mnc 
+writeMatrix(m1_without_mnc, $M1_O);

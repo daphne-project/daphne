@@ -1,0 +1,36 @@
+# my_stress_test.daph
+# FIXED: Using 'rand' correctly
+
+print("Running Scaled MNC Stress Test (4000x4000)...");
+
+# 1. Setup Large Dimensions & Sparsity
+r = 4000;
+c = 4000;
+s = 0.05; 
+
+print("Generating random matrices X and Y...");
+
+# CORRECT SYNTAX: rand(rows, cols, min, max, sparsity, seed)
+X = rand(r, c, 0.0, 1.0, s, 42);
+Y = rand(r, c, 0.0, 1.0, s, 24);
+
+# 2. Element-wise Operations 
+print("Testing Element-wise Addition (X + Y)...");
+Sum_Add = sum(X + Y);
+
+print("Testing Element-wise Multiplication (X * Y)...");
+Sum_Mul = sum(X * Y);
+
+# 3. Complex Chain
+print("Testing Complex Chain...");
+Chain_Res = sum((X * Y) + t(X));
+
+print("----------------------------------------");
+print("Computation Complete.");
+print("Sum Add: " + Sum_Add);
+print("Sum Mul: " + Sum_Mul);
+print("Chain Res: " + Chain_Res);
+D = t(C); # Transpose
+E = rbind(C, C); # Row-bind
+print("Sparsity Transpose: " + sparsity(D));
+print("Sparsity Rbind: " + sparsity(E));

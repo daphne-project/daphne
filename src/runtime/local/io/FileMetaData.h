@@ -17,10 +17,12 @@
 #pragma once
 
 #include <runtime/local/datastructures/ValueTypeCode.h>
+#include <runtime/local/datastructures/MncSketch.h>
 
 #include <string>
 #include <utility>
 #include <vector>
+#include <optional>
 
 struct HDFSMetaData {
     bool isHDFS = false;
@@ -40,22 +42,30 @@ struct FileMetaData {
     std::vector<std::string> labels;
     const ssize_t numNonZeros;
     HDFSMetaData hdfs;
+    std::optional<MncSketch> mncSketch;
 
     /**
      * @brief Construct a new File Meta Data object for Frames
      */
-    FileMetaData(size_t numRows, size_t numCols, bool isSingleValueType, std::vector<ValueTypeCode> schema,
-                 std::vector<std::string> labels, ssize_t numNonZeros = -1, HDFSMetaData hdfs = {})
-        : numRows(numRows), numCols(numCols), isSingleValueType(isSingleValueType), schema(std::move(schema)),
-          labels(std::move(labels)), numNonZeros(numNonZeros), hdfs(hdfs) {}
+    FileMetaData(size_t numRows, size_t numCols, bool isSingleValueType,
+                std::vector<ValueTypeCode> schema,
+                std::vector<std::string> labels,
+                ssize_t numNonZeros = -1,
+                HDFSMetaData hdfs = {},
+                std::optional<MncSketch> mncSketch = std::nullopt)
+        : numRows(numRows), numCols(numCols), isSingleValueType(isSingleValueType),
+        schema(std::move(schema)), labels(std::move(labels)),
+        numNonZeros(numNonZeros), hdfs(std::move(hdfs)),
+        mncSketch(std::move(mncSketch)) {}
 
-    /**
-     * @brief Construct a new File Meta Data object for Matrix
-     */
-    FileMetaData(size_t numRows, size_t numCols, bool isSingleValueType, ValueTypeCode valueType,
-                 ssize_t numNonZeros = -1, HDFSMetaData hdfs = {})
-        : numRows(numRows), numCols(numCols), isSingleValueType(isSingleValueType), numNonZeros(numNonZeros),
-          hdfs(hdfs) {
+    FileMetaData(size_t numRows, size_t numCols, bool isSingleValueType,
+                ValueTypeCode valueType,
+                ssize_t numNonZeros = -1,
+                HDFSMetaData hdfs = {},
+                std::optional<MncSketch> mncSketch = std::nullopt)
+        : numRows(numRows), numCols(numCols), isSingleValueType(isSingleValueType),
+        numNonZeros(numNonZeros), hdfs(std::move(hdfs)),
+        mncSketch(std::move(mncSketch)) {
         schema.emplace_back(valueType);
     }
 };

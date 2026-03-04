@@ -1,0 +1,266 @@
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.298898
+real_nnz:1302
+MNC:
+Sparsity:0.304178
+mnc_nnz:1325
+Relative error:1.01767
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-4356
+Relative error:-0.298898
+Diff Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.00207641
+real_nnz:1403
+MNC:
+Sparsity:0.00206901
+mnc_nnz:1398
+Relative error:1.00358
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-675684
+Relative error:-0.00207641
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.00213561
+real_nnz:1443
+MNC:
+Sparsity:0.00209121
+mnc_nnz:1413
+Relative error:1.02123
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-675684
+Relative error:-0.00213561
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.0302041
+real_nnz:37
+MNC:
+Sparsity:0.0228571
+mnc_nnz:28
+Relative error:1.32143
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-1225
+Relative error:-0.0302041
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.0181141
+real_nnz:11593
+MNC:
+Sparsity:0.0180391
+mnc_nnz:11545
+Relative error:1.00416
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-640000
+Relative error:-0.0181141
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.00156406
+real_nnz:1001
+MNC:
+Sparsity:0.00150156
+mnc_nnz:961
+Relative error:1.04162
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-640000
+Relative error:-0.00156406
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.00459531
+real_nnz:2941
+MNC:
+Sparsity:0.00438125
+mnc_nnz:2804
+Relative error:1.04886
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-640000
+Relative error:-0.00459531
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.0029815
+real_nnz:11926
+MNC:
+Sparsity:0.00299925
+mnc_nnz:11997
+Relative error:1.00595
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-4e+06
+Relative error:-0.0029815
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.0029815
+real_nnz:11926
+MNC:
+Sparsity:0.00299925
+mnc_nnz:11997
+Relative error:1.00595
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-4e+06
+Relative error:-0.0029815
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.00907372
+real_nnz:120
+MNC:
+Sparsity:0.0094518
+mnc_nnz:125
+Relative error:1.04167
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-13225
+Relative error:-0.00907372
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.00879474
+real_nnz:301
+MNC:
+Sparsity:0.00864865
+mnc_nnz:296
+Relative error:1.01689
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-34225
+Relative error:-0.00879474
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.00363794
+real_nnz:428
+MNC:
+Sparsity:0.00335744
+mnc_nnz:395
+Relative error:1.08354
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-117649
+Relative error:-0.00363794
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.00225449
+real_nnz:591
+MNC:
+Sparsity:0.0022583
+mnc_nnz:592
+Relative error:1.00169
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-262144
+Relative error:-0.00225449
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.00661764
+real_nnz:872
+MNC:
+Sparsity:0.00707298
+mnc_nnz:932
+Relative error:1.06881
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-131769
+Relative error:-0.00661764
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.00667076
+real_nnz:879
+MNC:
+Sparsity:0.00735378
+mnc_nnz:969
+Relative error:1.10239
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-131769
+Relative error:-0.00667076
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.00674628
+real_nnz:161
+MNC:
+Sparsity:0.00599204
+mnc_nnz:143
+Relative error:1.12587
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-23865
+Relative error:-0.00674628
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.0278261
+real_nnz:368
+MNC:
+Sparsity:0.0280529
+mnc_nnz:371
+Relative error:1.00815
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-13225
+Relative error:-0.0278261
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.00283432
+real_nnz:743
+MNC:
+Sparsity:0.00287628
+mnc_nnz:754
+Relative error:1.0148
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-262144
+Relative error:-0.00283432
+Same Rep
+-------------------------------End-------------------------
+-------------------------------Begin-------------------------
+Real Sparsity matmul_m_mnc:0.0236455
+real_nnz:103
+MNC:
+Sparsity:0.021809
+mnc_nnz:95
+Relative error:1.08421
+Same Rep
+Estimator:
+Sparsity:-1
+estimator_nnz:-4356
+Relative error:-0.0236455
+Same Rep
+-------------------------------End-------------------------

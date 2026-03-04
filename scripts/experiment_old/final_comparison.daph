@@ -1,0 +1,20 @@
+# Comparison: Old Naive vs. New MNC Estimator
+r = 5000; c = 5000; s = 0.01;
+A = rand(r, c, 0.0, 1.0, s, 42);
+B = rand(c, r, 0.0, 1.0, s, 24);
+
+C = A @ B;
+est_mnc = sparsity(C);
+actual = as.f64(sum(C != 0)) / (nrow(C) * ncol(C));
+naive = 1.0; # Old method assumes result is dense
+
+print("--- Comparison Report ---");
+print("Actual Sparsity:   " + actual);
+print("MNC Prediction:    " + est_mnc + " (Error: " + (est_mnc - actual) + ")");
+print("Naive Prediction:  " + naive   + " (Error: " + (naive - actual) + ")");
+
+if (actual > 0.25) {
+    print("Decision: Use Dense Matrix (Threshold 0.25 exceeded)");
+} else {
+    print("Decision: Use Sparse Matrix");
+}
