@@ -361,8 +361,8 @@ template <typename ValueType> class CSRMatrix : public Matrix<ValueType> {
     void print(std::ostream &os) const override {
         os << "CSRMatrix(" << numRows << 'x' << numCols << ", " << ValueTypeUtils::cppNameFor<ValueType> << ')'
            << std::endl;
-        // Note that, in general, the values within one row might not be sorted
-        // by column index. Thus, the following is a little complicated.
+        // Even though we generally assume that the colIdxs are sorted within each row, the following code could also
+        // handle unsorted colIdxs (which is why it is a little complicated).
         ValueType *oneRow = new ValueType[numCols];
         for (size_t r = 0; r < numRows; r++) {
             memset(oneRow, 0, numCols * sizeof(ValueType));
