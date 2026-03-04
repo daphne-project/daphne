@@ -16,16 +16,16 @@
 
 #pragma once
 
-#include <Eigen/Dense>
-#include <Eigen/Eigenvalues>
 #include <runtime/local/context/DaphneContext.h>
 #include <runtime/local/datastructures/CSRMatrix.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/kernels/IsSymmetric.h>
 
+#include <Eigen/Dense>
+#include <Eigen/Eigenvalues>
+
 #include <cstddef>
-#include <iostream>
 
 // ****************************************************************************
 // Struct for partial template specialization
