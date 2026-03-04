@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <runtime/local/datagen/GenGivenVals.h>
 #include <runtime/local/datastructures/CSRMatrix.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/ValueTypeUtils.h>
@@ -87,4 +88,91 @@ TEST_CASE("CSRMatrix sub-matrix works properly", TAG_DATASTRUCTURES) {
         DataObjectFactory::destroy(mSub);
         DataObjectFactory::destroy(mOrig);
     }
+}
+
+TEMPLATE_TEST_CASE("CSRMatrix validity check, valid matrices", TAG_DATASTRUCTURES, double, int32_t) {
+    using VT = TestType;
+    using DT = CSRMatrix<VT>;
+
+    DT *o = genGivenVals<DT>(5, {0, 1, 0, 0, 2, //
+                                 3, 0, 0, 0, 0, //
+                                 0, 0, 0, 4, 0, //
+                                 0, 0, 0, 0, 0, //
+                                 0, 5, 0, 0, 0});
+    DT *m = nullptr;
+
+    SECTION("0x0, non-view") { m = DataObjectFactory::create<DT>(0, 0, 0, true); }
+    SECTION("5x0, non-view") { m = DataObjectFactory::create<DT>(5, 0, 0, true); }
+    SECTION("0x5, non-view") { m = DataObjectFactory::create<DT>(0, 5, 0, true); }
+    SECTION("5x5, non-view") { m = o; }
+    SECTION("2x5, view (row-segment, top)") {
+        m = o->sliceRow(0, 2);
+        DataObjectFactory::destroy(o);
+    }
+    SECTION("1x5, view (row-segment, middle)") {
+        m = o->sliceRow(2, 3);
+        DataObjectFactory::destroy(o);
+    }
+    SECTION("2x5, view (row-segment, bottom)") {
+        m = o->sliceRow(3, 5);
+        DataObjectFactory::destroy(o);
+    }
+
+    m->checkValidity();
+
+    DataObjectFactory::destroy(o, m);
+}
+
+TEMPLATE_TEST_CASE("CSRMatrix validity check, invalid matrices", TAG_DATASTRUCTURES, double, int32_t) {
+    using VT = TestType;
+    using DT = CSRMatrix<VT>;
+
+    // Start with a valid 3x5 CSRMatrix...
+
+    DT *m = genGivenVals<DT>(3, {1, 0, 2, 0, 3, //
+                                 0, 0, 4, 5, 6, //
+                                 0, 0, 0, 0, 0});
+    // rowOffsets: [0, 3, 6, 6]
+    // values: [1, 2, 3, 4, 5, 6]
+    // colIdxs: [0, 2, 4, 2, 3, 4]
+
+    // ...and make it invalid in some way.
+
+    SECTION("the first row offset is not zero (and the CSRMatrix is not a view with rows allocated before it)") {
+        m->getRowOffsets()[0] = 42;
+        // rowOffsets: [42, 3, 6, 6]
+    }
+    SECTION("the row offsets are not an increasing sequence") {
+        m->getRowOffsets()[2] = 0;
+        // rowOffsets: [0, 3, 0, 6]
+    }
+    SECTION("the row offsets indicate that some row has more non-zeros than columns") {
+        m->getRowOffsets()[1] = 6;
+        // rowOffsets: [0, 6, 6, 6]
+    }
+    SECTION("the row offsets indicate more non-zeros than allocated") {
+        m->getRowOffsets()[3] = 100;
+        // rowOffsets: [0, 3, 6, 100]
+    }
+    SECTION("explicitly stored zero values") {
+        m->getValues(1)[1] = 0;
+        // values: [1, 2, 3, 4, 0, 6]
+    }
+    SECTION("out-of-bounds column index") {
+        m->getColIdxs(0)[2] = 100;
+        // colIdxs: [0, 2, 100, 2, 3, 4]
+    }
+    SECTION("unsorted column indexes within a row") {
+        m->getColIdxs(0)[1] = 4;
+        m->getColIdxs(0)[2] = 2;
+        // colIdxs: [0, 4, 2, 2, 3, 4]
+    }
+    SECTION("non-unique column indexes within a row") {
+        m->getColIdxs(1)[1] = 4;
+        // colIdxs: [0, 2, 4, 2, 4, 4]
+    }
+
+    CHECK_THROWS(m->checkValidity());
+
+    DataObjectFactory::destroy(m);
 }

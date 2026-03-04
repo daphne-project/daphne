@@ -458,6 +458,62 @@ template <typename ValueType> class CSRMatrix : public Matrix<ValueType> {
     }
 
     size_t serialize(std::vector<char> &buf) const override;
+
+    /**
+     * @brief Checks if the underlying arrays of this `CSRMatrix` are populated in a valid way and throws an exception
+     * with an explanation, otherwise.
+     */
+    void checkValidity() const {
+        const size_t *rowOffsetsRaw = getRowOffsets();
+
+        // Check the rowOffsets array.
+        if (!isRowAllocatedBefore && rowOffsetsRaw[0] != 0)
+            throw std::runtime_error("the first row offset must be zero unless this CSRMatrix is a view and there are "
+                                     "rows allocated before it");
+        for (size_t r = 1; r <= numRows; r++) {
+            if (rowOffsetsRaw[r] < rowOffsetsRaw[r - 1])
+                throw std::runtime_error("the row offsets must be an increasing sequence, violated at position " +
+                                         std::to_string(r));
+            const size_t nnzRow = rowOffsetsRaw[r] - rowOffsetsRaw[r - 1];
+            if (nnzRow > numCols)
+                throw std::runtime_error(
+                    "a row may contain at most as many non-zeros as there are columns, violated in row " +
+                    std::to_string(r - 1) + ", found " + std::to_string(nnzRow) + " but expected at most " +
+                    std::to_string(numCols));
+        }
+
+        // Check the allocated size.
+        const size_t nnz = rowOffsetsRaw[numRows];
+        if (nnz > maxNumNonZeros)
+            throw std::runtime_error("the rowOffsets array must not indicate more non-zeros than allocated, found " +
+                                     std::to_string(nnz) + " but expected at most " + std::to_string(maxNumNonZeros));
+
+        // Check the values and colIdxs arrays.
+        for (size_t r = 0; r < numRows; r++) {
+            const ValueType *valuesRow = getValues(r);
+            const size_t *colIdxsRow = getColIdxs(r);
+            const size_t nnzRow = getNumNonZeros(r);
+
+            // Check the values in the current row.
+            for (size_t i = 0; i < nnzRow; i++)
+                if (valuesRow[i] == 0)
+                    throw std::runtime_error("there must be no explicitly stored zeros, violated at position " +
+                                             std::to_string(i) + " in row " + std::to_string(r));
+
+            // Check the colIdxs in the current row.
+            for (size_t i = 0; i < nnzRow; i++) {
+                if (colIdxsRow[i] > numCols)
+                    throw std::runtime_error("the column indexes must be in-bounds, violated at position " +
+                                             std::to_string(i) + " in row " + std::to_string(r) + ", found " +
+                                             std::to_string(colIdxsRow[i]) + " but expected at most " +
+                                             std::to_string(numCols));
+                if (i > 0 && colIdxsRow[i] <= colIdxsRow[i - 1])
+                    throw std::runtime_error(
+                        "the column indexes must be sorted and unique within each row, violated at position " +
+                        std::to_string(i) + " in row " + std::to_string(r));
+            }
+        }
+    }
 };
 
 template <typename ValueType> std::ostream &operator<<(std::ostream &os, const CSRMatrix<ValueType> &obj) {
