@@ -236,9 +236,11 @@ template <typename ValueType> class CSRMatrix : public Matrix<ValueType> {
 
     ValueType get(size_t rowIdx, size_t colIdx) const override {
         if (rowIdx >= numRows)
-            throw std::runtime_error("CSRMatrix (get): rowIdx is out of bounds");
+            throw std::runtime_error("CSRMatrix (get): rowIdx is out of bounds: " + std::to_string(rowIdx) +
+                                     ", number of rows: " + std::to_string(numRows));
         if (colIdx >= numCols)
-            throw std::runtime_error("CSRMatrix (get): colIdx is out of bounds");
+            throw std::runtime_error("CSRMatrix (get): colIdx is out of bounds: " + std::to_string(colIdx) +
+                                     ", number of columns: " + std::to_string(numCols));
 
         const size_t *rowColIdxsBeg = getColIdxs(rowIdx);
         const size_t *rowColIdxsEnd = getColIdxs(rowIdx + 1);
@@ -254,9 +256,11 @@ template <typename ValueType> class CSRMatrix : public Matrix<ValueType> {
 
     void set(size_t rowIdx, size_t colIdx, ValueType value) override {
         if (rowIdx >= numRows)
-            throw std::runtime_error("CSRMatrix (set): rowIdx is out of bounds");
+            throw std::runtime_error("CSRMatrix (set): rowIdx is out of bounds: " + std::to_string(rowIdx) +
+                                     ", number of rows: " + std::to_string(numRows));
         if (colIdx >= numCols)
-            throw std::runtime_error("CSRMatrix (set): colIdx is out of bounds");
+            throw std::runtime_error("CSRMatrix (set): colIdx is out of bounds: " + std::to_string(colIdx) +
+                                     ", number of columns: " + std::to_string(numCols));
 
         size_t *rowColIdxsBeg = getColIdxs(rowIdx);
         size_t *rowColIdxsEnd = getColIdxs(rowIdx + 1);
@@ -319,9 +323,11 @@ template <typename ValueType> class CSRMatrix : public Matrix<ValueType> {
     // has been populated up to just before the row range of this view.
     void append(size_t rowIdx, size_t colIdx, ValueType value) override {
         if (rowIdx >= numRows)
-            throw std::runtime_error("CSRMatrix (append): rowIdx is out of bounds");
+            throw std::runtime_error("CSRMatrix (append): rowIdx is out of bounds: " + std::to_string(rowIdx) +
+                                     ", number of rows: " + std::to_string(numRows));
         if (colIdx >= numCols)
-            throw std::runtime_error("CSRMatrix (append): colIdx is out of bounds");
+            throw std::runtime_error("CSRMatrix (append): colIdx is out of bounds: " + std::to_string(colIdx) +
+                                     ", number of columns: " + std::to_string(numCols));
 
         if (value == ValueType(0))
             return;
