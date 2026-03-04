@@ -181,6 +181,16 @@ template <typename ValueType> class Matrix : public Structure {
     size_t getNumDims() const override { return 2; }
 
     size_t getNumItems() const override { return this->numCols * this->numRows; }
+
+    /**
+     * @brief Returns the physical size required to store the data of this matrix in its physical format.
+     *
+     * Note that this function is about the actual data itself, independently of the matrix object or any allocated
+     * buffer sizes.
+     *
+     * @return The size in bytes.
+     */
+    virtual size_t getPhysicalSizeByte() const = 0;
 };
 
 template <typename ValueType> std::ostream &operator<<(std::ostream &os, const Matrix<ValueType> &obj) {

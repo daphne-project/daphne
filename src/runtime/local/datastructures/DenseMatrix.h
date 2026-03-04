@@ -343,6 +343,11 @@ template <typename ValueType> class DenseMatrix : public Matrix<ValueType> {
     }
 
     size_t serialize(std::vector<char> &buf) const override;
+
+    size_t getPhysicalSizeByte() const override {
+        // The size of the dense array.
+        return numRows * numCols * sizeof(ValueType);
+    }
 };
 
 template <typename ValueType> std::ostream &operator<<(std::ostream &os, const DenseMatrix<ValueType> &obj) {
@@ -623,4 +628,6 @@ template <> class DenseMatrix<const char *> : public Matrix<const char *> {
     }
 
     size_t serialize(std::vector<char> &buf) const override { throw std::runtime_error("Not implemented"); }
+
+    size_t getPhysicalSizeByte() const override { throw std::runtime_error("not implemented"); }
 };

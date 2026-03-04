@@ -176,3 +176,41 @@ TEMPLATE_TEST_CASE("CSRMatrix validity check, invalid matrices", TAG_DATASTRUCTU
 
     DataObjectFactory::destroy(m);
 }
+
+TEMPLATE_TEST_CASE("CSRMatrix::getPhysicalSizeByte()", TAG_DATASTRUCTURES, double, int32_t) {
+    using VT = TestType;
+    using DT = CSRMatrix<VT>;
+
+    DT *m = nullptr;
+    size_t exp = -1;
+
+    SECTION("0x0") {
+        m = DataObjectFactory::create<DT>(0, 0, 0, true);
+        exp = sizeof(size_t);
+    }
+    SECTION("3x0") {
+        m = DataObjectFactory::create<DT>(3, 0, 0, true);
+        exp = 4 * sizeof(size_t);
+    }
+    SECTION("0x3") {
+        m = DataObjectFactory::create<DT>(0, 3, 0, true);
+        exp = sizeof(size_t);
+    }
+    SECTION("3x3, all zeros (no space allocated)") {
+        m = DataObjectFactory::create<DT>(3, 3, 0, true);
+        exp = 4 * sizeof(size_t);
+    }
+    SECTION("3x3, all zeros (much space allocated)") {
+        // The additional allocated space should not have an impact on the physical size.
+        m = DataObjectFactory::create<DT>(3, 3, 100, true);
+        exp = 4 * sizeof(size_t);
+    }
+    SECTION("3x3, some non-zeros") {
+        m = genGivenVals<DT>(3, {1, 2, 0, 3, 4, 0, 0, 5, 0});
+        exp = 4 * sizeof(size_t) + 5 * (sizeof(VT) + sizeof(size_t));
+    }
+
+    CHECK(m->getPhysicalSizeByte() == exp);
+
+    DataObjectFactory::destroy(m);
+}

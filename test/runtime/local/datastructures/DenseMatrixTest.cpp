@@ -312,3 +312,36 @@ TEMPLATE_TEST_CASE("DenseMatrix with string value type", TAG_DATASTRUCTURES, ALL
         DataObjectFactory::destroy(mView);
     }
 }
+
+TEMPLATE_TEST_CASE("DenseMatrix::getPhysicalSizeByte()", TAG_DATASTRUCTURES, double, int32_t) {
+    using VT = TestType;
+    using DT = DenseMatrix<VT>;
+
+    DT *m = nullptr;
+    size_t exp = -1;
+
+    SECTION("0x0") {
+        m = DataObjectFactory::create<DT>(0, 0, true);
+        exp = 0;
+    }
+    SECTION("3x0") {
+        m = DataObjectFactory::create<DT>(3, 0, true);
+        exp = 0;
+    }
+    SECTION("0x3") {
+        m = DataObjectFactory::create<DT>(0, 3, true);
+        exp = 0;
+    }
+    SECTION("3x3, all zeros") {
+        m = DataObjectFactory::create<DT>(3, 3, true);
+        exp = 3 * 3 * sizeof(VT);
+    }
+    SECTION("3x3, all non-zeros") {
+        m = genGivenVals<DT>(3, {1, 2, 3, 4, 5, 6, 7, 8, 9});
+        exp = 3 * 3 * sizeof(VT);
+    }
+
+    CHECK(m->getPhysicalSizeByte() == exp);
+
+    DataObjectFactory::destroy(m);
+}

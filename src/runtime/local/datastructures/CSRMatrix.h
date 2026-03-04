@@ -465,6 +465,11 @@ template <typename ValueType> class CSRMatrix : public Matrix<ValueType> {
 
     size_t serialize(std::vector<char> &buf) const override;
 
+    size_t getPhysicalSizeByte() const override {
+        return getNumNonZeros() * (sizeof(ValueType) + sizeof(size_t)) // the size of the values and colIdxs arrays
+               + (numRows + 1) * sizeof(size_t);                       // the size of the rowOffsets array
+    }
+
     /**
      * @brief Checks if the underlying arrays of this `CSRMatrix` are populated in a valid way and throws an exception
      * with an explanation, otherwise.
