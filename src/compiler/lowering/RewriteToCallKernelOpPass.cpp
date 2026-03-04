@@ -163,15 +163,12 @@ class KernelReplacement : public RewritePattern {
         std::vector<mlir::Type> lookupResTys;
         // Differences between op argument types and look-up argument types:
         // - The look-up argument types summarize n occurrences of a variadic
-        // operand into
-        //   one variadic pack and one number of occurrences.
+        //   operand into one variadic pack and one number of occurrences.
         // - The look-up argument types omit most of the properties of the op
-        // argument types,
-        //   because those would complicate the search for matching kernels.
+        //   argument types, because those would complicate the search for matching kernels.
         // Differences between op result types and look-up result types:
         // - The look-up result types omit most of the properties of the op
-        // result types,
-        //   because those would complicate the search for matching kernels.
+        //   result types, because those would complicate the search for matching kernels.
 
         // The operands to use for the CallKernelOp to be created. These may
         // differ from the operands of the given operation, if it has a variadic
