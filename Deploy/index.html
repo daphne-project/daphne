@@ -19,7 +19,7 @@
       
       
       <link rel="icon" href="../assets/logo_small.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
     
     
       
@@ -1997,7 +1997,7 @@
 
 <h1 id="deploying">Deploying</h1>
 <h2 id="overview">Overview</h2>
-<p>This file explains the deployment of <strong>DAPHNE</strong>, on HPC with Slurm or manually through SSH, and highlights the excerpts from descriptions of functionalities in the <a href="https://github.com/daphne-eu/daphne/tree/main/deploy/">deploy/</a> directory (mostly <a href="https://github.com/daphne-eu/daphne/tree/main/deploy/deploy-distributed-on-slurm.sh">deploy-distributed-on-slurm.sh</a>):</p>
+<p>This file explains the deployment of <strong>DAPHNE</strong>, on HPC with Slurm or manually through SSH, and highlights the excerpts from descriptions of functionalities in the <a href="https://github.com/daphne-project/daphne/tree/main/deploy/">deploy/</a> directory (mostly <a href="https://github.com/daphne-project/daphne/tree/main/deploy/deploy-distributed-on-slurm.sh">deploy-distributed-on-slurm.sh</a>):</p>
 <ul>
 <li>compilation of the Singularity image</li>
 <li>compilation of DAPHNE (and the DAPHNE DistributedWorker) within the Singularity image</li>
@@ -2012,7 +2012,7 @@
 <h2 id="background">Background</h2>
 <p>DAPHNE's distributed runtime consists of a single coordinator and multiple DistributedWorkers (see the documentation of the <a href="/daphne/DistributedRuntime#Background">distributed runtime</a> for more information). For now, in order to execute DAPHNE in a distributed fashion, we need to deploy DistributedWorkers manually. The coordinator gets the worker's addresses
 through an environment variable.</p>
-<p><code>deployDistributed.sh</code> manually connects to machines with SSH and starts up DistributedWorker processes. On the other hand, the script <a href="https://github.com/daphne-eu/daphne/tree/main/deploy/deploy-distributed-on-slurm.sh">deploy-distributed-on-slurm.sh</a> packages and starts DAPHNE on a target HPC platform, and is tailored to the communication required with Slurm and the target HPC platform.</p>
+<p><code>deployDistributed.sh</code> manually connects to machines with SSH and starts up DistributedWorker processes. On the other hand, the script <a href="https://github.com/daphne-project/daphne/tree/main/deploy/deploy-distributed-on-slurm.sh">deploy-distributed-on-slurm.sh</a> packages and starts DAPHNE on a target HPC platform, and is tailored to the communication required with Slurm and the target HPC platform.</p>
 <h2 id="deploying-without-slurm-support">Deploying without Slurm Support</h2>
 <p><strong><code>deployDistributed.sh</code></strong> can be used to manually connect to a list of machines and remotely start up workers, get status of running workers or terminate distributed worker processes. This script depends only on an SSH client/server and does not require any use of a resource management tool (e.g. Slurm). With this script you can:</p>
 <ul>
@@ -2031,10 +2031,10 @@ through an environment variable.</p>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>$<span class="w"> </span>./deployDistributed.sh<span class="w"> </span>-r<span class="w"> </span><span class="c1"># (Uses default peers and path/to/build/ to start workers)</span>
 </code></pre></div>
 <h2 id="deploying-with-slurm-support">Deploying with Slurm Support</h2>
-<p>Building DAPHNE (to be later deployed on distributed nodes) can be done with a Singularity container. The Singularity container can be built on the utilized HPC. <a href="https://github.com/daphne-eu/daphne/tree/main/deploy/deployDistributed.sh">deployDistributed.sh</a> sends executables to each node, assuming there are different storages for each node. This might cause unnecessary overwrites if the workers use the same mounted user storage (e.g. HPC environments with distributed storages). Instead, <a href="https://github.com/daphne-eu/daphne/tree/main/deploy/deploy-distributed-on-slurm.sh">deploy-distributed-on-slurm.sh</a> should be used for such cases. The latter also automatically generates the environment variable <code>PEERS</code> from Slurm.</p>
+<p>Building DAPHNE (to be later deployed on distributed nodes) can be done with a Singularity container. The Singularity container can be built on the utilized HPC. <a href="https://github.com/daphne-project/daphne/tree/main/deploy/deployDistributed.sh">deployDistributed.sh</a> sends executables to each node, assuming there are different storages for each node. This might cause unnecessary overwrites if the workers use the same mounted user storage (e.g. HPC environments with distributed storages). Instead, <a href="https://github.com/daphne-project/daphne/tree/main/deploy/deploy-distributed-on-slurm.sh">deploy-distributed-on-slurm.sh</a> should be used for such cases. The latter also automatically generates the environment variable <code>PEERS</code> from Slurm.</p>
 <h3 id="how-to-use-deploy-distributed-on-slurmsh-for-daphne-packaging-distributed-deployment-and-management-using-slurm">How to Use <code>deploy-distributed-on-slurm.sh</code> for DAPHNE Packaging, Distributed Deployment, and Management Using Slurm</h3>
 <p>This section explains how to set up the DistributedWorkers on a HPC platform and briefly comments on what to do afterwards (how to run, manage, stop, and clean it).
-Commands, with their parameters and arguments, are hence described below for deployment with <a href="https://github.com/daphne-eu/daphne/tree/main/deploy/deploy-distributed-on-slurm.sh">deploy-distributed-on-slurm.sh</a>.</p>
+Commands, with their parameters and arguments, are hence described below for deployment with <a href="https://github.com/daphne-project/daphne/tree/main/deploy/deploy-distributed-on-slurm.sh">deploy-distributed-on-slurm.sh</a>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Usage:<span class="w"> </span>deploy-distributed-on-slurm.sh<span class="w"> </span>&lt;options&gt;<span class="w"> </span>&lt;command&gt;
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>Start<span class="w"> </span>the<span class="w"> </span>DAPHNE<span class="w"> </span>distributed<span class="w"> </span>deployment<span class="w"> </span>on<span class="w"> </span>remote<span class="w"> </span>machines<span class="w"> </span>using<span class="w"> </span>Slurm.
@@ -2079,7 +2079,7 @@ Commands, with their parameters and arguments, are hence described below for dep
 <a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a>Logs<span class="w"> </span>can<span class="w"> </span>be<span class="w"> </span>found<span class="w"> </span>at<span class="w"> </span><span class="o">[</span>pathToBuild<span class="o">]</span>/logs.
 </code></pre></div>
 <h3 id="short-examples">Short Examples</h3>
-<p>The following list presents a few examples about how to use the <a href="https://github.com/daphne-eu/daphne/tree/main/deploy/deploy-distributed-on-slurm.sh">deploy-distributed-on-slurm.sh</a> command.</p>
+<p>The following list presents a few examples about how to use the <a href="https://github.com/daphne-project/daphne/tree/main/deploy/deploy-distributed-on-slurm.sh">deploy-distributed-on-slurm.sh</a> command.</p>
 <p>These comprise more hands-on documentation about deployment, including tutorial-like explanation examples about how to package, distributively deploy, manage, and execute workloads using DAPHNE.</p>
 <ol>
 <li>

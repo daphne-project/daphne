@@ -19,7 +19,7 @@
       
       
       <link rel="icon" href="../assets/logo_small.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
     
     
       
@@ -2489,7 +2489,7 @@ On an installed WSL container, launching DAPHNE via Docker should work the same 
 <h3 id="next-steps">Next Steps</h3>
 <ul>
 <li>Browse the <a href="/daphne/">user documentation</a>, especially the parts on <a href="/daphne/DaphneDSL/LanguageRef">DaphneDSL</a> and <a href="/daphne/DaphneLib/Overview">DaphneLib</a>.</li>
-<li>Have a look at some <a href="https://github.com/daphne-eu/daphne/tree/main/scripts/examples/">examples</a>.</li>
+<li>Have a look at some <a href="https://github.com/daphne-project/daphne/tree/main/scripts/examples/">examples</a>.</li>
 <li>Start using DAPHNE for your own integrated data analysis pipelines.</li>
 </ul>
 <h2 id="quickstart-for-developers">Quickstart for Developers</h2>
@@ -2544,7 +2544,7 @@ If required, you can find more details for custom setups later in this document.
 <h3 id="next-steps_1">Next Steps</h3>
 <ul>
 <li>Browse the <a href="/daphne/">user and developer documentation</a>.</li>
-<li>Get familiar with the <a href="https://github.com/daphne-eu/daphne/tree/main/CONTRIBUTING.md">contribution guidelines</a>.</li>
+<li>Get familiar with the <a href="https://github.com/daphne-project/daphne/tree/main/CONTRIBUTING.md">contribution guidelines</a>.</li>
 <li>Start working in DAPHNE (for inspiration, see the list of <a href="https://github.com/daphne-eu/daphne/issues">open issues</a>, including <a href="https://github.com/daphne-eu/daphne/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22">"good first issues"</a>)</li>
 </ul>
 <h2 id="additional-details-for-custom-setups">Additional Details for Custom Setups</h2>
@@ -2553,7 +2553,7 @@ Nevertheless, there are cases when more details are required, e.g., when DAPHNE 
 <h3 id="system-requirements">System Requirements</h3>
 <p>Please ensure that your development system meets the following requirements before trying to build DAPHNE.
 Note that the DAPHNE container images already ship with all these dependencies installed.
-There is a <a href="https://github.com/daphne-eu/daphne/tree/main/install-ubuntu-packages.sh">convenience script</a> to install all necessary dependencies to compile DAPHNE on Ubuntu distributions.
+There is a <a href="https://github.com/daphne-project/daphne/tree/main/install-ubuntu-packages.sh">convenience script</a> to install all necessary dependencies to compile DAPHNE on Ubuntu distributions.
 However, in order to use optional features, such as CUDA or FPGA support, the respective requirements listed below still need to be installed separately.</p>
 <p><strong>(*)</strong>
 You can view the version numbers as an orientation rather than a strict requirement.
@@ -2808,7 +2808,7 @@ variables (unless you have reason to customize your setup - then it is assumed t
 </code></pre></div>
 <p>We use <a href="https://github.com/catchorg/Catch2">catch2</a> as the unit test framework. You can use all <a href="https://github.com/catchorg/Catch2/blob/devel/docs/command-line.md#top">command line arguments</a> of catch2 with <code>test.sh</code>.</p>
 <h3 id="running-daphne">Running DAPHNE</h3>
-<p>Write a little DaphneDSL script or use <a href="https://github.com/daphne-eu/daphne/tree/main/scripts/examples/hello-world.daph"><code>scripts/examples/hello-world.daph</code></a>...</p>
+<p>Write a little DaphneDSL script or use <a href="https://github.com/daphne-project/daphne/tree/main/scripts/examples/hello-world.daph"><code>scripts/examples/hello-world.daph</code></a>...</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="n">print</span><span class="p">(</span><span class="s">&quot;Hello World!&quot;</span><span class="p">);</span>
 </code></pre></div>
 <p>... and execute it as follows: <code>bin/daphne scripts/examples/hello-world.daph</code> (This command works if <code>daphne</code> is run
@@ -2823,7 +2823,7 @@ For further flags that can be set at runtime to activate additional functionalit
 higher are sufficient</li>
 <li>You can use the provided docker files and scripts to create and run DAPHNE.</li>
 </ul>
-<p><strong>A full description on containers is available in the <a href="https://github.com/daphne-eu/daphne/tree/main/containers">containers</a> subdirectory.</strong></p>
+<p><strong>A full description on containers is available in the <a href="https://github.com/daphne-project/daphne/tree/main/containers">containers</a> subdirectory.</strong></p>
 <p>The following recreates all images provided by <a href="https://hub.docker.com/u/daphneeu">daphneeu</a></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="nb">cd</span><span class="w"> </span>containers
 <a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>./build-containers.sh
@@ -2834,7 +2834,7 @@ current directory and handling permissions:</p>
 <a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>./containers/run-docker-example.sh
 </code></pre></div>
 <p>For more about building and running with containers, refer (once again) to the directory <code>containers/</code> and its
-<a href="https://github.com/daphne-eu/daphne/tree/main/containers/README.md">README.md</a>.
+<a href="https://github.com/daphne-project/daphne/tree/main/containers/README.md">README.md</a>.
 For documentation about using containers in conjunction with our cluster deployment scripts, refer to <a href="/daphne/Deploy">Deploy.md</a>.</p>
 <h3 id="exploring-the-source-code">Exploring the Source Code</h3>
 <p>As an <strong>entry point for exploring the source code</strong>, you might want to have a look at the code behind the <code>daphne</code> executable, which can be found in <code>src/api/cli/daphne.cpp</code>.</p>
@@ -2842,13 +2842,13 @@ For documentation about using containers in conjunction with our cluster deploym
 <ul>
 <li><code>bin</code>: after compilation, generated binaries will be placed here (e.g., daphne)</li>
 <li><code>build</code>: temporary build output</li>
-<li><a href="https://github.com/daphne-eu/daphne/tree/main/containers"><code>containers</code>:</a> scripts and configuration files to get/build/run with Docker or Singularity containers</li>
-<li><a href="https://github.com/daphne-eu/daphne/tree/main/deploy"><code>deploy</code>:</a> shell scripts to ease deployment in Slurm clusters</li>
-<li><a href="https://github.com/daphne-eu/daphne/tree/main/doc"><code>doc</code>:</a> documentation written in markdown (e.g., what you are reading at the moment)</li>
+<li><a href="https://github.com/daphne-project/daphne/tree/main/containers"><code>containers</code>:</a> scripts and configuration files to get/build/run with Docker or Singularity containers</li>
+<li><a href="https://github.com/daphne-project/daphne/tree/main/deploy"><code>deploy</code>:</a> shell scripts to ease deployment in Slurm clusters</li>
+<li><a href="https://github.com/daphne-project/daphne/tree/main/doc"><code>doc</code>:</a> documentation written in markdown (e.g., what you are reading at the moment)</li>
 <li><code>lib</code>: after compilation, generated library files will be placed here (e.g., libAllKernels.so, libCUDAKernels.so, ...)</li>
-<li><a href="https://github.com/daphne-eu/daphne/tree/main/scripts"><code>scripts</code>:</a> a collection of algorithms and examples written in DAPHNE's own domain specific language (<a href="/daphne/DaphneDSL/LanguageRef">DaphneDSL</a>)</li>
-<li><a href="https://github.com/daphne-eu/daphne/tree/main/src"><code>src</code>:</a> the actual source code, subdivided into the individual components of the system</li>
-<li><a href="https://github.com/daphne-eu/daphne/tree/main/test"><code>test</code>:</a> test cases</li>
+<li><a href="https://github.com/daphne-project/daphne/tree/main/scripts"><code>scripts</code>:</a> a collection of algorithms and examples written in DAPHNE's own domain specific language (<a href="/daphne/DaphneDSL/LanguageRef">DaphneDSL</a>)</li>
+<li><a href="https://github.com/daphne-project/daphne/tree/main/src"><code>src</code>:</a> the actual source code, subdivided into the individual components of the system</li>
+<li><a href="https://github.com/daphne-project/daphne/tree/main/test"><code>test</code>:</a> test cases</li>
 <li><code>thirdparty</code>: required external software</li>
 </ul>
 

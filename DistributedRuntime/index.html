@@ -19,7 +19,7 @@
       
       
       <link rel="icon" href="../assets/logo_small.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
     
     
       
@@ -2031,7 +2031,7 @@
 <h2 id="background">Background</h2>
 <p>DAPHNE supports execution in a distributed fashion. Utilizing the DAPHNE distributed runtime does not require any changes to the DaphneDSL script.
 Similar to the local vectorized engine (<a href="https://daphne-eu.eu/wp-content/uploads/2022/08/D2.2-Refined-System-Architecture.pdf">here, section 4</a>), the compiler automatically fuses operations and creates pipelines for the distributed runtime, which then uses multiple distributed nodes (workers) that work on their local data, while a main node, the coordinator, is responsible for transferring the data and code to be executed.
-As mentioned above, changes to the DaphneDSL code are not needed, however the user is required to start the workers, either manually or using an HPC tool such as Slurm (see the documentation on <a href="https://github.com/daphne-eu/daphne/tree/main/deploy">deployment</a> for scripts that start the workers locally or remotely, natively or not).</p>
+As mentioned above, changes to the DaphneDSL code are not needed, however the user is required to start the workers, either manually or using an HPC tool such as Slurm (see the documentation on <a href="https://github.com/daphne-project/daphne/tree/main/deploy">deployment</a> for scripts that start the workers locally or remotely, natively or not).</p>
 <h2 id="scope">Scope</h2>
 <p>This document focuses on:</p>
 <ul>
@@ -2051,7 +2051,7 @@ A brief introduction to the other backend using <strong>OpenMPI</strong> can be 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># IP:PORT is the IP and PORT the worker server will be listening too</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>bin/DistributedWorker<span class="w"> </span>IP:PORT<span class="w"> </span>
 </code></pre></div>
-<p>There are <a href="https://github.com/daphne-eu/daphne/tree/main/deploy">scripts</a> that automate this task and can help running multiple workers at once locally or even utilizing tools (like Slurm) in HPC environments.</p>
+<p>There are <a href="https://github.com/daphne-project/daphne/tree/main/deploy">scripts</a> that automate this task and can help running multiple workers at once locally or even utilizing tools (like Slurm) in HPC environments.</p>
 <p>Each worker can be left running and reused for multiple scripts and pipeline executions (however, for now they might run into memory issues, see <strong>Limitations</strong> section below).</p>
 <p>Each worker can be terminated by sending a <code>SIGINT</code> (Ctrl+C) or by using the scripts mentioned above.</p>
 <h2 id="set-up-environment-variables">Set up Environment Variables</h2>
@@ -2075,7 +2075,7 @@ The distributed backend can be selected using the command-line argument <code>--
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>$<span class="w"> </span>bin/DistributedWorker<span class="w"> </span>localhost:5000
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Started<span class="w"> </span>Distributed<span class="w"> </span>Worker<span class="w"> </span>on<span class="w"> </span><span class="sb">`</span>localhost:5000<span class="sb">`</span>
 </code></pre></div>
-<p>On another terminal we set the environment variable and execute the script <a href="https://github.com/daphne-eu/daphne/tree/main/scripts/examples/distributed.daph"><code>distributed.daph</code></a>:</p>
+<p>On another terminal we set the environment variable and execute the script <a href="https://github.com/daphne-project/daphne/tree/main/scripts/examples/distributed.daph"><code>distributed.daph</code></a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">DISTRIBUTED_WORKERS</span><span class="o">=</span>localhost:5000
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>$<span class="w"> </span>bin/daphne<span class="w"> </span>--distributed<span class="w"> </span>./scripts/example/distributed.daph
 </code></pre></div>

@@ -19,7 +19,7 @@
       
       
       <link rel="icon" href="../../assets/logo_small.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
     
     
       
@@ -2137,17 +2137,17 @@ Nevertheless, since DAPHNE should be able to handle unexpected scripts efficient
 </li>
 </ul>
 <h3 id="concrete-examples">Concrete Examples</h3>
-<p>For concrete examples, please have a look at existing kernel implementations in <a href="https://github.com/daphne-eu/daphne/tree/main/src/runtime/local/kernels">src/runtime/local/kernels</a>.
+<p>For concrete examples, please have a look at existing kernel implementations in <a href="https://github.com/daphne-project/daphne/tree/main/src/runtime/local/kernels">src/runtime/local/kernels</a>.
 For instance, the following kernels represent some interesting cases:</p>
 <ul>
-<li><a href="https://github.com/daphne-eu/daphne/tree/main/src/runtime/local/kernels/EwBinarySca.h">ewBinarySca</a> works only on scalars.</li>
-<li><a href="https://github.com/daphne-eu/daphne/tree/main/src/runtime/local/kernels/EwBinaryMat.h">ewBinaryMat</a> works only on matrices.</li>
-<li><a href="https://github.com/daphne-eu/daphne/tree/main/src/runtime/local/kernels/EwBinaryObjSca.h">ewBinaryObjSca</a> combines matrix/frame and scalar inputs.</li>
-<li><a href="https://github.com/daphne-eu/daphne/tree/main/src/runtime/local/kernels/MatMul.h">matMul</a> delegates to an external library (OpenBLAS).</li>
+<li><a href="https://github.com/daphne-project/daphne/tree/main/src/runtime/local/kernels/EwBinarySca.h">ewBinarySca</a> works only on scalars.</li>
+<li><a href="https://github.com/daphne-project/daphne/tree/main/src/runtime/local/kernels/EwBinaryMat.h">ewBinaryMat</a> works only on matrices.</li>
+<li><a href="https://github.com/daphne-project/daphne/tree/main/src/runtime/local/kernels/EwBinaryObjSca.h">ewBinaryObjSca</a> combines matrix/frame and scalar inputs.</li>
+<li><a href="https://github.com/daphne-project/daphne/tree/main/src/runtime/local/kernels/MatMul.h">matMul</a> delegates to an external library (OpenBLAS).</li>
 </ul>
 <h3 id="test-cases">Test Cases</h3>
 <p>Implementing test cases for each kernel is important to reduce the likelihood of bugs, now and after changes to the code base.
-Please have a look at test cases for existing kernel implementations in <a href="https://github.com/daphne-eu/daphne/tree/main/test/runtime/local/kernels">test/runtime/local/kernels</a> (surely, these could still be improved).</p>
+Please have a look at test cases for existing kernel implementations in <a href="https://github.com/daphne-project/daphne/tree/main/test/runtime/local/kernels">test/runtime/local/kernels</a> (surely, these could still be improved).</p>
 <h3 id="error-handling">Error Handling</h3>
 <p>It is recommended to throw exceptions such as <code>throw std::runtime_error</code> in a kernel
 in case the code runs into an unresolvable issue. We catch these exceptions in
@@ -2156,7 +2156,7 @@ information about the source of the error in the DaphneDSL script.</p>
 <h3 id="experimental-kernels">Experimental Kernels</h3>
 <p>As an alternative to implementing a new kernel that is directly integrated into
 DAPHNE, one can also work on kernel implementations using the <a href="/daphne/Extensions">kernel catalog</a>.
-These should reside in <a href="https://github.com/daphne-eu/daphne/tree/main/src/runtime/local/kernels/experimental/op/">experimental/op/</a> where <code>op</code> is
+These should reside in <a href="https://github.com/daphne-project/daphne/tree/main/src/runtime/local/kernels/experimental/op/">experimental/op/</a> where <code>op</code> is
 the mnemonic of the DaphneIR operation that the kernel implements.</p>
 <p>Experimental kernels are not directly integrated into DAPHNE and are neither
 compiled nor executed by default. They can be used to test new ideas and
