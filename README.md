@@ -31,6 +31,6 @@ The system will be built up and extended gradually in the course of the project.
 
 - Read our [contribution guidelines](/CONTRIBUTING.md).
 
-- Have a look at the [online documentation](https://daphne-eu.github.io/daphne/).
+- Have a look at the [online documentation](https://daphne-project.github.io/daphne/).
 
 - [Browse open issues](https://github.com/daphne-eu/daphne/issues) (e.g. ["good first issues"](https://github.com/daphne-eu/daphne/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)) or [create a new issue](https://github.com/daphne-eu/daphne/issues/new).
