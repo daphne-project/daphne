@@ -19,13 +19,13 @@ jobs:
           cp CONTRIBUTING.md doc/development/Contributing.md
           sed -ri 's@(\(/doc/[a-zA-Z0-9/]*)(.md)@\1@g' doc/*.md
           sed -ri 's@(\(/doc/[a-zA-Z0-9/]*)(.md)@\1@g' doc/**/*.md
-          sed -ri 's@\(/([a-zA-Z0-9]*.[a-zA-Z0-9]*)@\(https://github.com/daphne-eu/daphne/tree/main/\1@g' doc/*.md
-          sed -ri 's@\(/([a-zA-Z0-9]*.[a-zA-Z0-9]*)@\(https://github.com/daphne-eu/daphne/tree/main/\1@g' doc/**/*.md
-          sed -ri 's@]\(/([a-z]+)@]\(https://github.com/daphne-eu/daphne/tree/main/\1@g' doc/*.md
-          sed -ri 's@]\(/([a-z]+)@]\(https://github.com/daphne-eu/daphne/tree/main/\1@g' doc/**/*.md
-          sed -i 's@](https://github.com/daphne-eu/daphne/tree/main/doc/@](/daphne/@g' doc/*.md
-          sed -i 's@](https://github.com/daphne-eu/daphne/tree/main/doc/@](/daphne/@g' doc/**/*.md
-          sed -ri 's@]\(/issues/([0-9]+)@]\(https://github.com/daphne-eu/daphne/issues/\1@g' doc/*.md
+          sed -ri 's@\(/([a-zA-Z0-9]*.[a-zA-Z0-9]*)@\(https://github.com/daphne-project/daphne/tree/main/\1@g' doc/*.md
+          sed -ri 's@\(/([a-zA-Z0-9]*.[a-zA-Z0-9]*)@\(https://github.com/daphne-project/daphne/tree/main/\1@g' doc/**/*.md
+          sed -ri 's@]\(/([a-z]+)@]\(https://github.com/daphne-project/daphne/tree/main/\1@g' doc/*.md
+          sed -ri 's@]\(/([a-z]+)@]\(https://github.com/daphne-project/daphne/tree/main/\1@g' doc/**/*.md
+          sed -i 's@](https://github.com/daphne-project/daphne/tree/main/doc/@](/daphne/@g' doc/*.md
+          sed -i 's@](https://github.com/daphne-project/daphne/tree/main/doc/@](/daphne/@g' doc/**/*.md
+          sed -ri 's@]\(/issues/([0-9]+)@]\(https://github.com/daphne-project/daphne/issues/\1@g' doc/*.md
       - name: Build
         uses: Tiryoh/actions-mkdocs@v0
         with:
