@@ -26,6 +26,8 @@
 #include <runtime/local/io/FileMetaData.h>
 #include <runtime/local/io/WriteCsv.h>
 #include <runtime/local/io/WriteDaphne.h>
+#include <runtime/local/datastructures/MncSketchBuild.h>
+
 #if USE_HDFS
 #include <runtime/local/io/HDFS/WriteHDFS.h>
 #endif
@@ -60,21 +62,27 @@ template <class DTArg> void write(const DTArg *arg, const char *filename, DCTX(c
 template <typename VT> struct Write<DenseMatrix<VT>> {
     static void apply(const DenseMatrix<VT> *arg, const char *filename, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
+        // Build sketch
+        auto sketch = buildMncFromDenseMatrix(*arg);
 
         if (ext == ".csv") {
             File *file = openFileForWrite(filename);
             FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
+            metaData.mncSketch = std::move(sketch);
+
             MetaDataParser::writeMetaData(filename, metaData);
             writeCsv(arg, file);
             closeFile(file);
         } else if (ext == ".dbdf") {
             FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
+            metaData.mncSketch = std::move(sketch);
             MetaDataParser::writeMetaData(filename, metaData);
             writeDaphne(arg, filename);
 #if USE_HDFS
         } else if (ext == ".hdfs") {
             HDFSMetaData hdfs = {true, filename};
             FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>, -1, hdfs);
+            metaData.mncSketch = std::move(sketch);
             // Get file extension before .hdfs (e.g. file.csv.hdfs)
             std::string nestedExt(
                 std::filesystem::path(std::string(filename).substr(0, std::string(filename).size() - ext.size()))
@@ -121,7 +129,10 @@ template <> struct Write<Frame> {
 template <typename VT> struct Write<Matrix<VT>> {
     static void apply(const Matrix<VT> *arg, const char *filename, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
-
+        if (auto dm = dynamic_cast<const DenseMatrix<VT> *>(arg)) {
+            Write<DenseMatrix<VT>>::apply(dm, filename, ctx);
+            return;
+        }
         if (ext == ".csv") {
             File *file = openFileForWrite(filename);
             FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);

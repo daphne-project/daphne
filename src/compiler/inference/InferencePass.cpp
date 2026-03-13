@@ -23,18 +23,21 @@
 #include <mlir/IR/Operation.h>
 #include <mlir/Pass/Pass.h>
 
+#include <runtime/local/datastructures/MncSketch.h>
+
 #include <memory>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 
 using namespace mlir;
+daphne::MncSketchRegistry mncRegistry;
 
 daphne::InferenceConfig::InferenceConfig(bool partialInferenceAllowed, bool typeInference, bool shapeInference,
-                                         bool frameLabelInference, bool sparsityInference, bool symmetricInference)
+                                         bool frameLabelInference, bool sparsityInference, bool symmetricInference, bool mncSketchIdInference)
     : partialInferenceAllowed(partialInferenceAllowed), typeInference(typeInference), shapeInference(shapeInference),
       frameLabelInference(frameLabelInference), sparsityInference(sparsityInference),
-      symmetricInference(symmetricInference) {}
+      symmetricInference(symmetricInference), mncSketchIdInference(mncSketchIdInference) {}
 
 namespace {
 void castOperandIf(OpBuilder &builder, Operation *op, size_t operandIdx, Type type) {
@@ -75,11 +78,14 @@ Type getTypeWithCommonInfo(Type t1, Type t2) {
         const daphne::MatrixRepresentation repr2 = mat2.getRepresentation();
         const BoolOrUnknown sym1 = mat1.getSymmetric();
         const BoolOrUnknown sym2 = mat2.getSymmetric();
+        const ssize_t mncSketchId1 = mat1.getMncSketchId();
+        const ssize_t mncSketchId2 = mat2.getMncSketchId();
         return daphne::MatrixType::get(ctx, (vt1 == vt2) ? vt1 : u, (nr1 == nr2) ? nr1 : -1, (nc1 == nc2) ? nc1 : -1,
                                        // TODO Maybe do approximate comparison of floating-point values.
                                        (sp1 == sp2) ? sp1 : -1,
                                        (repr1 == repr2) ? repr1 : daphne::MatrixRepresentation::Default,
-                                       (sym1 == sym2) ? sym1 : BoolOrUnknown::Unknown);
+                                       (sym1 == sym2) ? sym1 : BoolOrUnknown::Unknown,
+                                       (mncSketchId1 == mncSketchId2) ? mncSketchId1 : -1);
     } else if (frm1 && frm2) { // both types are frames
         const std::vector<Type> cts1 = frm1.getColumnTypes();
         const std::vector<Type> cts2 = frm2.getColumnTypes();
@@ -209,6 +215,28 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
                 }
             }
             if (cfg.sparsityInference && returnsUnknownSparsity(op)) {
+                // we infer mncSketchId before sparsity, since the former can be used to infer the latter
+                if (cfg.mncSketchIdInference && returnsUnknownMncSketchId(op)) {
+                    // Try to infer the mncSketchId of all results of this operation.
+                    std::vector<int64_t> mncSketchIds = daphne::tryInferMncSketchId(op);
+                    const size_t numRes = op->getNumResults();
+                    if (mncSketchIds.size() != numRes)
+                        throw ErrorHandler::compilerError(
+                            op, "InferencePass",
+                            "mncSketchId inference for op " + op->getName().getStringRef().str() + " returned " +
+                                std::to_string(mncSketchIds.size()) + " entries, but the op has " + std::to_string(numRes) +
+                                " results");
+                    // Set the inferred values on all results of this operation.
+                    for (size_t i = 0; i < numRes; i++) {
+                        const int64_t mncSketchId = mncSketchIds[i];
+                        if (llvm::isa<mlir::daphne::MatrixType>(op->getResultTypes()[i])) {
+                            Value rv = op->getResult(i);
+                            const Type rt = rv.getType();
+                            if (auto mt = mlir::dyn_cast<daphne::MatrixType>(rt))
+                                rv.setType(mt.withMncSketchId(mncSketchId));
+                        }
+                    }
+                }
                 // Try to infer the sparsity of all results of this operation.
                 std::vector<double> sparsities = daphne::tryInferSparsity(op);
                 const size_t numRes = op->getNumResults();
@@ -494,8 +522,13 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
     void runOnOperation() override {
         func::FuncOp f = getOperation();
         try {
+            daphne::setActiveMncSketchRegistry(&mncRegistry);
             f.walk<WalkOrder::PreOrder>(walkOp);
+            // clear the registry to free memory and to avoid accidentally using it in later passes 
+            // that might run in the same process without setting it up properly
+            daphne::clearActiveMncSketchRegistry();
         } catch (std::runtime_error &re) {
+            daphne::clearActiveMncSketchRegistry();
             throw ErrorHandler::rethrowError("InferencePass.cpp:" + std::to_string(__LINE__), re.what());
         }
         // infer function return types
@@ -550,6 +583,13 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
         return llvm::any_of(op->getResultTypes(), [](Type rt) {
             if (auto mt = mlir::dyn_cast<daphne::MatrixType>(rt))
                 return mt.getSymmetric() == BoolOrUnknown::Unknown;
+            return false;
+        });
+    }
+    static bool returnsUnknownMncSketchId(Operation *op) {
+        return llvm::any_of(op->getResultTypes(), [](Type rt) {
+            if (auto mt = mlir::dyn_cast<daphne::MatrixType>(rt))
+                return mt.getMncSketchId() == -1;
             return false;
         });
     }

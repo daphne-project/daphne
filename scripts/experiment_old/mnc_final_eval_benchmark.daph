@@ -1,0 +1,37 @@
+# MNC Sparsity Estimator: Final Evaluation & Comparison
+# ---------------------------------------------------
+# This script compares the new MNC Estimator against 
+# the old Naive approach using a 0.25 density threshold.
+
+r = 4000;
+c = 4000;
+s = 0.005; # 0.5% input sparsity
+
+print("--- Step 1: Generating Synthetic Data ---");
+A = rand(r, c, 0.0, 1.0, s, 42);
+B = rand(c, r, 0.0, 1.0, s, 24);
+
+print("--- Step 2: Propagating Sparsity (A @ B) ---");
+C = A @ B;
+
+# Calculations
+est_mnc = sparsity(C);
+actual = as.f64(sum(C != 0)) / (nrow(C) * ncol(C));
+old_naive = 1.0; # The old method assumes dense results
+threshold = 0.25;
+
+print("");
+print("--- FINAL EXPERIMENTAL RESULTS ---");
+print("New MNC Estimate:  " + est_mnc);
+print("Old Naive Estimate: " + old_naive);
+print("Actual Measured:    " + actual);
+print("----------------------------------");
+print("MNC Accuracy Error: " + (est_mnc - actual));
+print("Old Naive Error:    " + (old_naive - actual));
+print("");
+
+if (est_mnc > threshold) {
+    print("Optimization: Estimator suggests DENSE storage (threshold 0.25 exceeded)");
+} else {
+    print("Optimization: Estimator suggests SPARSE storage (memory saving potential)");
+}

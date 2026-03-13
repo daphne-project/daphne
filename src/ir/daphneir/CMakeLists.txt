@@ -26,6 +26,7 @@ add_mlir_interface(DaphneInferFrameLabelsOpInterface)
 add_mlir_interface(DaphneInferSymmetricOpInterface)
 add_mlir_interface(DaphneInferShapeOpInterface)
 add_mlir_interface(DaphneInferSparsityOpInterface)
+add_mlir_interface(DaphneInferMncSketchIdOpInterface)
 add_mlir_interface(DaphneInferTypesOpInterface)
 add_mlir_interface(DaphneVectorizableOpInterface)
 
@@ -44,6 +45,7 @@ add_mlir_dialect_library(MLIRDaphne
     DaphneInferSymmetricOpInterface.cpp
     DaphneInferShapeOpInterface.cpp
     DaphneInferSparsityOpInterface.cpp
+    DaphneInferMncSketchIdOpInterface.cpp
     DaphneInferTypesOpInterface.cpp
     DaphneVectorizableOpInterface.cpp
 
@@ -55,6 +57,7 @@ add_mlir_dialect_library(MLIRDaphne
     MLIRDaphneInferSymmetricOpInterfaceIncGen
     MLIRDaphneInferShapeOpInterfaceIncGen
     MLIRDaphneInferSparsityOpInterfaceIncGen
+    MLIRDaphneInferMncSketchIdOpInterfaceIncGen
     MLIRDaphneInferTypesOpInterfaceIncGen
     MLIRDaphneVectorizableOpInterfaceIncGen
 

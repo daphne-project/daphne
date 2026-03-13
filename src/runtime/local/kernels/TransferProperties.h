@@ -26,15 +26,15 @@
 // ****************************************************************************
 
 template <class DT> struct TransferProperties {
-    static void apply(const DT *arg, double sparsity, int64_t symmetric, DCTX(ctx)) = delete;
+    static void apply(const DT *arg, double sparsity, int64_t symmetric, int64_t mncSketchId, DCTX(ctx)) = delete;
 };
 
 // ****************************************************************************
 // Convenience function
 // ****************************************************************************
 
-template <class DT> void transferProperties(const DT *arg, double sparsity, int64_t symmetric, DCTX(ctx)) {
-    TransferProperties<DT>::apply(arg, sparsity, symmetric, ctx);
+template <class DT> void transferProperties(const DT *arg, double sparsity, int64_t symmetric, int64_t mncSketchId, DCTX(ctx)) {
+    TransferProperties<DT>::apply(arg, sparsity, symmetric, mncSketchId, ctx);
 }
 
 // ****************************************************************************
@@ -46,9 +46,10 @@ template <class DT> void transferProperties(const DT *arg, double sparsity, int6
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct TransferProperties<DenseMatrix<VT>> {
-    static void apply(const DenseMatrix<VT> *arg, double sparsity, int64_t symmetric, DCTX(ctx)) {
+    static void apply(const DenseMatrix<VT> *arg, double sparsity, int64_t symmetric, int64_t mncSketchId, DCTX(ctx)) {
         const_cast<DenseMatrix<VT> *>(arg)->sparsity = sparsity;
         const_cast<DenseMatrix<VT> *>(arg)->symmetric = static_cast<BoolOrUnknown>(symmetric);
+        const_cast<DenseMatrix<VT> *>(arg)->mncSketchId = mncSketchId;
     }
 };
 
@@ -57,8 +58,9 @@ template <typename VT> struct TransferProperties<DenseMatrix<VT>> {
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct TransferProperties<CSRMatrix<VT>> {
-    static void apply(const CSRMatrix<VT> *arg, double sparsity, int64_t symmetric, DCTX(ctx)) {
+    static void apply(const CSRMatrix<VT> *arg, double sparsity, int64_t symmetric, int64_t mncSketchId, DCTX(ctx)) {
         const_cast<CSRMatrix<VT> *>(arg)->sparsity = sparsity;
         const_cast<CSRMatrix<VT> *>(arg)->symmetric = static_cast<BoolOrUnknown>(symmetric);
+        const_cast<CSRMatrix<VT> *>(arg)->mncSketchId = mncSketchId;
     }
 };

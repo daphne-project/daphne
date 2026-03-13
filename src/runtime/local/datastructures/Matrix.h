@@ -32,7 +32,7 @@ template <typename ValueType> class Matrix : public Structure {
 
   protected:
     Matrix(size_t numRows, size_t numCols)
-        : Structure(numRows, numCols), sparsity(-1), symmetric(BoolOrUnknown::Unknown){
+        : Structure(numRows, numCols), sparsity(-1), symmetric(BoolOrUnknown::Unknown), mncSketchId(-1){
                                                          // nothing to do
                                                      };
 
@@ -55,6 +55,8 @@ template <typename ValueType> class Matrix : public Structure {
      * Note that, so far, this is the compile-time estimate (not the actual run-time value) of the symmetry.
      */
     BoolOrUnknown symmetric;
+
+    ssize_t mncSketchId;
 
     virtual ~Matrix(){
         // nothing to do

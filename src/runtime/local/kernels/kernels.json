@@ -7813,6 +7813,10 @@
                 {
                     "type": "int64_t",
                     "name": "symmetric"
+                },
+                {
+                    "type": "int64_t",
+                    "name": "mncSketchId"
                 }
             ]
         },

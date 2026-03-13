@@ -59,7 +59,7 @@ def Matrix : Daphne_Type<"Matrix"> {
     // TODO Maybe we should rename "element type" to "value type" everywhere.
     let parameters = (ins
         "::mlir::Type":$elementType,
-        "ssize_t":$numRows, "ssize_t":$numCols, "double":$sparsity, "MatrixRepresentation":$representation, "BoolOrUnknown":$symmetric
+        "ssize_t":$numRows, "ssize_t":$numCols, "double":$sparsity, "MatrixRepresentation":$representation, "BoolOrUnknown":$symmetric, "ssize_t":$mncSketchId
     );
     let genVerifyDecl = 1;
     // NOTE: float needs special treatment for equality check and hashing (epsilon)
@@ -69,7 +69,7 @@ def Matrix : Daphne_Type<"Matrix"> {
         // Creates a MatrixType from mere element type information, with all
         // other parameters reset.
         TypeBuilder<(ins "::mlir::Type":$elementType), [{
-            return Base::get($_ctxt, elementType, -1, -1, -1.0, ::mlir::daphne::MatrixRepresentation::Default, ::mlir::daphne::BoolOrUnknown::Unknown);
+            return Base::get($_ctxt, elementType, -1, -1, -1.0, ::mlir::daphne::MatrixRepresentation::Default, ::mlir::daphne::BoolOrUnknown::Unknown, -1);
         }]>,
     ];
 
@@ -79,25 +79,28 @@ def Matrix : Daphne_Type<"Matrix"> {
         // new value.
 
         ::mlir::daphne::MatrixType withElementType(::mlir::Type elementType) {
-            return get(getContext(), elementType, getNumRows(), getNumCols(), getSparsity(), getRepresentation(), getSymmetric());
+            return get(getContext(), elementType, getNumRows(), getNumCols(), getSparsity(), getRepresentation(), getSymmetric(), getMncSketchId());
         }
 
         ::mlir::daphne::MatrixType withShape(ssize_t numRows, ssize_t numCols) {
-            return get(getContext(), getElementType(), numRows, numCols, getSparsity(), getRepresentation(), getSymmetric());
+            return get(getContext(), getElementType(), numRows, numCols, getSparsity(), getRepresentation(), getSymmetric(), getMncSketchId());
         }
 
         ::mlir::daphne::MatrixType withSparsity(double sparsity) {
-            return get(getContext(), getElementType(), getNumRows(), getNumCols(), sparsity, getRepresentation(), getSymmetric());
+            return get(getContext(), getElementType(), getNumRows(), getNumCols(), sparsity, getRepresentation(), getSymmetric(), getMncSketchId());
         }
 
         ::mlir::daphne::MatrixType withRepresentation(::mlir::daphne::MatrixRepresentation rep) {
-            return get(getContext(), getElementType(), getNumRows(), getNumCols(), getSparsity(), rep, getSymmetric());
+            return get(getContext(), getElementType(), getNumRows(), getNumCols(), getSparsity(), rep, getSymmetric(), getMncSketchId());
         }
 
         ::mlir::daphne::MatrixType withSymmetric(BoolOrUnknown symmetric) {
-            return get(getContext(), getElementType(), getNumRows(), getNumCols(), getSparsity(), getRepresentation(), symmetric);
+            return get(getContext(), getElementType(), getNumRows(), getNumCols(), getSparsity(), getRepresentation(), symmetric, getMncSketchId());
         }
 
+        ::mlir::daphne::MatrixType withMncSketchId(ssize_t mncSketchId) {
+            return get(getContext(), getElementType(), getNumRows(), getNumCols(), getSparsity(), getRepresentation(), getSymmetric(), mncSketchId);
+        }
         // The following methods return a MatrixType preserving the specified
         // properties and resetting all others.
 
@@ -106,7 +109,7 @@ def Matrix : Daphne_Type<"Matrix"> {
         }
 
         ::mlir::daphne::MatrixType withSameElementTypeAndRepr() {
-            return get(getContext(), getElementType(), -1, -1, -1.0, getRepresentation(), ::mlir::daphne::BoolOrUnknown::Unknown);
+            return get(getContext(), getElementType(), -1, -1, -1.0, getRepresentation(), ::mlir::daphne::BoolOrUnknown::Unknown, -1);
         }
 
         /**
@@ -133,6 +136,9 @@ def Matrix : Daphne_Type<"Matrix"> {
 
             if (other.getSymmetric() != ::mlir::daphne::BoolOrUnknown::Unknown
                 && getSymmetric() != other.getSymmetric())
+                return false;
+
+            if (other.getMncSketchId() != -1 && getMncSketchId() != other.getMncSketchId())
                 return false;
 
             return true;

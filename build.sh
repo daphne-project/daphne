@@ -1111,7 +1111,7 @@ cmake -S "$projectRoot" -B "$daphneBuildDir" -G Ninja -DANTLR_VERSION="$antlrVer
     -DCMAKE_PREFIX_PATH="$installPrefix" \
     $BUILD_CUDA $BUILD_FPGAOPENCL $BUILD_DEBUG $BUILD_MPI $BUILD_HDFS $BUILD_PAPI
 
-cmake --build "$daphneBuildDir" --target "$target"
+cmake --build "$daphneBuildDir" --target "$target" #-- -j2
 
 build_ts_end=$(date +%s%N)
 daphne_msg "Successfully built Daphne://${target} (took $(printableTimestamp $((build_ts_end - build_ts_begin))))"

@@ -28,6 +28,7 @@ include "ir/daphneir/DaphneInferShapeOpInterface.td"
 include "ir/daphneir/DaphneInferShapeTraits.td"
 include "ir/daphneir/DaphneInferSparsityOpInterface.td"
 include "ir/daphneir/DaphneInferSparsityTraits.td"
+include "ir/daphneir/DaphneInferMncSketchIdOpInterface.td"
 include "ir/daphneir/DaphneInferTypesOpInterface.td"
 include "ir/daphneir/DaphneInferTypesTraits.td"
 include "ir/daphneir/DaphneVectorizableOpInterface.td"
@@ -132,7 +133,9 @@ def Daphne_ConvertCSRMatrixToRowOffsetsMemRef : Daphne_Op<"convertCSRMatrixToRow
 def Daphne_FillOp : Daphne_Op<"fill", [
     DataTypeMat, ValueTypeFromFirstArg,
     NumRowsFromIthScalar<1>, NumColsFromIthScalar<2>, CUDASupport,
-    DeclareOpInterfaceMethods<InferSymmetricOpInterface>
+    DeclareOpInterfaceMethods<InferSymmetricOpInterface>,
+    DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>,
+    DeclareOpInterfaceMethods<InferSparsityOpInterface>
 ]> {
     let arguments = (ins AnyScalar:$arg, Size:$numRows, Size:$numCols);
     let results = (outs MatrixOrU:$res);
@@ -141,7 +144,8 @@ def Daphne_FillOp : Daphne_Op<"fill", [
 def Daphne_MatrixConstantOp : Daphne_Op<"matrixConstant", [
     DataTypeMat,
     DeclareOpInterfaceMethods<InferShapeOpInterface>,
-    DeclareOpInterfaceMethods<InferSparsityOpInterface>
+    DeclareOpInterfaceMethods<InferSparsityOpInterface>,
+    DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>
 ]>{
     let arguments = (ins UI64:$matrixAddr);
     let results = (outs MatrixOrU:$res);
@@ -161,7 +165,8 @@ def Daphne_CreateFrameOp : Daphne_Op<"createFrame", [
 def Daphne_DiagMatrixOp : Daphne_Op<"diagMatrix", [
     TypeFromFirstArg,
     NumRowsFromArg, NumColsFromArgNumRows,
-    DeclareOpInterfaceMethods<InferSparsityOpInterface>
+    DeclareOpInterfaceMethods<InferSparsityOpInterface>,
+    DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>
 ]> {
     let arguments = (ins MatrixOrU:$arg);
     let results = (outs MatrixOrU:$res);
@@ -170,7 +175,7 @@ def Daphne_DiagMatrixOp : Daphne_Op<"diagMatrix", [
 def Daphne_RandMatrixOp : Daphne_Op<"randMatrix", [
     TypesMatchWith<"min and max arguments must be of the same type", "min", "max", "$_self">,
     NumRowsFromIthScalar<0>, NumColsFromIthScalar<1>, DeclareOpInterfaceMethods<InferTypesOpInterface>,
-    SparsityFromIthScalar<4>, CastArgsToResTypeRandMatrixOp
+    SparsityFromIthScalar<4>, CastArgsToResTypeRandMatrixOp, DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>,
 ]> {
     let arguments = (ins Size:$numRows, Size:$numCols, AnyScalar:$min, AnyScalar:$max, F64:$sparsity, IntScalar:$seed);
     let results = (outs MatrixOrU:$res);
@@ -188,7 +193,9 @@ def Daphne_SeqOp : Daphne_Op<"seq", [
     DataTypeMat, ValueTypeFromArgs,
     OneCol, DeclareOpInterfaceMethods<InferNumRowsOpInterface>,
     CompletelyDense,
-    CastArgsToResType
+    CastArgsToResType,
+    DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>,
+    DeclareOpInterfaceMethods<InferSparsityOpInterface>
 ]> {
     let arguments = (ins NumScalar:$from, NumScalar:$to, NumScalar:$inc);
     let results = (outs MatrixOf<[NumScalar]>);
@@ -240,7 +247,8 @@ def Daphne_MatMulOp : Daphne_Op<"matMul", [
     DeclareOpInterfaceMethods<VectorizableOpInterface>,
     DataTypeMat, ValueTypeFromArgs,
     DeclareOpInterfaceMethods<InferShapeOpInterface>,
-    DeclareOpInterfaceMethods<InferSparsityOpInterface>, CUDASupport, FPGAOPENCLSupport,
+    DeclareOpInterfaceMethods<InferSparsityOpInterface>, 
+    DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>, CUDASupport, FPGAOPENCLSupport,
     CastFirstTwoArgsToResType, NoMemoryEffect
 ]> {
     let arguments = (ins MatrixOf<[NumScalar]>:$lhs, MatrixOf<[NumScalar]>:$rhs, BoolScalar:$transa, BoolScalar:$transb);
@@ -335,7 +343,7 @@ class Daphne_EwBinaryOp<string name, Type scalarType, list<Trait> traits = []>
     DeclareOpInterfaceMethods<DistributableOpInterface>,
     DeclareOpInterfaceMethods<VectorizableOpInterface>,
     ShapeEwBinary,
-    NoMemoryEffect
+    NoMemoryEffect,
 ])> {
     let arguments = (ins AnyTypeOf<[MatrixOf<[scalarType]>, scalarType, Unknown]>:$lhs, AnyTypeOf<[MatrixOf<[scalarType]>, scalarType, Unknown]>:$rhs);
     let results = (outs AnyTypeOf<[MatrixOf<[scalarType]>, scalarType, Unknown]>:$res);
@@ -348,16 +356,20 @@ class Daphne_EwBinaryOp<string name, Type scalarType, list<Trait> traits = []>
 // ----------------------------------------------------------------------------
 
 // TODO Make EwAddOp Commutative again (see #449).
-def Daphne_EwAddOp    : Daphne_EwBinaryOp<"ewAdd", AnyScalar, [ValueTypeFromArgs, CastArgsToResType/*, Commutative*/, EwSparseIfBoth, CUDASupport]> {
+def Daphne_EwAddOp    : Daphne_EwBinaryOp<"ewAdd", AnyScalar, [ValueTypeFromArgs, 
+                                                               CastArgsToResType/*, Commutative*/, 
+                                                               EwSparseIfBoth, CUDASupport, 
+                                                               DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>,
+                                                               DeclareOpInterfaceMethods<InferSparsityOpInterface>]> {
     let hasCanonicalizeMethod = 1;
 }
-def Daphne_EwSubOp    : Daphne_EwBinaryOp<"ewSub", NumScalar, [ValueTypeFromArgs, CastArgsToResType, EwSparseIfBoth, CUDASupport]> {
+def Daphne_EwSubOp    : Daphne_EwBinaryOp<"ewSub", NumScalar, [ValueTypeFromArgs, CastArgsToResType, EwSparseIfBoth, CUDASupport, DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>, DeclareOpInterfaceMethods<InferSparsityOpInterface>]> {
     let hasCanonicalizeMethod = 1;
 }
-def Daphne_EwMulOp    : Daphne_EwBinaryOp<"ewMul", NumScalar, [ValueTypeFromArgs, CastArgsToResType, Commutative, EwSparseIfEither, CUDASupport]> {
+def Daphne_EwMulOp    : Daphne_EwBinaryOp<"ewMul", NumScalar, [ValueTypeFromArgs, CastArgsToResType, Commutative, EwSparseIfEither, CUDASupport, DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>, DeclareOpInterfaceMethods<InferSparsityOpInterface>]> {
     let hasCanonicalizeMethod = 1;
 }
-def Daphne_EwDivOp    : Daphne_EwBinaryOp<"ewDiv", NumScalar, [ValueTypeFromArgs, CastArgsToResType, CUDASupport]> {
+def Daphne_EwDivOp    : Daphne_EwBinaryOp<"ewDiv", NumScalar, [ValueTypeFromArgs, CastArgsToResType, CUDASupport, DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>, DeclareOpInterfaceMethods<InferSparsityOpInterface>]> {
     let hasCanonicalizeMethod = 1;
 }
 def Daphne_EwPowOp    : Daphne_EwBinaryOp<"ewPow", NumScalar, [ValueTypeFromArgs, CastArgsToResType, CUDASupport]>;
@@ -748,7 +760,8 @@ def Daphne_InsertColOp : Daphne_Op<"insertCol", [
 
 def Daphne_ReshapeOp : Daphne_Op<"reshape", [
     TypeFromFirstArg,
-    NumRowsFromIthScalar<1>, NumColsFromIthScalar<2>, SparsityFromArg
+    NumRowsFromIthScalar<1>, NumColsFromIthScalar<2>, SparsityFromArg,
+    DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>
 ]> {
     let arguments = (ins MatrixOrU:$arg, Size:$numRows, Size:$numCols);
     let results = (outs MatrixOrU:$res);
@@ -759,6 +772,7 @@ def Daphne_TransposeOp : Daphne_Op<"transpose", [
     DeclareOpInterfaceMethods<VectorizableOpInterface>,
     NumRowsFromArgNumCols, NumColsFromArgNumRows, SparsityFromArg, CUDASupport,
     DeclareOpInterfaceMethods<InferSymmetricOpInterface>,
+    DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>,
     Pure
 ]> {
     let arguments = (ins MatrixOrU:$arg);
@@ -785,12 +799,16 @@ def Daphne_ColBindOp : Daphne_BindOp<"colBind", [
     DeclareOpInterfaceMethods<InferFrameLabelsOpInterface>,
     DeclareOpInterfaceMethods<VectorizableOpInterface>,
     NumRowsFromAllArgs, NumColsFromSumOfAllArgs, CUDASupport,
+    DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>,
+    DeclareOpInterfaceMethods<InferSparsityOpInterface>,
     Pure
 ]>;
 
 def Daphne_RowBindOp : Daphne_BindOp<"rowBind", [
     ValueTypeFromArgs,
-    NumRowsFromSumOfAllArgs, NumColsFromAllArgs
+    NumRowsFromSumOfAllArgs, NumColsFromAllArgs,
+    DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>,
+    DeclareOpInterfaceMethods<InferSparsityOpInterface>
 ]>;
 
 def Daphne_ReverseOp : Daphne_Op<"reverse", [
@@ -1739,7 +1757,8 @@ def Daphne_ReadOp : Daphne_Op<"read", [
     DeclareOpInterfaceMethods<InferTypesOpInterface>,
     DeclareOpInterfaceMethods<InferShapeOpInterface>,
     DeclareOpInterfaceMethods<InferFrameLabelsOpInterface>,
-    DeclareOpInterfaceMethods<InferSparsityOpInterface>
+    DeclareOpInterfaceMethods<InferSparsityOpInterface>,
+    DeclareOpInterfaceMethods<InferMncSketchIdOpInterface>
 ]> {
     // TODO We might add arguments for a UDF later.
     let arguments = (ins StrScalar:$fileName);
@@ -2054,7 +2073,7 @@ def Daphne_RecordPropertiesOp : Daphne_Op<"recordProperties"> {
 def Daphne_TransferPropertiesOp : Daphne_Op<"transferProperties"> {
     let summary = "Transfers compile-time information on data properties to the runtime data objects";
 
-    let arguments = (ins MatrixOrU:$arg, F64:$sparsity, SI64:$symmetric);
+    let arguments = (ins MatrixOrU:$arg, F64:$sparsity, SI64:$symmetric, SI32:$mncSketchId);
     let results = (outs);
 
     let hasCanonicalizeMethod = 1;

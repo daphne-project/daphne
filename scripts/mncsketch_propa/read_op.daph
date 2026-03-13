@@ -1,0 +1,28 @@
+/*
+ * Copyright 2021 The DAPHNE Consortium
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// bin/daphne --explain property_inference scripts/mncsketch/read_op.daph C=\"./data/outm1.csv\" O=\"./data/test/read_1.csv\" 
+// all works 
+
+read_1 = readMatrix($C);
+
+print("Es. Sparsity read_1:");
+print(sparsity(read_1));
+
+print("Real Sparsity:");
+print(as.f64(sum(read_1 != 0)) / as.f64(nrow(read_1) * ncol(read_1)));
+
+writeMatrix(read_1, $O);
