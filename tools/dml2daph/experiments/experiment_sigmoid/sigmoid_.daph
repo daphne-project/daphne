@@ -1,0 +1,7 @@
+import "../../translated_files/sigmoid.daph";
+
+X = readMatrix("data/test_matrix_daph.csv");
+
+Y = sigmoid.m_sigmoid(X);
+
+write(Y, "output/daphne_output.csv");
