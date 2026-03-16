@@ -341,6 +341,11 @@ template class DenseMatrix<signed char>;
 template class DenseMatrix<unsigned char>;
 template class DenseMatrix<unsigned int>;
 template class DenseMatrix<unsigned long>;
+// On macOS ARM64, long long / unsigned long long are distinct from long / unsigned long.
+#if defined(__APPLE__) && defined(__aarch64__)
+template class DenseMatrix<long long>;
+template class DenseMatrix<unsigned long long>;
+#endif
 template class DenseMatrix<bool>;
 template class DenseMatrix<std::string>;
 template class DenseMatrix<FixedStr16>;

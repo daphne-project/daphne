@@ -89,7 +89,7 @@ static std::string_view binary_op_codes[] = {
  * @tparam op The binary operation.
  */
 template <BinaryOpCode op, typename VTRes, typename VTLhs, typename VTRhs>
-static constexpr bool supportsBinaryOp = false;
+inline constexpr bool supportsBinaryOp = false;
 
 // Macros for concisely specifying which binary operations should be
 // supported on which value types.
@@ -97,12 +97,12 @@ static constexpr bool supportsBinaryOp = false;
 // Generates code specifying that the binary operation `Op` should be supported
 // on the value type `VT` (for the result and the two arguments, for
 // simplicity).
-#define SUPPORT(Op, VT) template <> constexpr bool supportsBinaryOp<BinaryOpCode::Op, VT, VT, VT> = true;
+#define SUPPORT(Op, VT) template <> inline constexpr bool supportsBinaryOp<BinaryOpCode::Op, VT, VT, VT> = true;
 
 // Generates code specifying that the binary operation `Op` should be supported on
 // the value types `VTLhs` and `VTRhs` with result `VTRes`.
 #define SUPPORT_RLR(Op, VTRes, VTLhs, VTRhs)                                                                           \
-    template <> constexpr bool supportsBinaryOp<BinaryOpCode::Op, VTRes, VTLhs, VTRhs> = true;
+    template <> inline constexpr bool supportsBinaryOp<BinaryOpCode::Op, VTRes, VTLhs, VTRhs> = true;
 
 // Generates code specifying that all binary operations of a certain category
 // should be supported on the given value type `VT` (for the result and the two

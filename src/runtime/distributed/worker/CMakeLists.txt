@@ -31,7 +31,7 @@ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 get_property(extension_libs GLOBAL PROPERTY MLIR_EXTENSION_LIBS)
 
 if(USE_HDFS)
-        find_library(LIBHDFS3 NAMES libhdfs3.so HINTS ${PROJECT_BINARY_DIR}/installed/lib REQUIRED)
+        find_library(LIBHDFS3 NAMES hdfs3 HINTS ${PROJECT_BINARY_DIR}/installed/lib REQUIRED)
 else()
         set(LIBHDFS3 "")
 endif()

@@ -132,6 +132,37 @@ All possible options for the build script:
 
 ---
 
+## Building on macOS (Experimental)
+
+DAPHNE can be built natively on macOS with Apple Silicon (ARM64). This support is experimental.
+
+### Prerequisites
+
+Install [Homebrew](https://brew.sh/), then install the required packages:
+
+```bash
+brew install gcc@15 cmake ninja wget zstd libomp
+```
+
+GCC is required because DAPHNE and all its dependencies must be built with the
+same C++ standard library (libstdc++). Apple Clang uses libc++, which is
+ABI-incompatible and causes link failures.
+
+### Building
+
+```bash
+./build.sh --no-papi
+```
+
+The build script automatically detects macOS and configures GCC-15 as the compiler. PAPI is not supported on macOS, so `--no-papi` is required.
+
+### Known Limitations
+
+- CPU pinning (thread affinity) is disabled on macOS
+- PAPI-based profiling is not available
+- CUDA and FPGA options are not supported on macOS
+- Only Apple Silicon (ARM64) has been tested
+
 ## Building on WSL
 
 When using Windows Subsystems for Linux (WSL), the default memory limit for WSL is 50% of the total memory of the underlying Windows host. This can lead to build fails due to SIGKILL for DAPHNE builds. [Advanced settings configuration in WSL](https://learn.microsoft.com/en-us/windows/wsl/wsl-config) describes how the memory limit can be configured.

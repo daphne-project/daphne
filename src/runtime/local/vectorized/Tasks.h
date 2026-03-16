@@ -65,10 +65,9 @@ template <class DT> struct CompiledPipelineTaskData {
     DCTX(_ctx);
 
     [[maybe_unused]] CompiledPipelineTaskData<DT> withDifferentRange(uint64_t newRl, uint64_t newRu) {
-        CompiledPipelineTaskData<DT> flatCopy = *this;
-        flatCopy._rl = newRl;
-        flatCopy._ru = newRu;
-        return flatCopy;
+        return CompiledPipelineTaskData<DT>{_funcs, _isScalar, _inputs, _numInputs, _numOutputs, _outRows, _outCols,
+                                            _splits, _combines, newRl, newRu, _wholeResultRows, _wholeResultCols,
+                                            _offset, _ctx};
     }
 };
 

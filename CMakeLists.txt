@@ -154,12 +154,32 @@ if(USE_CUDA AND CMAKE_CUDA_COMPILER)
 endif()
 
 find_program(LLD_PROGRAM lld)
-if(LLD_PROGRAM)
+if(LLD_PROGRAM AND NOT APPLE)
     message(STATUS "Using lld")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fuse-ld=lld")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fuse-ld=lld")
 endif()
 
+# On macOS, LLVM/MLIR's cmake config creates partial zstd IMPORTED targets
+# (shared + static) but not the zstd::libzstd alias. Homebrew's zstd cmake
+# config then fails when Arrow tries to re-find zstd because some targets
+# already exist. Work around by telling Arrow that zstd is already found.
+# Also fix the INTERFACE_INCLUDE_DIRECTORIES: LLVM's Findzstd.cmake sets it
+# to /opt/homebrew/include (all of Homebrew), which pulls in wrong versions
+# of headers (e.g. fmt 11.2 vs our thirdparty fmt 11.0). Narrow it to the
+# zstd-specific include path.
+if(APPLE AND TARGET zstd::libzstd_shared)
+    set(zstdAlt_FOUND TRUE)
+    find_path(_ZSTD_SPECIFIC_INCLUDE zstd.h PATHS /opt/homebrew/opt/zstd/include NO_DEFAULT_PATH)
+    if(_ZSTD_SPECIFIC_INCLUDE)
+        set_target_properties(zstd::libzstd_shared PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES "${_ZSTD_SPECIFIC_INCLUDE}")
+        if(TARGET zstd::libzstd_static)
+            set_target_properties(zstd::libzstd_static PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${_ZSTD_SPECIFIC_INCLUDE}")
+        endif()
+    endif()
+endif()
 find_package(Arrow REQUIRED)
 find_package(Parquet REQUIRED)
 
@@ -205,7 +225,7 @@ if(USE_HDFS)
     endif()
 
     include_directories(${PROJECT_SOURCE_DIR} ${HDFS_LIB_LOCATION})
-    find_library(hdfs3 NAMES libhdfs3.so HINTS ${PROJECT_BINARY_DIR}/installed/lib REQUIRED)
+    find_library(hdfs3 NAMES hdfs3 HINTS ${PROJECT_BINARY_DIR}/installed/lib REQUIRED)
     message(STATUS "HDFS_LIB_FOUND: ${HDFS_LIB_FOUND}")
     if(DEFINED HDFS_LIB_FOUND)
         add_definitions(-DUSE_HDFS)

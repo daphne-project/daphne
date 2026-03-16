@@ -97,6 +97,12 @@ template <> const ValueTypeCode ValueTypeUtils::codeFor<float> = ValueTypeCode::
 template <> const ValueTypeCode ValueTypeUtils::codeFor<double> = ValueTypeCode::F64;
 template <> const ValueTypeCode ValueTypeUtils::codeFor<std::string> = ValueTypeCode::STR;
 template <> const ValueTypeCode ValueTypeUtils::codeFor<FixedStr16> = ValueTypeCode::FIXEDSTR16;
+// On macOS ARM64, long/unsigned long are distinct from long long/unsigned long long
+// (int64_t/uint64_t). Add explicit specializations so DenseMatrix<long> etc. can compile.
+#if defined(__APPLE__) && defined(__aarch64__)
+template <> const ValueTypeCode ValueTypeUtils::codeFor<long> = ValueTypeCode::SI64;
+template <> const ValueTypeCode ValueTypeUtils::codeFor<unsigned long> = ValueTypeCode::UI64;
+#endif
 
 template <> const std::string ValueTypeUtils::cppNameFor<int8_t> = "int8_t";
 template <> const std::string ValueTypeUtils::cppNameFor<int32_t> = "int32_t";
@@ -110,6 +116,10 @@ template <> const std::string ValueTypeUtils::cppNameFor<bool> = "bool";
 template <> const std::string ValueTypeUtils::cppNameFor<const char *> = "const char*";
 template <> const std::string ValueTypeUtils::cppNameFor<std::string> = "std::string";
 template <> const std::string ValueTypeUtils::cppNameFor<FixedStr16> = "FixedStr";
+#if defined(__APPLE__) && defined(__aarch64__)
+template <> const std::string ValueTypeUtils::cppNameFor<long> = "int64_t";
+template <> const std::string ValueTypeUtils::cppNameFor<unsigned long> = "uint64_t";
+#endif
 
 template <> const std::string ValueTypeUtils::irNameFor<int8_t> = "si8";
 template <> const std::string ValueTypeUtils::irNameFor<int32_t> = "si32";
@@ -119,6 +129,10 @@ template <> const std::string ValueTypeUtils::irNameFor<uint32_t> = "ui32";
 template <> const std::string ValueTypeUtils::irNameFor<uint64_t> = "ui64";
 template <> const std::string ValueTypeUtils::irNameFor<float> = "f32";
 template <> const std::string ValueTypeUtils::irNameFor<double> = "f64";
+#if defined(__APPLE__) && defined(__aarch64__)
+template <> const std::string ValueTypeUtils::irNameFor<long> = "si64";
+template <> const std::string ValueTypeUtils::irNameFor<unsigned long> = "ui64";
+#endif
 
 template <> const int8_t ValueTypeUtils::defaultValue<int8_t> = 0;
 template <> const int32_t ValueTypeUtils::defaultValue<int32_t> = 0;
@@ -132,6 +146,10 @@ template <> const bool ValueTypeUtils::defaultValue<bool> = false;
 template <> const char *ValueTypeUtils::defaultValue<const char *> = "";
 template <> const std::string ValueTypeUtils::defaultValue<std::string> = std::string("");
 template <> const FixedStr16 ValueTypeUtils::defaultValue<FixedStr16> = FixedStr16();
+#if defined(__APPLE__) && defined(__aarch64__)
+template <> const long ValueTypeUtils::defaultValue<long> = 0;
+template <> const unsigned long ValueTypeUtils::defaultValue<unsigned long> = 0;
+#endif
 
 const std::string ValueTypeUtils::cppNameForCode(ValueTypeCode type) {
     switch (type) {

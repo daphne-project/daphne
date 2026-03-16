@@ -53,11 +53,13 @@ class WorkerCPU : public Worker {
 
     void run() override {
         if (_pinWorkers) {
+#ifdef __linux__
             // pin worker to CPU core
             cpu_set_t cpuset;
             CPU_ZERO(&cpuset);
             CPU_SET(_threadID, &cpuset);
             sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
+#endif
         }
 
         int currentDomain = _physical_ids[_threadID];

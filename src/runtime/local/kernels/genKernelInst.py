@@ -43,6 +43,7 @@ system start-up.
 
 import io
 import json
+import platform
 import re
 import sys
 from typing import List, Tuple
@@ -280,7 +281,7 @@ def generateKernelInstantiation(kernelTemplateInfo, templateValues, opCodes, out
             "backend": API,
             # Assumes that the generated catalog file is saved in
             # the same directory as the kernels libraries.
-            "libPath": "libAllKernels.so" if API == "CPP" else f"lib{API}Kernels.so"
+            "libPath": ("libAllKernels.dylib" if platform.system() == "Darwin" else "libAllKernels.so") if API == "CPP" else (f"lib{API}Kernels.dylib" if platform.system() == "Darwin" else f"lib{API}Kernels.so")
         })
 
     # Generate the function(s).

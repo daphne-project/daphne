@@ -19,6 +19,18 @@ set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard to conform to")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+# Apple Clang needs Homebrew's libomp for OpenMP support
+if(APPLE)
+    execute_process(COMMAND brew --prefix libomp
+        OUTPUT_VARIABLE LIBOMP_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(LIBOMP_PREFIX)
+        set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp -I${LIBOMP_PREFIX}/include" CACHE STRING "" FORCE)
+        set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I${LIBOMP_PREFIX}/include" CACHE STRING "" FORCE)
+        set(OpenMP_C_LIB_NAMES "omp" CACHE STRING "" FORCE)
+        set(OpenMP_CXX_LIB_NAMES "omp" CACHE STRING "" FORCE)
+        set(OpenMP_omp_LIBRARY "${LIBOMP_PREFIX}/lib/libomp.dylib" CACHE FILEPATH "" FORCE)
+    endif()
+endif()
 find_package(OpenMP REQUIRED)
 
 # The library of pre-compiled CUDA kernels
@@ -129,14 +141,14 @@ list(APPEND LIBS DaphneMetaDataParser MLIRDaphne MLIRDaphneTransforms)
 list(APPEND LIBS Eigen3::Eigen Arrow::arrow_shared Parquet::parquet_shared)
 
 if(USE_PAPI)
-    find_library(PAPI_LIB NAMES libpapi.so HINTS ${PROJECT_BINARY_DIR}/installed/lib REQUIRED)
+    find_library(PAPI_LIB NAMES papi HINTS ${PROJECT_BINARY_DIR}/installed/lib REQUIRED)
 endif()
 
-find_library(HWLOC_LIB NAMES libhwloc.so HINTS ${PROJECT_BINARY_DIR}/installed/lib REQUIRED)
+find_library(HWLOC_LIB NAMES hwloc HINTS ${PROJECT_BINARY_DIR}/installed/lib REQUIRED)
 
 if(USE_HDFS)
         target_include_directories(AllKernels PUBLIC ${PROJECT_SOURCE_DIR}/thirdparty/installed/include/hdfs)
-        find_library(LIBHDFS3 NAMES libhdfs3.so HINTS ${PROJECT_BINARY_DIR}/installed/lib REQUIRED)
+        find_library(LIBHDFS3 NAMES hdfs3 HINTS ${PROJECT_BINARY_DIR}/installed/lib REQUIRED)
 endif()
 
 target_link_libraries(KernelObjLib PUBLIC ${LIBS} ${MPI_LIBRARIES} ${PAPI_LIB} ${HWLOC_LIB} ${LIBHDFS3})

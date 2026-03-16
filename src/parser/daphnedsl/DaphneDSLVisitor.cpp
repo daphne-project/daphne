@@ -1652,8 +1652,8 @@ antlrcpp::Any DaphneDSLVisitor::visitMatrixLiteralExpr(DaphneDSLGrammarParser::M
     // Missing dimensions are inferred (defaults to column matrix).
     if (!ctx->rows && !ctx->cols) {
         numMatElems = ctx->expr().size();
-        cols = builder.create<mlir::daphne::ConstantOp>(loc, static_cast<size_t>(1));
-        rows = builder.create<mlir::daphne::ConstantOp>(loc, static_cast<size_t>(ctx->expr().size()));
+        cols = builder.create<mlir::daphne::ConstantOp>(loc, static_cast<uint64_t>(1));
+        rows = builder.create<mlir::daphne::ConstantOp>(loc, static_cast<uint64_t>(ctx->expr().size()));
     } else {
         numMatElems = (ctx->rows && ctx->cols) ? ctx->expr().size() - 2 : ctx->expr().size() - 1;
         if (ctx->cols && ctx->rows) {
@@ -1663,12 +1663,12 @@ antlrcpp::Any DaphneDSLVisitor::visitMatrixLiteralExpr(DaphneDSLGrammarParser::M
             cols = valueOrErrorOnVisit(ctx->cols);
             rows =
                 builder.create<mlir::daphne::EwDivOp>(loc, builder.getIntegerType(64, false),
-                                                      builder.create<mlir::daphne::ConstantOp>(loc, numMatElems), cols);
+                                                      builder.create<mlir::daphne::ConstantOp>(loc, static_cast<uint64_t>(numMatElems)), cols);
         } else {
             rows = valueOrErrorOnVisit(ctx->rows);
             cols =
                 builder.create<mlir::daphne::EwDivOp>(loc, builder.getIntegerType(64, false),
-                                                      builder.create<mlir::daphne::ConstantOp>(loc, numMatElems), rows);
+                                                      builder.create<mlir::daphne::ConstantOp>(loc, static_cast<uint64_t>(numMatElems)), rows);
         }
     }
     cols = utils.castSizeIf(cols);
@@ -1939,17 +1939,17 @@ antlrcpp::Any DaphneDSLVisitor::visitLiteral(DaphneDSLGrammarParser::LiteralCont
         litStr = std::regex_replace(litStr, std::regex("_|'"), "");
 
         if (litStr.back() == 'u')
-            return static_cast<mlir::Value>(builder.create<mlir::daphne::ConstantOp>(loc, std::stoul(litStr)));
+            return static_cast<mlir::Value>(builder.create<mlir::daphne::ConstantOp>(loc, static_cast<uint64_t>(std::stoul(litStr))));
         else if ((litStr.length() > 2) && std::string_view(litStr).substr(litStr.length() - 3) == "ull") {
             // The suffix "ull" must be checked before the suffix "l", since "l"
             // is a suffix of "ull".
             return static_cast<mlir::Value>(
                 builder.create<mlir::daphne::ConstantOp>(loc, static_cast<uint64_t>(std::stoull(litStr))));
         } else if (litStr.back() == 'l')
-            return static_cast<mlir::Value>(builder.create<mlir::daphne::ConstantOp>(loc, std::stol(litStr)));
+            return static_cast<mlir::Value>(builder.create<mlir::daphne::ConstantOp>(loc, static_cast<int64_t>(std::stol(litStr))));
         else if (litStr.back() == 'z') {
             return static_cast<mlir::Value>(
-                builder.create<mlir::daphne::ConstantOp>(loc, static_cast<std::size_t>(std::stoll(litStr))));
+                builder.create<mlir::daphne::ConstantOp>(loc, static_cast<uint64_t>(std::stoll(litStr))));
         } else {
             // Note that a leading minus of a numeric literal is not parsed as
             // part of the literal itself, but handled separately as a unary

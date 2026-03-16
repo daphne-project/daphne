@@ -31,3 +31,7 @@ template class CSRMatrix<signed char>;
 template class CSRMatrix<unsigned char>;
 template class CSRMatrix<unsigned int>;
 template class CSRMatrix<unsigned long>;
+#if defined(__APPLE__) && defined(__aarch64__)
+template class CSRMatrix<long long>;
+template class CSRMatrix<unsigned long long>;
+#endif

@@ -37,3 +37,7 @@ template class ChunkedTensor<int>;
 template class ChunkedTensor<long>;
 template class ChunkedTensor<unsigned int>;
 template class ChunkedTensor<unsigned long>;
+#if defined(__APPLE__) && defined(__aarch64__)
+template class ChunkedTensor<long long>;
+template class ChunkedTensor<unsigned long long>;
+#endif

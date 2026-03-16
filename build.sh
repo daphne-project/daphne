@@ -26,6 +26,32 @@
 # Stop immediately if any command fails.
 set -e
 
+#******************************************************************************
+# Platform detection and portable helpers
+#******************************************************************************
+IS_DARWIN=0
+if [ "$(uname -s)" == "Darwin" ]; then
+    IS_DARWIN=1
+fi
+
+# Portable replacement for nproc (not available on macOS)
+get_nproc() {
+    if [ "$IS_DARWIN" == "1" ]; then
+        sysctl -n hw.ncpu
+    else
+        nproc
+    fi
+}
+
+# Portable replacement for sed -i (different syntax on macOS)
+sed_inplace() {
+    if [ "$IS_DARWIN" == "1" ]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 build_ts_begin=$(date +%s%N)
 
 #******************************************************************************
@@ -454,6 +480,10 @@ BUILD_MPI="-DUSE_MPI=OFF"
 BUILD_HDFS="-DUSE_HDFS=OFF"
 BUILD_IO_URING="-DUSE_IO_URING=OFF"
 BUILD_PAPI="-DUSE_PAPI=ON"
+# Default PAPI to OFF on macOS (not well supported)
+if [ "$IS_DARWIN" == "1" ]; then
+    BUILD_PAPI="-DUSE_PAPI=OFF"
+fi
 WITH_DEPS=1
 WITH_SUBMODULE_UPDATE=1
 
@@ -572,12 +602,26 @@ fi
 #******************************************************************************
 # #8 Download and install third-party dependencies if requested (default is yes, omit with --no-deps))
 #******************************************************************************
+# On macOS, use Apple Clang for third-party dependency builds to avoid
+# boringssl/GCC incompatibilities. DAPHNE itself uses GCC-15 (set below).
+
 if [ $WITH_DEPS -gt 0 ]; then
+    # CMake 4.x removed compatibility with cmake_minimum_required < 3.5.
+    # Many third-party deps use older versions; this global setting allows them to configure.
+    export CMAKE_POLICY_VERSION_MINIMUM=3.5
+
+    # On macOS, use GCC-15 for all builds (deps + DAPHNE) for ABI compatibility.
+    # The boringssl patches below handle GCC-specific issues.
+    if [ "$IS_DARWIN" == "1" ]; then
+        export CC=gcc-15
+        export CXX=g++-15
+    fi
+
     LLVM_ARCH=X86
     # optimizes for multiple x86_64 architectures
     PAPI_OBLAS_ARCH=NEHALEM
     # Determine CPU architecture to compile for
-    if [ $(arch) == 'armv*'  ] || [ $(arch) == 'aarch64' ]; then
+    if [ $(arch) == 'armv*'  ] || [ $(arch) == 'aarch64' ] || [ $(arch) == 'arm64' ]; then
       echo "Building for ARMv8 architecture"
       LLVM_ARCH=AArch64
       PAPI_OBLAS_ARCH=ARMV8
@@ -625,7 +669,7 @@ if [ $WITH_DEPS -gt 0 ]; then
                 --with-components="coretemp infiniband io lustre net powercap rapl sde stealtime" \
 
 
-            CFLAGS="-fPIC -DPIC" make -j"$(nproc)" DYNAMIC_ARCH=1 TARGET="$PAPI_OBLAS_ARCH"
+            CFLAGS="-fPIC -DPIC" make -j"$(get_nproc)" DYNAMIC_ARCH=1 TARGET="$PAPI_OBLAS_ARCH"
             make install
             cd - > /dev/null
             dependency_install_success "papi_v${papiVersion}"
@@ -650,7 +694,7 @@ if [ $WITH_DEPS -gt 0 ]; then
     if ! is_dependency_installed "hwloc_v${hwlocVersion}"; then
         cd "$sourcePrefix/$hwlocDirName/"
         ./configure --prefix="$hwlocInstDirName"
-        make -j"$(nproc)" DYNAMIC_ARCH=1 TARGET="$PAPI_OBLAS_ARCH"
+        make -j"$(get_nproc)" DYNAMIC_ARCH=1 TARGET="$PAPI_OBLAS_ARCH"
         make install
         cd - > /dev/null
         dependency_install_success "hwloc_v${hwlocVersion}"
@@ -691,7 +735,11 @@ if [ $WITH_DEPS -gt 0 ]; then
             -d "$sourcePrefix/$antlrCppRuntimeDirName"
         # Github disabled the unauthenticated git:// protocol, patch antlr4 to use https://
         # until we upgrade to antlr4-4.9.3+
-        sed -i 's#git://github.com#https://github.com#' "$sourcePrefix/$antlrCppRuntimeDirName/runtime/CMakeLists.txt"
+        sed_inplace 's#git://github.com#https://github.com#' "$sourcePrefix/$antlrCppRuntimeDirName/runtime/CMakeLists.txt"
+
+        # CMake 4.x no longer supports setting deprecated policies to OLD. Remove them.
+        sed_inplace '/CMAKE_POLICY(SET CMP00[2-5][0-9] OLD)/d' \
+            "$sourcePrefix/$antlrCppRuntimeDirName/CMakeLists.txt"
 
         daphne_msg "Build Antlr v${antlrVersion}"
         cmake -S "$sourcePrefix/$antlrCppRuntimeDirName" -B "${buildPrefix}/${antlrCppRuntimeDirName}" \
@@ -753,7 +801,15 @@ if [ $WITH_DEPS -gt 0 ]; then
     if ! is_dependency_installed "${dep_openBlas[@]}"; then
         cd "$sourcePrefix/$openBlasDirName"
         make clean
-        make -j"$(nproc)" DYNAMIC_ARCH=1 TARGET="$PAPI_OBLAS_ARCH"
+        # GCC 15+ treats -Wincompatible-pointer-types as error; OpenBLAS 0.3.23 triggers it
+        # macOS doesn't support DYNAMIC_ARCH (clang assembler lacks many -mtune targets)
+        if [ "$IS_DARWIN" == "1" ]; then
+            make -j"$(get_nproc)" TARGET="$PAPI_OBLAS_ARCH" \
+                CFLAGS="-Wno-error=incompatible-pointer-types" \
+                COMMON_OPT="-Wno-error=incompatible-pointer-types"
+        else
+            make -j"$(get_nproc)" DYNAMIC_ARCH=1 TARGET="$PAPI_OBLAS_ARCH"
+        fi
         make PREFIX="$openBlasInstDirName" install
         cd - >/dev/null
         dependency_install_success "${dep_openBlas[@]}"
@@ -782,7 +838,7 @@ if [ $WITH_DEPS -gt 0 ]; then
     # abseil (compiled separately to apply a patch)
     #------------------------------------------------------------------------------
     abslPath=$sourcePrefix/abseil-cpp
-    if [ $(arch) == 'armv64'  ] || [ $(arch) == 'aarch64' ]; then
+    if [ $(arch) == 'armv64'  ] || [ $(arch) == 'aarch64' ] || [ $(arch) == 'arm64' ]; then
         abslVersion=20211102.0
     fi
     dep_absl=("absl_v${abslVersion}" "v1")
@@ -791,7 +847,7 @@ if [ $WITH_DEPS -gt 0 ]; then
         daphne_msg "Get abseil version ${abslVersion}"
         rm -rf "$abslPath"
         git clone --depth 1 --branch "$abslVersion" https://github.com/abseil/abseil-cpp.git "$abslPath"
-        if [ $(arch) == 'armv*'  ] || [ $(arch) == 'aarch64' ]; then
+        if [ $(arch) == 'armv*'  ] || [ $(arch) == 'aarch64' ] || [ $(arch) == 'arm64' ]; then
            daphne_msg "Applying 0002-absl-stdmax-params.patch"
            patch -Np1 -i "${patchDir}/0002-absl-stdmax-params.patch" -d "$abslPath"
         fi
@@ -809,26 +865,28 @@ if [ $WITH_DEPS -gt 0 ]; then
     #------------------------------------------------------------------------------
     # MPI (Default is MPI library is OpenMPI but cut can be any)
     #------------------------------------------------------------------------------
-    MPIZipName=openmpi-$openMPIVersion.tar.gz
-    MPIInstDirName=$installPrefix
-    dep_mpi=("openmpi_v${openMPIVersion}" "v1")
+    if [ "$BUILD_MPI" == "-DUSE_MPI=ON" ]; then
+        MPIZipName=openmpi-$openMPIVersion.tar.gz
+        MPIInstDirName=$installPrefix
+        dep_mpi=("openmpi_v${openMPIVersion}" "v1")
 
-    if ! is_dependency_downloaded "${dep_mpi[@]}"; then
-        daphne_msg "Get openmpi version ${openMPIVersion}"
-        wget "https://download.open-mpi.org/release/open-mpi/v4.1/$MPIZipName" -qO "${cacheDir}/${MPIZipName}"
-        tar -xf "$cacheDir/$MPIZipName" --directory "$sourcePrefix"
-        dependency_download_success "${dep_mpi[@]}"
-        mkdir -p "$MPIInstDirName"
-    fi
-    if ! is_dependency_installed "${dep_mpi[@]}"; then
-        cd "$sourcePrefix/openmpi-$openMPIVersion"
-        ./configure --prefix="$MPIInstDirName"
-        make -j"$(nproc)" all
-        make install
-        cd -
-        dependency_install_success "${dep_mpi[@]}"
-    else
-        daphne_msg "No need to build OpenMPI again"
+        if ! is_dependency_downloaded "${dep_mpi[@]}"; then
+            daphne_msg "Get openmpi version ${openMPIVersion}"
+            wget "https://download.open-mpi.org/release/open-mpi/v4.1/$MPIZipName" -qO "${cacheDir}/${MPIZipName}"
+            tar -xf "$cacheDir/$MPIZipName" --directory "$sourcePrefix"
+            dependency_download_success "${dep_mpi[@]}"
+            mkdir -p "$MPIInstDirName"
+        fi
+        if ! is_dependency_installed "${dep_mpi[@]}"; then
+            cd "$sourcePrefix/openmpi-$openMPIVersion"
+            ./configure --prefix="$MPIInstDirName"
+            make -j"$(get_nproc)" all
+            make install
+            cd -
+            dependency_install_success "${dep_mpi[@]}"
+        else
+            daphne_msg "No need to build OpenMPI again"
+        fi
     fi
     #------------------------------------------------------------------------------
     # gRPC
@@ -855,8 +913,21 @@ if [ $WITH_DEPS -gt 0 ]; then
         dependency_download_success "${dep_grpc[@]}"
     fi
     if ! is_dependency_installed "${dep_grpc[@]}"; then
+        # Patch boringssl for GCC compatibility on macOS:
+        # 1) __builtin_available() is a Clang-only builtin; on macOS 10.12+
+        #    getentropy() is always available so the check can be removed.
+        # 2) -stdlib=libc++ is a Clang-only flag; GCC uses libstdc++ natively.
+        if [ "$IS_DARWIN" == "1" ]; then
+            sed_inplace 's/if (__builtin_available(macos 10\.12, \*))/if (1)/g' \
+                "$sourcePrefix/$grpcDirName/third_party/boringssl-with-bazel/src/crypto/fipsmodule/rand/urandom.c"
+            sed_inplace '/stdlib=libc++/d' \
+                "$sourcePrefix/$grpcDirName/third_party/boringssl-with-bazel/CMakeLists.txt"
+            sed_inplace '/stdlib=libc++/d' \
+                "$sourcePrefix/$grpcDirName/third_party/boringssl-with-bazel/src/CMakeLists.txt"
+        fi
         cmake -G Ninja -S "$sourcePrefix/$grpcDirName" -B "$buildPrefix/$grpcDirName" \
             -DCMAKE_INSTALL_PREFIX="$grpcInstDir" \
+            -DCMAKE_PREFIX_PATH="$installPrefix" \
             -DCMAKE_BUILD_TYPE=Release \
             -DgRPC_INSTALL=ON \
             -DgRPC_BUILD_TESTS=OFF \
@@ -886,8 +957,8 @@ if [ $WITH_DEPS -gt 0 ]; then
     fi
 
     # this works around a build error that occurs on Ubuntu with Boost installed
-    if [ $(lsb_release -is) == "Ubuntu" ]; then
-        if [ $(dpkg -l | grep libboost | wc -l) == "" ]; then
+    if [ "$IS_DARWIN" != "1" ] && [ "$(lsb_release -is 2>/dev/null)" == "Ubuntu" ]; then
+        if [ "$(dpkg -l | grep libboost | wc -l)" == "" ]; then
             daphne_msg "Setting BOOST_ROOT=/usr on Ubuntu Linux with libboost installed"
             sleep 5
             export BOOST_ROOT=/usr
@@ -895,6 +966,14 @@ if [ $WITH_DEPS -gt 0 ]; then
     fi
 
     if ! is_dependency_installed "${dep_arrow[@]}"; then
+        # GCC-15 is stricter about missing includes; Arrow 13 uses std::find
+        # without #include <algorithm> in filesystem/util_internal.cc.
+        if [ "$IS_DARWIN" == "1" ]; then
+            arrow_file="${sourcePrefix}/${arrowDirName}/cpp/src/arrow/filesystem/util_internal.cc"
+            if ! grep -q '#include <algorithm>' "$arrow_file" 2>/dev/null; then
+                sed_inplace '1s/^/#include <algorithm>\n/' "$arrow_file"
+            fi
+        fi
         cmake -G Ninja -S "${sourcePrefix}/${arrowDirName}/cpp" -B "${buildPrefix}/${arrowDirName}" \
             -DCMAKE_INSTALL_PREFIX="${installPrefix}" -DARROW_CSV=ON -DARROW_FILESYSTEM=ON -DARROW_PARQUET=ON \
             -DARROW_WITH_BROTLI=ON -DARROW_WITH_BZ2=ON -DARROW_WITH_LZ4=ON -DARROW_WITH_SNAPPY=ON -DARROW_WITH_ZLIB=ON \
@@ -940,7 +1019,8 @@ if [ $WITH_DEPS -gt 0 ]; then
     fi
     if ! is_dependency_installed "spdlog_v${spdlogVersion}"; then
         cmake -G Ninja -S "${sourcePrefix}/${spdlogDirName}" -B "${buildPrefix}/${spdlogDirName}" \
-            -DSPDLOG_FMT_EXTERNAL=ON -DCMAKE_INSTALL_PREFIX="${installPrefix}" -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+            -DSPDLOG_FMT_EXTERNAL=ON -DCMAKE_INSTALL_PREFIX="${installPrefix}" -DCMAKE_PREFIX_PATH="${installPrefix}" \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         cmake --build "${buildPrefix}/${spdlogDirName}" --target install/strip
         dependency_install_success "spdlog_v${spdlogVersion}"
     else
@@ -1036,13 +1116,23 @@ if [ $WITH_DEPS -gt 0 ]; then
         daphne_msg "Building LLVM/MLIR from ${llvmCommit}"
         cd "${thirdpartyPath}/${llvmName}"
         echo "Need to build MLIR/LLVM."
+        # On macOS, use GCC-15 for LLVM/MLIR build to ensure ABI compatibility
+        # with the rest of the project (all using libstdc++). LLD is disabled
+        # because it is a Clang/LLVM-specific linker.
+        if [ "$IS_DARWIN" == "1" ]; then
+            LLVM_COMPILER_FLAGS="-DCMAKE_C_COMPILER=gcc-15 -DCMAKE_CXX_COMPILER=g++-15"
+            LLVM_LLD_FLAG=""
+        else
+            LLVM_COMPILER_FLAGS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
+            LLVM_LLD_FLAG="-DLLVM_ENABLE_LLD=ON"
+        fi
         cmake -G Ninja -S llvm -B "$buildPrefix/$llvmName" \
             -DLLVM_ENABLE_PROJECTS=mlir \
             -DLLVM_BUILD_EXAMPLES=OFF \
             -DLLVM_TARGETS_TO_BUILD="$LLVM_ARCH" \
             -DCMAKE_BUILD_TYPE=Release \
             -DLLVM_ENABLE_ASSERTIONS=ON \
-            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_LLD=ON \
+            $LLVM_COMPILER_FLAGS $LLVM_LLD_FLAG \
             -DLLVM_ENABLE_RTTI=ON \
             -DCMAKE_INSTALL_PREFIX="$installPrefix"
         cmake --build "$buildPrefix/$llvmName" --target check-mlir
@@ -1074,7 +1164,7 @@ if [ $WITH_DEPS -gt 0 ]; then
         if ! is_dependency_installed "liburing_v${liburingVersion}"; then
             cd "$sourcePrefix/$liburingDirName"
             ./configure --cc="$liburing_cc" --cxx="$liburing_cxx" --prefix="$liburingInstDirName"
-            make -j"$(nproc)"
+            make -j"$(get_nproc)"
             cp ./src/liburing.a "$installPrefix/lib/"
             cp -r ./src/include/* "$installPrefix/include"
             cd - > /dev/null
@@ -1107,9 +1197,15 @@ fi
 
 daphne_msg "Build Daphne"
 
+DAPHNE_CMAKE_EXTRA=""
+if [ "$IS_DARWIN" == "1" ]; then
+    # GCC-15 is already exported; explicitly pass to cmake as well.
+    DAPHNE_CMAKE_EXTRA="-DCMAKE_C_COMPILER=gcc-15 -DCMAKE_CXX_COMPILER=g++-15"
+fi
+
 cmake -S "$projectRoot" -B "$daphneBuildDir" -G Ninja -DANTLR_VERSION="$antlrVersion" \
     -DCMAKE_PREFIX_PATH="$installPrefix" \
-    $BUILD_CUDA $BUILD_FPGAOPENCL $BUILD_DEBUG $BUILD_MPI $BUILD_HDFS $BUILD_PAPI
+    $BUILD_CUDA $BUILD_FPGAOPENCL $BUILD_DEBUG $BUILD_MPI $BUILD_HDFS $BUILD_PAPI $DAPHNE_CMAKE_EXTRA
 
 cmake --build "$daphneBuildDir" --target "$target"
 
