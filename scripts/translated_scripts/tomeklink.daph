@@ -1,0 +1,56 @@
+def get_nn(X:matrix<f64>) -> matrix<f64> {
+  nn = fill(as.f64(0), as.si64(nrow(X)), 1);
+  for(i in 1:as.si64(nrow(X))) {
+    dists = sum((X - X[i - 1, ]) ^ 2, 0);
+    dists[i - 1, ] = nan;
+    nn[i - 1, 0] = idxMax(t(dists), 0);
+  }
+  return as.matrix<f64>(nn);
+}
+
+def get_links(X:matrix<f64>, y:matrix<f64>, majority_label:f64) -> matrix<f64> {
+  tomek_links = fill(as.f64((-1.0)), 1, 1);
+  
+  if (aggMax(y) <= 2) {
+    nn = get_nn(as.matrix<f64>(X));
+    perm = ctable(seq(as.f64(1), as.si64(nrow(y)), 1 <= as.si64(nrow(y)) ? 1 : -1), nn, as.si64(nrow(y)), as.si64(nrow(y)));
+    nn_labels = perm @ y;
+    links = (y != majority_label) && (nn_labels == majority_label);
+    tomek_links = as.matrix<f64>((ctable(nn, 1, links, as.si64(nrow(y)), 1) > 0));
+  }
+  
+  return as.matrix<f64>(tomek_links);
+}
+
+def m_tomeklink(X:matrix<f64>, y:matrix<f64>) -> matrix<f64>, matrix<f64>, matrix<f64> {
+  ymin = aggMin(y);
+  
+  if (ymin == 0) {
+    y = as.matrix<f64>(y + 1);
+  }
+  
+  label = ctable(y, 1);
+  majority_label = as.scalar(as.f64(idxMax(t(label), 0)));
+  tomek_links = get_links(as.matrix<f64>(X), as.matrix<f64>(y), as.f64(majority_label));
+  drop_idx = [0.0];
+  y_under = [0.0];
+  X_under = [0.0];
+  if (sum(tomek_links == 0) > 0) {
+    drop_idx = tomek_links * seq(as.f64(1), as.si64(nrow(X)), 1 <= as.si64(nrow(X)) ? 1 : -1);
+    X_under = X[[(tomek_links == 0), ]];
+    y_under = y[[(tomek_links == 0), ]];
+    drop_idx = drop_idx[[tomek_links, ]];
+  } else {
+    X_under = as.matrix<f64>(X);
+    y_under = as.matrix<f64>(y);
+    drop_idx = as.matrix(nan);
+  }
+  
+  
+  if (ymin == 0) {
+    y_under = as.matrix<f64>(y_under - 1);
+  }
+  
+  return as.matrix<f64>(X_under), as.matrix<f64>(y_under), as.matrix<f64>(drop_idx);
+}
+

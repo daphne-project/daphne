@@ -1,0 +1,15 @@
+def m_pcaInverse(Y:matrix<f64>, Clusters:matrix<f64>, Centering:matrix<f64> /*= fill(as.f64(0), 1, 1)*/, ScaleFactor:matrix<f64> /*= fill(as.f64(0), 1, 1)*/) -> matrix<f64> {
+  X = Y @ t(Clusters);
+  
+  if (as.si64(nrow(ScaleFactor)) > 0 && as.si64(ncol(ScaleFactor)) > 0) {
+    X = as.matrix<f64>(X * ScaleFactor);
+  }
+  
+  
+  if (as.si64(nrow(Centering)) > 0 && as.si64(ncol(Centering)) > 0) {
+    X = as.matrix<f64>(X + Centering);
+  }
+  
+  return as.matrix<f64>(X);
+}
+

@@ -1,0 +1,9 @@
+import "logSumExp.daph";
+
+M =  [100000, 2, 3, 4, 5, 0.00001];
+
+margin = "rows";
+
+output = logSumExp.m_logSumExp(as.matrix<f64>(M), margin);
+
+print(output);

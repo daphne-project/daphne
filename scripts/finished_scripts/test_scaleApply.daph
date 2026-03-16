@@ -1,0 +1,9 @@
+import "scaleApply.daph";
+
+X = [1, 1, 1, 2, 2, 2, 3, 3, 3](3, 3);
+
+center = [2, 2, 2];
+scale = [1, 1, 1];
+
+Y = scaleApply.m_scaleApply(as.f64(X), as.f64(center), as.f64(scale));
+print(Y);

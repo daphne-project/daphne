@@ -1,0 +1,5 @@
+def m_rand(X:matrix<f64>) -> matrix<f64> {
+  Y = rand(10, 20, 0, 1, 0.2000000000000000111, 1);
+  return as.matrix<f64>(Y);
+}
+
