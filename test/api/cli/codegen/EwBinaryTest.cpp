@@ -45,11 +45,17 @@ void test_binary_lowering(const std::string op, const std::string kernel_call, c
     CHECK(out.str() == result);
 }
 
-TEST_CASE("ewBinaryAddScalar", TAG_CODEGEN) {
+TEST_CASE("ewBinaryAdd", TAG_CODEGEN) {
     // clang-format off
     std::string result = "DenseMatrix(2x3, double)\n"
                             "2 4 6\n"
                             "8 10 12\n"
+                        "DenseMatrix(2x3, double)\n"
+                            "6 6 6\n"
+                            "9 9 9\n"
+                        "DenseMatrix(2x3, double)\n"
+                            "5 6 7\n"
+                            "7 8 9\n"
                         "DenseMatrix(2x3, double)\n"
                             "3 4 5\n"
                             "6 7 8\n"
@@ -58,6 +64,12 @@ TEST_CASE("ewBinaryAddScalar", TAG_CODEGEN) {
                             "2 4 6\n"
                             "8 10 12\n"
                         "DenseMatrix(2x3, int64_t)\n"
+                            "6 6 6\n"
+                            "9 9 9\n"
+                        "DenseMatrix(2x3, int64_t)\n"
+                            "5 6 7\n"
+                            "7 8 9\n"
+                        "DenseMatrix(2x3, int64_t)\n"
                             "3 4 5\n"
                             "6 7 8\n"
                         "6\n";
@@ -65,11 +77,17 @@ TEST_CASE("ewBinaryAddScalar", TAG_CODEGEN) {
     test_binary_lowering("add", "llvm.call @_ewAdd__", result);
 }
 
-TEST_CASE("ewBinarySubScalar", TAG_CODEGEN) {
+TEST_CASE("ewBinarySub", TAG_CODEGEN) {
     // clang-format off
     std::string result = "DenseMatrix(2x3, double)\n"
                             "-5 -3 -1\n"
                             "1 3 5\n"
+                        "DenseMatrix(2x3, double)\n"
+                            "-4 -2 0\n"
+                            "-1 1 3\n"
+                        "DenseMatrix(2x3, double)\n"
+                            "-3 -2 -1\n"
+                            "1 2 3\n"
                         "DenseMatrix(2x3, double)\n"
                             "-1 0 1\n"
                             "2 3 4\n"
@@ -78,6 +96,12 @@ TEST_CASE("ewBinarySubScalar", TAG_CODEGEN) {
                             "-5 -3 -1\n"
                             "1 3 5\n"
                         "DenseMatrix(2x3, int64_t)\n"
+                            "-4 -2 0\n"
+                            "-1 1 3\n"
+                        "DenseMatrix(2x3, int64_t)\n"
+                            "-3 -2 -1\n"
+                            "1 2 3\n"
+                        "DenseMatrix(2x3, int64_t)\n"
                             "-1 0 1\n"
                             "2 3 4\n"
                         "-2\n";
@@ -85,11 +109,17 @@ TEST_CASE("ewBinarySubScalar", TAG_CODEGEN) {
     test_binary_lowering("sub", "llvm.call @_ewSub__", result);
 }
 
-TEST_CASE("ewBinaryMulScalar", TAG_CODEGEN) {
+TEST_CASE("ewBinaryMul", TAG_CODEGEN) {
     // clang-format off
     std::string result = "DenseMatrix(2x3, double)\n"
                             "1 4 9\n"
                             "16 25 36\n"
+                        "DenseMatrix(2x3, double)\n"
+                            "5 8 9\n"
+                            "20 20 18\n"
+                        "DenseMatrix(2x3, double)\n"
+                            "4 8 12\n"
+                            "12 15 18\n"
                         "DenseMatrix(2x3, double)\n"
                             "2 4 6\n"
                             "8 10 12\n"
@@ -98,6 +128,12 @@ TEST_CASE("ewBinaryMulScalar", TAG_CODEGEN) {
                             "1 4 9\n"
                             "16 25 36\n"
                         "DenseMatrix(2x3, int64_t)\n"
+                            "5 8 9\n"
+                            "20 20 18\n"
+                        "DenseMatrix(2x3, int64_t)\n"
+                            "4 8 12\n"
+                            "12 15 18\n"
+                        "DenseMatrix(2x3, int64_t)\n"
                             "2 4 6\n"
                             "8 10 12\n"
                         "8\n";
@@ -105,11 +141,17 @@ TEST_CASE("ewBinaryMulScalar", TAG_CODEGEN) {
     test_binary_lowering("mul", "llvm.call @_ewMul__", result);
 }
 
-TEST_CASE("ewBinaryDivScalar", TAG_CODEGEN) {
+TEST_CASE("ewBinaryDiv", TAG_CODEGEN) {
     // clang-format off
     std::string result = "DenseMatrix(2x3, double)\n"
                             "1 1 1\n"
                             "1 1 1\n"
+                        "DenseMatrix(2x3, double)\n"
+                            "0.2 0.5 1\n"
+                            "0.8 1.25 2\n"
+                        "DenseMatrix(2x3, double)\n"
+                            "0.25 0.5 0.75\n"
+                            "1.33333 1.66667 2\n"
                         "DenseMatrix(2x3, double)\n"
                             "0.5 1 1.5\n"
                             "2 2.5 3\n"
@@ -118,12 +160,24 @@ TEST_CASE("ewBinaryDivScalar", TAG_CODEGEN) {
                             "1 1 1\n"
                             "1 1 1\n"
                         "DenseMatrix(2x3, int64_t)\n"
+                            "0 0 1\n"
+                            "0 1 2\n"
+                        "DenseMatrix(2x3, int64_t)\n"
+                            "0 0 0\n"
+                            "1 1 2\n"
+                        "DenseMatrix(2x3, int64_t)\n"
                             "0 0 0\n"
                             "1 1 1\n"
                         "2\n"
                         "DenseMatrix(2x3, uint64_t)\n"
                             "1 1 1\n"
                             "1 1 1\n"
+                        "DenseMatrix(2x3, uint64_t)\n"
+                            "0 0 1\n"
+                            "0 1 2\n"
+                        "DenseMatrix(2x3, uint64_t)\n"
+                            "0 0 0\n"
+                            "1 1 2\n"
                         "DenseMatrix(2x3, uint64_t)\n"
                             "0 0 0\n"
                             "1 1 1\n"
@@ -132,7 +186,7 @@ TEST_CASE("ewBinaryDivScalar", TAG_CODEGEN) {
     test_binary_lowering("div", "llvm.call @_ewDiv__", result);
 }
 
-// TEST_CASE("ewBinaryPowScalar", TAG_CODEGEN) {
+// TEST_CASE("ewBinaryPow", TAG_CODEGEN) {
 //     // clang-format off
 //     std::string result = "DenseMatrix(2x3, double)\n"
 //                             "1 4 27\n"
@@ -152,11 +206,17 @@ TEST_CASE("ewBinaryDivScalar", TAG_CODEGEN) {
 //     test_binary_lowering("pow", "llvm.call @_ewPow__", "llvm.intr.pow", result);
 // }
 
-TEST_CASE("ewBinaryMinScalar", TAG_CODEGEN) {
+TEST_CASE("ewBinaryMin", TAG_CODEGEN) {
     // clang-format off
     std::string result = "DenseMatrix(2x3, double)\n"
                             "0 1 3\n"
                             "4 3 2\n"
+                        "DenseMatrix(2x3, double)\n"
+                            "1 2 1\n"
+                            "2 4 1\n"
+                        "DenseMatrix(2x3, double)\n"
+                            "1 2 3\n"
+                            "3 3 3\n"
                         "DenseMatrix(2x3, double)\n"
                             "1 2 3\n"
                             "4 4 4\n"
@@ -165,12 +225,24 @@ TEST_CASE("ewBinaryMinScalar", TAG_CODEGEN) {
                             "0 1 3\n"
                             "4 3 2\n"
                         "DenseMatrix(2x3, int64_t)\n"
+                            "1 2 1\n"
+                            "2 4 1\n"
+                        "DenseMatrix(2x3, int64_t)\n"
+                            "1 2 3\n"
+                            "3 3 3\n"
+                        "DenseMatrix(2x3, int64_t)\n"
                             "1 2 3\n"
                             "4 4 4\n"
                         "2\n"
                         "DenseMatrix(2x3, uint64_t)\n"
                             "0 1 3\n"
                             "4 3 2\n"
+                        "DenseMatrix(2x3, uint64_t)\n"
+                            "1 2 1\n"
+                            "2 4 1\n"
+                        "DenseMatrix(2x3, uint64_t)\n"
+                            "1 2 3\n"
+                            "3 3 3\n"
                         "DenseMatrix(2x3, uint64_t)\n"
                             "1 2 3\n"
                             "4 4 4\n"
@@ -179,11 +251,17 @@ TEST_CASE("ewBinaryMinScalar", TAG_CODEGEN) {
     test_binary_lowering("min", "llvm.call @_ewMin__", result);
 }
 
-TEST_CASE("ewBinaryMaxScalar", TAG_CODEGEN) {
+TEST_CASE("ewBinaryMax", TAG_CODEGEN) {
     // clang-format off
     std::string result = "DenseMatrix(2x3, double)\n"
                             "1 2 4\n"
                             "11 5 6\n"
+                        "DenseMatrix(2x3, double)\n"
+                            "5 2 3\n"
+                            "5 5 6\n"
+                        "DenseMatrix(2x3, double)\n"
+                            "3 3 3\n"
+                            "4 5 6\n"
                         "DenseMatrix(2x3, double)\n"
                             "4 4 4\n"
                             "4 5 6\n"
@@ -192,12 +270,24 @@ TEST_CASE("ewBinaryMaxScalar", TAG_CODEGEN) {
                             "1 2 4\n"
                             "11 5 6\n"
                         "DenseMatrix(2x3, int64_t)\n"
+                            "5 2 3\n"
+                            "5 5 6\n"
+                        "DenseMatrix(2x3, int64_t)\n"
+                            "3 3 3\n"
+                            "4 5 6\n"
+                        "DenseMatrix(2x3, int64_t)\n"
                             "4 4 4\n"
                             "4 5 6\n"
                         "4\n"
                         "DenseMatrix(2x3, uint64_t)\n"
                             "1 2 4\n"
                             "11 5 6\n"
+                        "DenseMatrix(2x3, uint64_t)\n"
+                            "5 2 3\n"
+                            "5 5 6\n"
+                        "DenseMatrix(2x3, uint64_t)\n"
+                            "3 3 3\n"
+                            "4 5 6\n"
                         "DenseMatrix(2x3, uint64_t)\n"
                             "4 4 4\n"
                             "4 5 6\n"
