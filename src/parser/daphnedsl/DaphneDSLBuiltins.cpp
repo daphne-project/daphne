@@ -1492,6 +1492,20 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
 
         return builder.create<RemoveOp>(loc, utils.unknownType, utils.unknownType, list, idx).getResults();
     }
+    if (func == "replaceElementInList") {
+        checkNumArgsExact(loc, func, numArgs, 3);
+        mlir::Value list = args[0];
+        mlir::Value idx = utils.castSizeIf(args[1]);
+        mlir::Value elem = args[2];
+
+        return builder.create<ReplaceElementInListOp>(loc, utils.unknownType, utils.unknownType, list, idx, elem).getResults();
+    }
+    if (func == "getElementInList") {
+        checkNumArgsExact(loc, func, numArgs, 2);
+        mlir::Value list = args[0];
+        mlir::Value idx = utils.castSizeIf(args[1]);
+        return builder.create<GetElementInListOp>(loc, utils.unknownType, list, idx).getResult();
+    }
 
     // ********************************************************************
 
