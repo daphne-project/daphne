@@ -1,0 +1,7 @@
+import "multiLogReg.daph";
+
+X = rand(10, 100, 0.0, 1.0, 0.5, 1234);
+Y = rand(10, 1, 0, 3, 1, 1234);
+print(Y);
+
+multiLogReg.m_multiLogReg(X, as.matrix<f64>(Y), 2, 0.000001, 1.0, 100, 20, as.bool(1));
