@@ -352,6 +352,7 @@ class SpecializeGenericFunctionsPass : public PassWrapper<SpecializeGenericFunct
                 callOp.setCalleeAttr(specializedFunc.getSymNameAttr());
                 if (fixResultTypes(callOp->getResults(), specializedFunc.getFunctionType())) {
                     inferTypesInFunction(function);
+                    inferTypesInFunction(specializedFunc);
                 }
                 specializeCallsInFunction(specializedFunc);
                 called.insert(specializedFunc);
