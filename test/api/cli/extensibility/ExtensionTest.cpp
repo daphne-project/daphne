@@ -65,6 +65,11 @@ TEST_CASE("extension_kernel", TAG_EXTENSIBILITY) {
                            std::string(dirPath + "extension_kernel_usage_hint.daphne").c_str(), "--kernel-ext",
                            std::string(dirPath + "kernel_extension_test/myKernels.json").c_str());
     }
+    SECTION("hint, no priority, type mismatch") { // must use the custom kernel
+        checkDaphneStatusCode(StatusCode::PASS_ERROR,
+                              std::string(dirPath + "extension_kernel_usage_hint_type_mismatch.daphne").c_str(),
+                              "--kernel-ext", std::string(dirPath + "kernel_extension_test/myKernels.json").c_str());
+    }
     SECTION("hint, default priority") { // must use the custom kernel
         compareDaphneToStr("hello from mySumAll\n2\n",
                            std::string(dirPath + "extension_kernel_usage_hint.daphne").c_str(), "--kernel-ext",

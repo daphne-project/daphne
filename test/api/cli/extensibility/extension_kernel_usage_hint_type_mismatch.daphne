@@ -1,0 +1,6 @@
+// Manual use of a custom kernel through a kernel hint.
+// Trying to invoke a custom kernel on an input of a mismatching type: the custom kernel expects value type f32, but encounters f64.
+
+X = [1.0, 4.0, -5.0, 2.0];
+s = sum::mySumAll(X);
+print(s);

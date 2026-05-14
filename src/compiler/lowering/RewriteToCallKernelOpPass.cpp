@@ -386,6 +386,13 @@ class KernelReplacement : public RewritePattern {
             for (size_t i = 0; i < kernelInfos.size() && !found; i++) {
                 auto ki = kernelInfos[i];
                 if (ki.kernelFuncName == kernelFuncName) {
+                    if (ki.argTypes != lookupArgTys || ki.resTypes != lookupResTys) {
+                        std::stringstream msg;
+                        msg << "found kernel for operation `" << opMnemonic << "` with hinted name `" << kernelFuncName
+                            << "`, but the argument/result types do not match: expected `(" << ki.argTypes << ") -> ("
+                            << ki.resTypes << ")`, but found `(" << lookupArgTys << ") -> (" << lookupResTys << ")`";
+                        throw ErrorHandler::compilerError(loc, "RewriteToCallKernelOpPass", msg.str());
+                    }
                     libPath = ki.libPath;
                     found = true;
                 }
