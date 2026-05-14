@@ -104,21 +104,9 @@ class KernelCatalog {
     void dumpKernelInfos(const std::string &opMnemonic, const std::vector<KernelInfo> &kernelInfos,
                          std::ostream &os = std::cerr) const {
         os << "- operation `" << opMnemonic << "` (" << kernelInfos.size() << " kernels)" << std::endl;
-        for (KernelInfo ki : kernelInfos) {
-            os << "  - kernel `" << ki.kernelFuncName << "`: (";
-            for (size_t i = 0; i < ki.argTypes.size(); i++) {
-                os << ki.argTypes[i];
-                if (i < ki.argTypes.size() - 1)
-                    os << ", ";
-            }
-            os << ") -> (";
-            for (size_t i = 0; i < ki.resTypes.size(); i++) {
-                os << ki.resTypes[i];
-                if (i < ki.resTypes.size() - 1)
-                    os << ", ";
-            }
-            os << ") for backend `" << ki.backend << "` (in `" << ki.libPath << "`)" << std::endl;
-        }
+        for (KernelInfo ki : kernelInfos)
+            os << "  - kernel `" << ki.kernelFuncName << "`: (" << ki.argTypes << ") -> (" << ki.resTypes
+               << ") for backend `" << ki.backend << "` (in `" << ki.libPath << "`)" << std::endl;
     }
 
   public:
@@ -254,19 +242,9 @@ class KernelCatalog {
     std::string formatNoKernelError(const std::string &opMnemonic, const std::vector<mlir::Type> &argTypes,
                                     const std::vector<mlir::Type> &resTypes, const std::string &backend = "CPP") const {
         std::stringstream s;
-        s << "no kernel for operation `" << opMnemonic << "` available for the required input types `(";
-        for (size_t i = 0; i < argTypes.size(); i++) {
-            s << argTypes[i];
-            if (i < argTypes.size() - 1)
-                s << ", ";
-        }
-        s << ")` and output types `(";
-        for (size_t i = 0; i < resTypes.size(); i++) {
-            s << resTypes[i];
-            if (i < resTypes.size() - 1)
-                s << ", ";
-        }
-        s << ")` for backend `" << backend << "`, registered kernels for this op:" << std::endl;
+        s << "no kernel for operation `" << opMnemonic << "` available for the required input types `(" << argTypes
+          << ")` and output types `(" << resTypes << ")` for backend `" << backend
+          << "`, registered kernels for this op:" << std::endl;
         dump(opMnemonic, s);
         return s.str();
     }

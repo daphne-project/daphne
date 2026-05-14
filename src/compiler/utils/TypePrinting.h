@@ -19,5 +19,20 @@
 #include <mlir/IR/Types.h>
 
 #include <ostream>
+#include <vector>
 
+/**
+ * @brief Prints the name of the given MLIR type to the given stream.
+ *
+ * @param os The stream to print to.
+ * @param t The MLIR type to print.
+ */
 std::ostream &operator<<(std::ostream &os, mlir::Type t);
+
+/**
+ * @brief Prints the names of the given MLIR types to the given stream, separated by comma and space.
+ *
+ * @param os The stream to print to.
+ * @param ts The MLIR types to print.
+ */
+std::ostream &operator<<(std::ostream &os, std::vector<mlir::Type> ts);

@@ -21,11 +21,21 @@
 
 #include <ostream>
 #include <string>
+#include <vector>
 
 std::ostream &operator<<(std::ostream &os, mlir::Type t) {
     std::string s;
     llvm::raw_string_ostream rsos(s);
     t.print(rsos);
     os << s;
+    return os;
+}
+
+std::ostream &operator<<(std::ostream &os, std::vector<mlir::Type> ts) {
+    for (size_t i = 0; i < ts.size(); i++) {
+        os << ts[i];
+        if (i < ts.size() - 1)
+            os << ", ";
+    }
     return os;
 }
