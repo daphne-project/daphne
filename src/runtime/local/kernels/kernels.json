@@ -4168,6 +4168,10 @@
                 {
                     "type": "const char *",
                     "name": "filename"
+                },
+                {
+                    "type": "Frame *",
+                    "name": "opts"
                 }
             ]
         },
@@ -4220,6 +4224,10 @@
                 {
                     "type": "const char *",
                     "name": "filename"
+                },
+                {
+                    "type": "Frame *",
+                    "name": "opts"
                 }
             ]
         },

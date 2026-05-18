@@ -491,6 +491,11 @@ class Frame : public Structure {
                     return false;
                 }
                 break;
+            case ValueTypeCode::STR:
+                if (!(*(this->getColumn<std::string>(c)) == *(rhs.getColumn<std::string>(c)))) {
+                    return false;
+                }
+                break;
             default:
                 throw std::runtime_error("CheckEq::apply: unknown value type code");
             }

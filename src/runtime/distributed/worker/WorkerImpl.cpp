@@ -31,6 +31,7 @@
 #include <runtime/local/datastructures/CSRMatrix.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
+#include <runtime/local/datastructures/Frame.h>
 #include <runtime/local/io/File.h>
 #include <runtime/local/io/ReadCsv.h>
 #include <runtime/local/kernels/Read.h>
@@ -40,6 +41,8 @@
 const std::string WorkerImpl::DISTRIBUTED_FUNCTION_NAME = "dist";
 
 WorkerImpl::WorkerImpl(DaphneUserConfig &_cfg) : cfg(_cfg), tmp_file_counter_(0), localData_() {}
+
+static Frame *emptyFrame = DataObjectFactory::create<Frame>(0, 0, nullptr, nullptr, false);
 
 template <> WorkerImpl::StoredInfo WorkerImpl::Store<Structure>(Structure *mat) {
     auto identifier = "tmp_" + std::to_string(tmp_file_counter_++);
@@ -237,11 +240,11 @@ Structure *WorkerImpl::readOrGetMatrix(const std::string &identifier, size_t num
         if (isSparse) {
             if (isFloat) {
                 CSRMatrix<double> *m2 = nullptr;
-                read<CSRMatrix<double>>(m2, identifier.c_str(), nullptr);
+                read<CSRMatrix<double>>(m2, identifier.c_str(),emptyFrame, nullptr);
                 m = m2;
             } else {
                 CSRMatrix<int64_t> *m2 = nullptr;
-                read<CSRMatrix<int64_t>>(m2, identifier.c_str(), nullptr);
+                read<CSRMatrix<int64_t>>(m2, identifier.c_str(), emptyFrame, nullptr);
                 m = m2;
             }
         } else {
