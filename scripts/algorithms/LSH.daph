@@ -1,0 +1,205 @@
+# This script has been manually translated from this article's python implementation (https://www.pinecone.io/learn/series/faiss/locality-sensitive-hashing/#Testing-LSH).
+#
+# This script only coveres the post-processing part of LSH, refer to the article to see the pre-processing steps.
+#
+# This script implements Locality Sensitivity Hashing into DaphneDSL.
+# 
+# For example usage please look at LSH_usage.daph
+# 
+# .. code-block::
+#
+#   For example, given a matrix where each row represents a signature vector of integers.
+#   LSH will return which vectors are similar to each other
+#   input--> signatures :=
+#   (row 0)            [1,2,3,4,5,6]
+#   (row 1)            [1,2,3,7,8,9]
+#   (row 1)            [1,2,12,4,5,6]
+#
+#
+#   output--> M :=
+#   (row 0)            [0,1,2]
+#   (row 1)            [0,2,-1] (-1 is a placeholder for empty space)
+#   
+# 
+#
+#
+# INPUT:
+# ------------------------------------------------------------------------------
+# signatures      Matrix of si64, each row is an individual signature vector
+# b               The number of bands for each signature vector.
+#
+# ------------------------------------------------------------------------------
+#
+# OUTPUT:
+# ------------------------------------------------------------------------------
+# M              Matrix M containing which row indices are similar to each other from Input I.
+#                EX: for row [0,1,2], rows 0,1,2 from Input I are similar.
+#                EX: for row [0,1,-1], rows 0,1 from Input I are similar.
+# ------------------------------------------------------------------------------
+# FUNCTIONS:
+# ------------------------------------------------------------------------------
+# Any function name starting with a _ is a helper function and not meant to be called directly
+# init_buckets     First function that should be called in program: creates the list of buckets.
+#                  INPUT:
+#                  b: the number of bands.
+#                  num_of_signatures: Number of Signatures in input matrix.
+#                  RETURN: list object.
+#
+# add_hash         Hashing an individual signature vector into the buckets.
+#                  INPUT:
+#                  signature: signature vector from input I (a row from I)
+#                  b: the number of bands.
+#                  buckets: the list object which was initialized from init_buckets. Object which is returned.
+#                  counter: the index of signature in input I. (This number is how you connect the output of LSH to the input.)
+#                  RETURN: list object.
+# check_candidates Once add_hash has been run on the entire input, run check_candidates to see results.
+#                  INPUT:
+#                  buckets: list object containing the results of the algorithm.
+#                  RETURN: matrix M, where each row shows which indices of input I are similar.
+#                  NOTE: Matrix M will have -1 elements representing empty space.
+# print_candidates_result
+#                  Takes in the matrix from check_candidates as input and prints it in a more readable way.
+#                  INPUT:
+#                  candidates: matrix result check_candidates.
+#                  RETURN: NONE. Prints to terminal.
+
+
+
+def _make_subvecs(signature: matrix, b: si64) -> matrix { # splits 1-row signature into multiple rows.
+    l = ncol(signature);
+    r = (l - (l % b)) / b; #floor division
+    result = reshape(signature, b, r);
+    return result;
+}
+
+def _hash_key(subvec: matrix) -> si64 { #function to concatenate row of numbers to si64. [12,34] -> 1234. 
+    key = 0;
+    for (i in 0:(ncol(subvec) - 1)) {
+        digit = as.scalar<si64>(subvec[0, i]);
+        factor = 1;
+
+        # Count number of digits in digit
+        num_digits = -1;
+        if (digit == 0) {
+            num_digits = 1;
+        } else {
+            temp = digit;
+            num_digits = 0;
+            while (temp > 0) {
+                temp = temp / 10;
+                num_digits = num_digits + 1;
+            }
+        }
+
+        # Shift key to the left by num_digits and add digit
+        for (j in 0:(num_digits - 1)) {
+            factor = factor * 10;
+        }
+
+        key = key * factor + digit;
+    }
+    return key;
+}
+
+def _is_bucket_empty(bucket:matrix){
+    first_bucket_elem = bucket[0,0];
+    if (as.scalar<si64>(first_bucket_elem) == -1){
+        return true;
+    }
+    return false;
+}
+
+def _add_counter(row:matrix, counter: si64)->matrix{
+    len = ncol(row);
+    inserted = false;
+    i = 0;
+    while (inserted == false && i < len){
+        elem = row[0,i];
+        if (as.scalar<si64>(elem) == -1){
+            row[0,i] = [counter];
+            inserted = true;
+        }
+        i = i + 1;
+    }
+    return row;
+}
+
+def add_hash(signature: matrix, b: si64, buckets, counter: si64){
+    subvecs = _make_subvecs(signature, b);
+
+    for (i in 0:(b - 1)){ #iterate all buckets
+        subvec = subvecs[i, :];
+        key = _hash_key(subvec);
+        bucket = getElementInList(buckets, i);
+        found = false;
+
+        for (j in 0:(nrow(bucket) - 1)) { #iterate every row in a bucket
+            row = bucket[j, :];
+            row_key = row[0,0];
+            if (as.scalar<si64>(row_key) == key) {
+                updated_row = _add_counter(row,counter);
+                bucket[j, :] = updated_row;
+                found = true;
+            }
+        }
+        if (found == false) {
+            # Add new row [key, counter, -1 , -1, ...] (as a row vector)
+            new_row = fill(-1, 1, ncol(bucket));
+            new_row[0,0] = [key];
+            new_row = _add_counter(new_row, counter);
+            
+            #check if bucket was been modified since initialization.
+            if (_is_bucket_empty(bucket)){
+                bucket = new_row;
+            }
+            else{
+                bucket = rbind(bucket, new_row);
+            }
+        }
+
+        buckets, _ = replaceElementInList(buckets, i, bucket);
+    }
+    return buckets;
+}
+
+def check_candidates(buckets){ #returns the results from the algorithm, removes the key column.
+    bucket_len = ncol(getElementInList(buckets,0));
+    buckets_len = length(buckets);
+    results = fill(0,1,bucket_len); # init with 0-row because matrix cant be empty.
+    for (i in 0:buckets_len-1){
+        bucket = getElementInList(buckets,i);
+        candidates = (bucket[:,2] != [-1]); # if index 2 is -1, then there is not two counters in the row and no similarity was found.
+        new_bucket = bucket * candidates;
+        remove_rows_all_zero = new_bucket[[candidates,]];
+        results = rbind(results, remove_rows_all_zero);
+    }
+    results = results[1:,:]; #remove empty 0 row when initialized.
+    key_removed = results[:,1:];
+    results = key_removed;
+    return results;
+}
+
+def print_candidates_result(candidates: matrix){ #given the matrix from check_candidates, displays results in a human friendly format
+    /*NOTE: if one day DaphneDSL supports saving lists, this code and be retooled to return the results from
+    check_candidates without any -1 elements to represent negative space.*/
+    for (i in 0:(nrow(candidates)-1)){
+        row = candidates[i,:];
+        non_empty_elements = row != -1;
+        non_empty_elements = reshape(non_empty_elements,ncol(row),1);
+        similar_elements = row[[, non_empty_elements ]];
+        print("The following signature vectors are similar:");
+        print(similar_elements);
+    }
+}
+
+
+def init_buckets(b: si64, num_of_signatures: si64) {
+    empty_band = fill(-1, 1, num_of_signatures+1); #num of columns is initialized based on num_of_signatures for the worst case that a key is found in all signatures.
+    buckets = createList(empty_band);
+
+    for (i in 1:(b - 1)) {
+        buckets = append(buckets, empty_band);
+    }
+
+    return buckets;
+}

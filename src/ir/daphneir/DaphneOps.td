@@ -2040,6 +2040,24 @@ def Daphne_RemoveOp : Daphne_Op<"remove", [
     let results = (outs ListOrU:$resList, MatrixOrU:$elem);
 }
 
+def Daphne_ReplaceElementInListOp : Daphne_Op<"replaceElementInList", [
+    DeclareOpInterfaceMethods<InferTypesOpInterface>
+]> {
+    let summary = "Replaces the element at the specified index from the given list with the given element. Returns the old element.";
+    
+    let arguments = (ins ListOrU:$argList, Size:$idx, MatrixOrU:$argElem);
+    let results = (outs ListOrU:$resList, MatrixOrU:$oldElem);
+}
+
+def Daphne_GetElementInListOp : Daphne_Op<"getElementInList", [
+    DeclareOpInterfaceMethods<InferTypesOpInterface>
+]> {
+    let summary = "Returns the element at the specified index from the given list";
+    
+    let arguments = (ins ListOrU:$argList, Size:$idx);
+    let results = (outs MatrixOrU:$elem);
+}
+
 // ****************************************************************************
 // Handling of data properties
 // ****************************************************************************
