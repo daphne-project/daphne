@@ -1,0 +1,14 @@
+import "shortestPath.daph";
+
+G = [0.0, 1.0, 0.0, 1.0,
+     0.0, 0.0, 1.0, 0.0,
+     0.0, 0.0, 0.0, 1.0,
+     0.0, 0.0, 0.0, 0.0](4, 4);
+
+sourceNode = 1;
+maxi = 0;
+verbose = true;
+
+result = shortestPath.m_shortestPath(G, maxi, sourceNode, verbose);
+
+print(G);

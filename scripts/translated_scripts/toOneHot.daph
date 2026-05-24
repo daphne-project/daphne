@@ -1,0 +1,10 @@
+def m_toOneHot(X:matrix<f64>, numClasses:si64) -> matrix<f64> {
+  
+  if (numClasses < aggMax(X)) {
+    stop("numClasses must be >= largest value in X to prevent cropping");
+  }
+  
+  Y = ctable(seq(as.f64(1), as.si64(nrow(X)), 1 <= as.si64(nrow(X)) ? 1 : -1), X, as.si64(nrow(X)), numClasses);
+  return as.matrix<f64>(Y);
+}
+

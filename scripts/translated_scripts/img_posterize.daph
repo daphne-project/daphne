@@ -1,0 +1,5 @@
+def m_img_posterize(img_in:matrix<f64>, bits:si64) -> matrix<f64> {
+  img_out = (floor(img_in / 2 ^ (8 - bits))) * (2 ^ (8 - bits));
+  return as.matrix<f64>(img_out);
+}
+

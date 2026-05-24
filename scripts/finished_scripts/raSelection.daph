@@ -1,0 +1,6 @@
+def m_raSelection(X:matrix<f64>, col:si64, op:str, val:f64) -> matrix<f64> {
+  I = op == "==" ? X[, col - 1] == val : op == "!=" ? X[, col - 1] != val : op == "<" ? X[, col - 1] < val : op == ">" ? X[, col - 1] > val : op == "<=" ? X[, col - 1] <= val : X[, col - 1] >= val;
+  Y = X[[I, ]];
+  return as.matrix<f64>(Y);
+}
+

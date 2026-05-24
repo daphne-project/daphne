@@ -1,0 +1,6 @@
+import "getAccuracy.daph";
+
+y = [1,7,3,9,4,8,2,6,9,2,4,7,1,2,5];
+y_hat = [1,4,8,2,4,1,6,7,0,4,7,2,3,7,5];
+
+print(getAccuracy.m_getAccuracy(as.f64(y), as.f64(y_hat), as.bool(0)));

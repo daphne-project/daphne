@@ -1,0 +1,109 @@
+def m_lmCG(X:matrix<f64>, y:matrix<f64>, icpt:si64 /*= 0*/, reg:f64 /*= 0.0000001*/, tol:f64 /*= 0.0000001*/, maxi:si64 /*= 0*/, verbose:bool /*= true*/) -> matrix<f64> {
+  intercept_status = icpt;
+  regularization = reg;
+  tolerance = tol;
+  max_iteration = maxi;
+  n = as.si64(nrow(X));
+  m = as.si64(ncol(X));
+  scale_lambda = [0.0];
+  m_ext = 0;
+  if (intercept_status == 1 || intercept_status == 2) {
+    ones_n = fill(as.f64(1), n, 1);
+    X = cbind(X, ones_n);
+    m_ext = as.si64(ncol(X));
+    scale_lambda = fill(as.f64(1), m_ext, 1);
+    scale_lambda[m_ext - 1, 0] = as.matrix(0.0);
+  } else {
+    scale_lambda = fill(as.f64(1), m, 1);
+    m_ext = as.si64(m);
+  }
+  
+  scale_X = [0.0];
+  shift_X = [0.0];
+  if (intercept_status == 2) {
+    avg_X_cols = t(sum(X, 1)) / n;
+    var_X_cols = (t(sum(X ^ 2, 1)) - n * (avg_X_cols ^ 2)) / (n - 1);
+    is_unsafe = (var_X_cols <= 0);
+    scale_X = 1.0 / sqrt(var_X_cols * (1 - is_unsafe) + is_unsafe);
+    scale_X[m_ext - 1, 0] = as.matrix(1.0);
+    shift_X = (0.0 - avg_X_cols) * scale_X;
+    shift_X[m_ext - 1, 0] = as.matrix(0.0);
+  } else {
+    scale_X = fill(as.f64(1), m_ext, 1);
+    shift_X = fill(as.f64(0), m_ext, 1);
+  }
+  
+  lambda = scale_lambda * regularization;
+  beta_unscaled = fill(as.f64(0), m_ext, 1);
+  
+  if (max_iteration == 0) {
+    max_iteration = as.si64(m_ext);
+  }
+  
+  i = 0;
+  
+  if (verbose) {
+    print("Running the CG algorithm...");
+  }
+  
+  r = (0.0 - t(X)) @ y;
+  
+  if (intercept_status == 2) {
+    r = as.matrix<f64>(scale_X * r + shift_X @ r[m_ext - 1, ]);
+  }
+  
+  p = (0.0 - r);
+  norm_r2 = sum(r ^ 2);
+  norm_r2_initial = norm_r2;
+  norm_r2_target = norm_r2_initial * tolerance ^ 2;
+  
+  if (verbose) {
+    print("||r|| initial value = "); print(sqrt(norm_r2_initial)); print(", target value = "); print(sqrt(norm_r2_target));
+  }
+  
+  while (i < max_iteration && norm_r2 > norm_r2_target) {
+    ssX_p = [0.0];
+    if (intercept_status == 2) {
+      ssX_p = scale_X * p;
+      ssX_p[m_ext - 1, ] = ssX_p[m_ext - 1, ] + t(shift_X) @ p;
+    } else {
+      ssX_p = as.matrix<f64>(p);
+    }
+    
+    q = t(X) @ (X @ ssX_p);
+    
+    if (intercept_status == 2) {
+      q = as.matrix<f64>(scale_X * q + shift_X @ q[m_ext - 1, ]);
+    }
+    
+    q = q + lambda * p;
+    a = norm_r2 / sum(p * q);
+    beta_unscaled = beta_unscaled + a * p;
+    r = r + a * q;
+    old_norm_r2 = norm_r2;
+    norm_r2 = sum(r ^ 2);
+    p = as.matrix<f64>((0.0 - r) + (norm_r2 / old_norm_r2) * p);
+    i = as.si64(i + 1);
+    
+    if (verbose) {
+      print("Iteration "); print(i); print(":  ||r|| / ||r init|| = "); print(sqrt(norm_r2 / norm_r2_initial));
+    }
+    
+  }
+  
+  if (verbose && i >= max_iteration) {
+    print("Warning: the maximum number of iterations has been reached.");
+  }
+  
+  beta = [0.0];
+  if (intercept_status == 2) {
+    beta = scale_X * beta_unscaled;
+    beta[m_ext - 1, ] = beta[m_ext - 1, ] + t(shift_X) @ beta_unscaled;
+  } else {
+    beta = as.matrix<f64>(beta_unscaled);
+  }
+  
+  B = beta;
+  return as.matrix<f64>(B);
+}
+

@@ -1,0 +1,5 @@
+def m_img_brightness(img_in:matrix<f64>, value:f64, channel_max:si64) -> matrix<f64> {
+  img_out = max(0, min(img_in + value, channel_max));
+  return as.matrix<f64>(img_out);
+}
+
