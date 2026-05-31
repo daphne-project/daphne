@@ -33,6 +33,12 @@ template <AnalysisFlag... Fs, typename... TArgs> struct AnalysisResult<FlagArg<F
         return std::get<idx>(tup);
     }
 
+    // const at the end makes it so the method is callable on a const instance of AnalysisResult
+    template <AnalysisFlag F> const auto &get() const {
+        constexpr size_t idx = indexOf<F>;
+        return std::get<idx>(tup);
+    }
+
     // type alias template to get the data type corresponding to a given flag.
     template <AnalysisFlag F> using TypeOf = std::tuple_element_t<indexOf<F>, std::tuple<TArgs...>>;
 };

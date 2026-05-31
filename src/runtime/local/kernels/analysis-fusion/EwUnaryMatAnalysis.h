@@ -38,7 +38,7 @@
 // ****************************************************************************
 
 template <class DTRes, class DTArg, typename TAnalysis> struct EwUnaryMatAnalysis {
-    static void apply(UnaryOpCode opCode, DTRes *&res, const DTArg *arg, TAnalysis *&resAnal, DCTX(ctx)) = delete;
+    static void apply(UnaryOpCode opCode, DTRes *&res, const DTArg *arg, TAnalysis &resAnal, DCTX(ctx)) = delete;
 };
 
 // ****************************************************************************
@@ -46,8 +46,8 @@ template <class DTRes, class DTArg, typename TAnalysis> struct EwUnaryMatAnalysi
 // ****************************************************************************
 
 template <class DTRes, class DTArg, typename TAnalysis>
-void ewUnaryMat(UnaryOpCode opCode, DTRes *&res, const DTArg *arg, TAnalysis *&resAnal, DCTX(ctx)) {
-    EwUnaryMatAnalysis<DTRes, DTArg, TAnalysis>::apply(opCode, res, arg, ctx);
+void ewUnaryMatAnalysis(UnaryOpCode opCode, DTRes *&res, const DTArg *arg, TAnalysis &resAnal, DCTX(ctx)) {
+    EwUnaryMatAnalysis<DTRes, DTArg, TAnalysis>::apply(opCode, res, arg, resAnal, ctx);
 }
 
 // ****************************************************************************
@@ -61,21 +61,21 @@ void ewUnaryMat(UnaryOpCode opCode, DTRes *&res, const DTArg *arg, TAnalysis *&r
 template <typename VT, typename... FAs>
 struct EwUnaryMatAnalysis<DenseMatrix<VT>, DenseMatrix<VT>, AnalysisResult<FAs...>> {
     static void apply(UnaryOpCode opCode, DenseMatrix<VT> *&res, const DenseMatrix<VT> *arg,
-                      AnalysisResult<FAs...> *&resAnal, DCTX(ctx)) {
+                      AnalysisResult<FAs...> &resAnal, DCTX(ctx)) {
         using anal_t = AnalysisResult<FAs...>;
         const size_t numRows = arg->getNumRows();
         const size_t numCols = arg->getNumCols();
 
         if constexpr (anal_t::template contains<AnalysisFlag::mean>) {
-            resAnal->template get<AnalysisFlag::mean>() = 0;
+            resAnal.template get<AnalysisFlag::mean>() = 0;
         }
         if constexpr (anal_t::template contains<AnalysisFlag::max>) {
             using AVT = anal_t::template TypeOf<AnalysisFlag::max>;
-            resAnal->template get<AnalysisFlag::max>() = std::numeric_limits<AVT>::lowest();
+            resAnal.template get<AnalysisFlag::max>() = std::numeric_limits<AVT>::lowest();
         }
         if constexpr (anal_t::template contains<AnalysisFlag::min>) {
             using AVT = anal_t::template TypeOf<AnalysisFlag::min>;
-            resAnal->template get<AnalysisFlag::min>() = std::numeric_limits<AVT>::max();
+            resAnal.template get<AnalysisFlag::min>() = std::numeric_limits<AVT>::max();
         }
 
         if (res == nullptr)
@@ -91,14 +91,14 @@ struct EwUnaryMatAnalysis<DenseMatrix<VT>, DenseMatrix<VT>, AnalysisResult<FAs..
                 VT tmp = func(valuesArg[c], ctx);
                 valuesRes[c] = tmp;
                 if constexpr (anal_t::template contains<AnalysisFlag::mean>) {
-                    resAnal->template get<AnalysisFlag::mean>() += tmp;
+                    resAnal.template get<AnalysisFlag::mean>() += tmp;
                 }
                 if constexpr (anal_t::template contains<AnalysisFlag::max>) {
-                    auto &maxVal = resAnal->template get<AnalysisFlag::max>();
+                    auto &maxVal = resAnal.template get<AnalysisFlag::max>();
                     maxVal = std::max(maxVal, tmp);
                 }
                 if constexpr (anal_t::template contains<AnalysisFlag::min>) {
-                    auto &minVal = resAnal->template get<AnalysisFlag::min>();
+                    auto &minVal = resAnal.template get<AnalysisFlag::min>();
                     minVal = std::min(minVal, tmp);
                 }
             }
@@ -106,7 +106,7 @@ struct EwUnaryMatAnalysis<DenseMatrix<VT>, DenseMatrix<VT>, AnalysisResult<FAs..
             valuesRes += res->getRowSkip();
         }
         if constexpr (anal_t::template contains<AnalysisFlag::mean>) {
-            resAnal->template get<AnalysisFlag::mean>() /= (float)res->getNumItems();
+            resAnal.template get<AnalysisFlag::mean>() /= (float)(numRows * numCols);
         }
     }
 };
@@ -118,7 +118,7 @@ struct EwUnaryMatAnalysis<DenseMatrix<VT>, DenseMatrix<VT>, AnalysisResult<FAs..
 template <typename VT, typename... FAs>
 struct EwUnaryMatAnalysis<CSRMatrix<VT>, CSRMatrix<VT>, AnalysisResult<FAs...>> {
     static void apply(UnaryOpCode opCode, CSRMatrix<VT> *&res, const CSRMatrix<VT> *arg,
-                      AnalysisResult<FAs...> *&resAnal, DCTX(ctx)) {
+                      AnalysisResult<FAs...> &resAnal, DCTX(ctx)) {
         const size_t numRows = arg->getNumRows();
         const size_t numCols = arg->getNumCols();
 
