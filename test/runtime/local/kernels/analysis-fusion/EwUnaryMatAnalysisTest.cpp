@@ -153,3 +153,52 @@ TEMPLATE_PRODUCT_TEST_CASE(TEST_NAME("abs, symmetric square matrix: mean, min, n
                         AnalysisFlag::sparsity, AnalysisFlag::symmetry>(UnaryOpCode::ABS, arg, exp);
     DataObjectFactory::destroy(arg, exp);
 }
+
+TEMPLATE_PRODUCT_TEST_CASE(TEST_NAME("abs, symmetric 4x4 matrix: mean, min, numDistinct, sparsity, symmetry"),
+                           TAG_KERNELS, (DATA_TYPES), (VALUE_TYPES)) {
+    using DT = TestType;
+    auto arg = genGivenVals<DT>(4, {
+                                       1,
+                                       -2,
+                                       3,
+                                       0,
+                                       -2,
+                                       4,
+                                       0,
+                                       5,
+                                       3,
+                                       0,
+                                       6,
+                                       -1,
+                                       0,
+                                       5,
+                                       -1,
+                                       7,
+                                   });
+    auto exp = genGivenVals<DT>(4, {
+                                       1,
+                                       2,
+                                       3,
+                                       0,
+                                       2,
+                                       4,
+                                       0,
+                                       5,
+                                       3,
+                                       0,
+                                       6,
+                                       1,
+                                       0,
+                                       5,
+                                       1,
+                                       7,
+                                   });
+    exp->mean = 40.0 / 16.0;
+    exp->min = 0;
+    exp->numDistinct = 8;        // 0,1,2,3,4,5,6,7
+    exp->sparsity = 12.0 / 16.0; // 4 zeros
+    exp->symmetric = BoolOrUnknown::True;
+    checkEwUnaryMatAnal<DT, DT, AnalysisFlag::mean, AnalysisFlag::min, AnalysisFlag::numDistinct,
+                        AnalysisFlag::sparsity, AnalysisFlag::symmetry>(UnaryOpCode::ABS, arg, exp);
+    DataObjectFactory::destroy(arg, exp);
+}
