@@ -49,7 +49,7 @@ template <class DTRes, class DTArg, typename TAnalysis> struct EwUnaryMatAnalysi
 // ****************************************************************************
 
 template <class DTRes, class DTArg, typename TAnalysis>
-void ewUnaryMatAnalysis(UnaryOpCode opCode, DTRes *&res, const DTArg *arg, TAnalysis &resAnal, DCTX(ctx)) {
+void ewUnaryMatAnalysis(UnaryOpCode opCode, DTRes *&res, const DTArg *arg, DCTX(ctx)) {
     EwUnaryMatAnalysis<DTRes, DTArg, TAnalysis>::apply(opCode, res, arg, ctx);
 }
 
@@ -105,17 +105,18 @@ struct EwUnaryMatAnalysis<DenseMatrix<VT>, DenseMatrix<VT>, AnalysisFlags<Fs...>
                 if constexpr (anal_t::template contains<AnalysisFlag::symmetry>) {
                     if (isSquare && isSymmetric) {
                         if (r < c) {
-                            symVec[c].pusn_back(tmp);
+                            symVec[c].push(tmp);
                         }
                         if (r > c) {
-                            isSymmetric = symVec[r].pop_front() == tmp;
+                            isSymmetric = symVec[r].front() == tmp;
+                            symVec[r].pop();
                         }
                     }
                 }
             }
+            valuesArg += arg->getRowSkip();
+            valuesRes += res->getRowSkip();
         }
-        valuesArg += arg->getRowSkip();
-        valuesRes += res->getRowSkip();
 
         if constexpr (anal_t::template contains<AnalysisFlag::mean>)
             res->mean = sumAcc / (double)(numCols * numRows);

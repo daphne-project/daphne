@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "ir/daphneir/DataPropertyTypes.h"
 #include <runtime/local/datagen/GenGivenVals.h>
 #include <runtime/local/datastructures/CSRMatrix.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
@@ -34,33 +35,38 @@
 #define DATA_TYPES DenseMatrix //, CSRMatrix, Matrix
 #define VALUE_TYPES int32_t, double
 
-// compare two analysis results for equality with a given epsilon value if there is floating point in there.
-template <AnalysisFlag... Fs, typename... TArgs>
-bool checkAnalEqApprox(const AnalysisResult<FlagArg<Fs, TArgs>...> &resA,
-                       const AnalysisResult<FlagArg<Fs, TArgs>...> &resB, float eps = 1e-2) {
-    // if constexpr is a statement and not an expression, so we wrap it in a lambda function body.
-    // for each flag, we compare the matching value.
-    return ([&]() {
-        auto &va = resA.template get<Fs>();
-        auto &vb = resB.template get<Fs>();
-        // static dispatch to floating point comparison if floating point.
-        if constexpr (std::is_floating_point_v<TArgs>) {
-            return std::abs(va - vb) < eps;
-        } else {
-            return va == vb;
-        }
-    }() && ...);
+template <typename DTRes, typename DTArg, AnalysisFlag... Fs>
+void checkEwUnaryMatAnal(UnaryOpCode opCode, const DTArg *arg, const DTRes *exp) {
+    DTRes *res = nullptr;
+    ewUnaryMatAnalysis<DTRes, DTArg, AnalysisFlags<Fs...>>(opCode, res, arg, nullptr);
+    CHECK(checkEqApprox(res, exp, 1e-2, nullptr));
+    checkEwUnaryMatAnalOnly<DTRes, Fs...>(opCode, res, exp);
+    DataObjectFactory::destroy(res);
 }
 
-template <typename DTRes, typename DTArg, typename DTAnalRes>
-void checkEwUnaryMatAnal(UnaryOpCode opCode, const DTArg *arg, const DTRes *exp, const DTAnalRes &analExp) {
-    DTRes *res = nullptr;
-    DTAnalRes anal;
-    ewUnaryMatAnalysis<DTRes, DTArg, DTAnalRes>(opCode, res, arg, anal, nullptr);
-    CHECK(*res == *exp);
-    // compare by value
-    CHECK(checkAnalEqApprox(anal, analExp));
-    DataObjectFactory::destroy(res);
+template <typename DT, AnalysisFlag... Fs>
+void checkEwUnaryMatAnalOnly(UnaryOpCode opCode, const DT *arg, const DT *exp) {
+    using anal_t = AnalysisFlags<Fs...>;
+    if constexpr (anal_t::template contains<AnalysisFlag::mean>) {
+        CHECK(arg->mean.has_value() == exp->mean.has_value());
+        if (arg->mean.has_value())
+            CHECK(std::abs(arg->mean.value() - exp->mean.value()) < 1e-2);
+    }
+    if constexpr (anal_t::template contains<AnalysisFlag::min>) {
+        CHECK(arg->min.has_value() == exp->min.has_value());
+        if (arg->min.has_value())
+            CHECK(arg->min.value() == exp->min.value());
+    }
+    if constexpr (anal_t::template contains<AnalysisFlag::sparsity>)
+        CHECK(std::abs(arg->sparsity - exp->sparsity) < 1e-2);
+
+    if constexpr (anal_t::template contains<AnalysisFlag::symmetry>)
+        CHECK(arg->symmetric == exp->symmetric);
+
+    if constexpr (anal_t::template contains<AnalysisFlag::numDistinct>) {
+        CHECK(arg->numDistinct.has_value() == exp->numDistinct.has_value());
+        CHECK(arg->numDistinct.value() == exp->numDistinct.value());
+    }
 }
 
 // ****************************************************************************
@@ -73,29 +79,7 @@ TEMPLATE_PRODUCT_TEST_CASE(TEST_NAME("abs with no result analysis: "), TAG_KERNE
     auto arg = genGivenVals<DT>(3, {
                                        0,
                                        1,
-                                       -1,
-                                   });
-
-    auto exp = genGivenVals<DT>(3, {
-                                       0,
-                                       1,
-                                       1,
-                                   });
-
-    AnalysisResult<> anal;
-    checkEwUnaryMatAnal(UnaryOpCode::ABS, arg, exp, anal);
-
-    DataObjectFactory::destroy(arg, exp);
-}
-
-TEMPLATE_PRODUCT_TEST_CASE(TEST_NAME("abs with all possible result analysis: "), TAG_KERNELS, (DATA_TYPES),
-                           (VALUE_TYPES)) {
-    using DT = TestType;
-
-    auto arg = genGivenVals<DT>(3, {
-                                       0,
-                                       1,
-                                       -5,
+                                       5,
                                    });
 
     auto exp = genGivenVals<DT>(3, {
@@ -103,9 +87,69 @@ TEMPLATE_PRODUCT_TEST_CASE(TEST_NAME("abs with all possible result analysis: "),
                                        1,
                                        5,
                                    });
-    using VT = DT::VT;
-    AnalysisResult<FlagArg<AnalysisFlag::min, VT>, FlagArg<AnalysisFlag::max, VT>, FlagArg<AnalysisFlag::mean, VT>>
-        anal{{0, 5, 2}};
-    checkEwUnaryMatAnal(UnaryOpCode::ABS, arg, exp, anal);
+
+    checkEwUnaryMatAnal(UnaryOpCode::ABS, arg, exp);
+
+    DataObjectFactory::destroy(arg, exp);
+}
+
+TEMPLATE_PRODUCT_TEST_CASE(TEST_NAME("abs, non-symmetric square matrix: mean, min, numDistinct, sparsity, symmetry"),
+                           TAG_KERNELS, (DATA_TYPES), (VALUE_TYPES)) {
+    using DT = TestType;
+    auto arg = genGivenVals<DT>(2, {
+                                       1,
+                                       2,
+                                       3,
+                                       4,
+                                   });
+    auto exp = genGivenVals<DT>(2, {
+                                       1,
+                                       2,
+                                       3,
+                                       4,
+                                   });
+    exp->mean = 2.5; // (1 + 2 + 3 + 4) / 4
+    exp->min = 1;
+    exp->numDistinct = 4;
+    exp->sparsity = 1.0;
+    exp->symmetric = BoolOrUnknown::False;
+    checkEwUnaryMatAnal<DT, DT, AnalysisFlag::mean, AnalysisFlag::min, AnalysisFlag::numDistinct,
+                        AnalysisFlag::sparsity, AnalysisFlag::symmetry>(UnaryOpCode::ABS, arg, exp);
+    DataObjectFactory::destroy(arg, exp);
+}
+
+TEMPLATE_PRODUCT_TEST_CASE(TEST_NAME("abs, symmetric square matrix: mean, min, numDistinct, sparsity, symmetry"),
+                           TAG_KERNELS, (DATA_TYPES), (VALUE_TYPES)) {
+    using DT = TestType;
+    // 3x3 matrix
+    auto arg = genGivenVals<DT>(3, {
+                                       1,
+                                       -2,
+                                       0,
+                                       -2,
+                                       3,
+                                       4,
+                                       0,
+                                       4,
+                                       -5,
+                                   });
+    auto exp = genGivenVals<DT>(3, {
+                                       1,
+                                       2,
+                                       0,
+                                       2,
+                                       3,
+                                       4,
+                                       0,
+                                       4,
+                                       5,
+                                   });
+    exp->mean = 21.0 / 9.0; // (1+2+0+2+3+4+0+4+5)/9
+    exp->min = 0;
+    exp->numDistinct = 6;
+    exp->sparsity = 7.0 / 9.0; // 7 non-zeros
+    exp->symmetric = BoolOrUnknown::True;
+    checkEwUnaryMatAnal<DT, DT, AnalysisFlag::mean, AnalysisFlag::min, AnalysisFlag::numDistinct,
+                        AnalysisFlag::sparsity, AnalysisFlag::symmetry>(UnaryOpCode::ABS, arg, exp);
     DataObjectFactory::destroy(arg, exp);
 }
