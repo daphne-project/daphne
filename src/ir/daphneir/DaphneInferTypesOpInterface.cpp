@@ -295,14 +295,44 @@ std::vector<Type> daphne::EigenOp::inferTypes() {
 }
 
 std::vector<Type> daphne::GroupJoinOp::inferTypes() {
-    auto lhsFt = llvm::dyn_cast<daphne::FrameType>(getLhs().getType());
-    auto rhsFt = llvm::dyn_cast<daphne::FrameType>(getRhs().getType());
-    Type lhsOnType = getFrameColumnTypeByLabel(this->getOperation(), lhsFt, getLhsOn());
-    Type rhsAggType = getFrameColumnTypeByLabel(this->getOperation(), rhsFt, getRhsAgg());
-
     MLIRContext *ctx = getContext();
     Builder builder(ctx);
-    return {daphne::FrameType::get(ctx, {lhsOnType, rhsAggType}), daphne::MatrixType::get(ctx, builder.getIndexType())};
+
+    auto lhsFt = llvm::dyn_cast<daphne::FrameType>(getLhs().getType());
+    auto rhsFt = llvm::dyn_cast<daphne::FrameType>(getRhs().getType());
+
+    Type lhsOnType = getFrameColumnTypeByLabel(this->getOperation(), lhsFt, getLhsOn());
+    std::vector<Value> aggColValues;
+    std::vector<Type> newColumnTypes;
+    std::vector<std::string> aggFuncNames;
+
+    newColumnTypes.push_back(lhsOnType);
+
+    // Values get collected in an easier to use data structure
+    for (Value t : getRhsAggCol()) {
+        aggColValues.push_back(t);
+    }
+    // Function names get collected in an easier to use data structure
+    for (Attribute t : getAggFuncs()) {
+        GroupEnum aggFuncValue = llvm::dyn_cast<GroupEnumAttr>(t).getValue();
+        aggFuncNames.push_back(stringifyGroupEnum(aggFuncValue).str());
+    }
+    // New Types get computed
+    for (size_t i = 0; i < aggFuncNames.size() && i < aggColValues.size(); i++) {
+        std::string groupAggFunction = aggFuncNames.at(i);
+        if (groupAggFunction == "COUNT") {
+            newColumnTypes.push_back(builder.getIntegerType(64, true));
+        } else if (groupAggFunction == "AVG") {
+            newColumnTypes.push_back(builder.getF64Type());
+        } else { // DEFAULT OPTION (The Type of the named column)
+            Value t = aggColValues.at(i);
+            // NOTE: should we handle the case rhs.col here?, since GroupOps also does not handle strip out col type
+            // else, the helper should handle the rhs strip out instead
+            newColumnTypes.push_back(getFrameColumnTypeByLabel(this->getOperation(), rhsFt, t));
+        }
+    }
+
+    return {daphne::FrameType::get(ctx, newColumnTypes), daphne::MatrixType::get(ctx, builder.getIndexType())};
 }
 
 std::vector<Type> daphne::SemiJoinOp::inferTypes() {

@@ -1045,7 +1045,7 @@ def Daphne_CTableOp : Daphne_Op<"ctable", [
 def Daphne_SyrkOp : Daphne_Op<"syrk", [
     TypeFromFirstArg,
     DeclareOpInterfaceMethods<VectorizableOpInterface>,
-    NumRowsFromArgNumCols, NumColsFromArg, CUDASupport,FPGAOPENCLSupport, 
+    NumRowsFromArgNumCols, NumColsFromArg, CUDASupport,FPGAOPENCLSupport,
     CastFirstArgToResType
 ]> {
     let summary = [{Performs the operation `t(A) @ A` if `transLeft` is `true`; or `A @ t(A)`, otherwise.}];
@@ -1177,6 +1177,16 @@ def Daphne_SemiJoinOp : Daphne_Op<"semiJoin", [
     let results = (outs FrameOrU:$res, MatrixOf<[Size]>:$lhsTids);
 }
 
+def Daphne_GroupAggCount : I32EnumAttrCase<"COUNT", 1>;
+def Daphne_GroupAggSum : I32EnumAttrCase<"SUM", 2>;
+def Daphne_GroupAggMin : I32EnumAttrCase<"MIN", 3>;
+def Daphne_GroupAggMax : I32EnumAttrCase<"MAX", 4>;
+def Daphne_GroupAggAvg : I32EnumAttrCase<"AVG", 5>;
+
+def Daphne_GroupAggEnum : I32EnumAttr<"GroupEnum", "", [Daphne_GroupAggCount, Daphne_GroupAggSum, Daphne_GroupAggMin, Daphne_GroupAggMax, Daphne_GroupAggAvg]>{
+    let cppNamespace = "::mlir::daphne";
+}
+
 def Daphne_GroupJoinOp : Daphne_Op<"groupJoin", [
     DeclareOpInterfaceMethods<InferFrameLabelsOpInterface>,
     DeclareOpInterfaceMethods<InferTypesOpInterface>,
@@ -1211,7 +1221,14 @@ def Daphne_GroupJoinOp : Daphne_Op<"groupJoin", [
           corresponding to the pairs in the first result.
     }];
 
-    let arguments = (ins FrameOrU:$lhs, FrameOrU:$rhs, StrScalar:$lhsOn, StrScalar:$rhsOn, StrScalar:$rhsAgg);
+    let arguments = (
+        ins FrameOrU:$lhs,
+        FrameOrU:$rhs,
+        StrScalar:$lhsOn,
+        StrScalar:$rhsOn,
+        Variadic<StrScalar>:$rhsAggCol,
+        TypedArrayAttrBase<Daphne_GroupAggEnum, "enum">:$aggFuncs
+    );
     // TODO Result `lhsTids` could be made optional.
     let results = (outs FrameOrU:$res, MatrixOf<[Size]>:$lhsTids);
 }
@@ -1283,16 +1300,6 @@ def Daphne_FilterColOp : Daphne_Op<"filterCol", [
 // ----------------------------------------------------------------------------
 // Grouping
 // ----------------------------------------------------------------------------
-
-def Daphne_GroupAggCount : I32EnumAttrCase<"COUNT", 1>;
-def Daphne_GroupAggSum : I32EnumAttrCase<"SUM", 2>;
-def Daphne_GroupAggMin : I32EnumAttrCase<"MIN", 3>;
-def Daphne_GroupAggMax : I32EnumAttrCase<"MAX", 4>;
-def Daphne_GroupAggAvg : I32EnumAttrCase<"AVG", 5>;
-
-def Daphne_GroupAggEnum : I32EnumAttr<"GroupEnum", "", [Daphne_GroupAggCount, Daphne_GroupAggSum, Daphne_GroupAggMin, Daphne_GroupAggMax, Daphne_GroupAggAvg]>{
-    let cppNamespace = "::mlir::daphne";
-}
 
 def Daphne_GroupOp : Daphne_Op<"group", [
     AttrSizedOperandSegments,
@@ -2017,7 +2024,7 @@ def Daphne_LengthOp : Daphne_Op<"length", [
     DataTypeSca, ValueTypeSize
 ]> {
     let summary = "Returns the number of elements in the given list";
-    
+
     let arguments = (ins ListOrU:$arg);
     let results = (outs Size:$res);
 }
@@ -2026,7 +2033,7 @@ def Daphne_AppendOp : Daphne_Op<"append", [
     TypeFromFirstArg
 ]> {
     let summary = "Appends the given element to the end of the given list";
-    
+
     let arguments = (ins ListOrU:$argList, MatrixOrU:$elem);
     let results = (outs ListOrU:$resList);
 }
@@ -2035,7 +2042,7 @@ def Daphne_RemoveOp : Daphne_Op<"remove", [
     DeclareOpInterfaceMethods<InferTypesOpInterface>
 ]> {
     let summary = "Removes and returns the element at the specified index from the given list";
-    
+
     let arguments = (ins ListOrU:$argList, Size:$idx);
     let results = (outs ListOrU:$resList, MatrixOrU:$elem);
 }
