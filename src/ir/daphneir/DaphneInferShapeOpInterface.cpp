@@ -181,7 +181,8 @@ std::vector<std::pair<ssize_t, ssize_t>> daphne::CreateFrameOp::inferShape() {
 std::vector<std::pair<ssize_t, ssize_t>> daphne::GroupJoinOp::inferShape() {
     // We don't know the exact numbers of rows here, but we know the numbers of
     // columns.
-    return {{-1, 2}, {-1, 1}};
+    const size_t numAggCols = getRhsAggCols().size();
+    return {{-1, 1 + numAggCols}, {-1, 1}};
 }
 
 std::vector<std::pair<ssize_t, ssize_t>> daphne::GroupOp::inferShape() {
@@ -197,6 +198,7 @@ std::vector<std::pair<ssize_t, ssize_t>> daphne::GroupOp::inferShape() {
         const std::string colLabel = keyLabel.substr(keyLabel.find(delimiter) + delimiter.length(), keyLabel.length());
 
         if (keyLabel == "*") {
+
             daphne::FrameType arg = llvm::dyn_cast<daphne::FrameType>(getFrame().getType());
             for (std::string frameLabel : *arg.getLabels()) {
                 newLabels.push_back(frameLabel);
