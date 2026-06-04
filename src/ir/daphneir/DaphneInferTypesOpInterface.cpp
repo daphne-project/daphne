@@ -313,7 +313,7 @@ std::vector<Type> daphne::GroupJoinOp::inferTypes() {
         aggColValues.push_back(t);
     }
     // Function names get collected in an easier to use data structure
-    for (Attribute t : getAggFuncs()) {
+    for (Attribute t : getRhsAggFuncs()) {
         GroupEnum aggFuncValue = llvm::dyn_cast<GroupEnumAttr>(t).getValue();
         aggFuncNames.push_back(stringifyGroupEnum(aggFuncValue).str());
     }
