@@ -309,7 +309,7 @@ std::vector<Type> daphne::GroupJoinOp::inferTypes() {
     newColumnTypes.push_back(lhsOnType);
 
     // Values get collected in an easier to use data structure
-    for (Value t : getRhsAggCol()) {
+    for (Value t : getRhsAggCols()) {
         aggColValues.push_back(t);
     }
     // Function names get collected in an easier to use data structure

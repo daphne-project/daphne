@@ -138,7 +138,7 @@ void daphne::GroupJoinOp::inferFrameLabels() {
     newLabels->push_back(CompilerUtils::constantOrThrow<std::string>(getLhsOn()));
 
     auto aggFuncs = getRhsAggFuncs();
-    auto aggCols = getRhsAggCol();
+    auto aggCols = getRhsAggCols();
     for (size_t i = 0; i < std::min(aggFuncs.size(), aggCols.size()); ++i) {
         auto aggFuncValue = llvm::dyn_cast<GroupEnumAttr>(aggFuncs[i]).getValue();
         auto colLabel = CompilerUtils::constantOrThrow<std::string>(aggCols[i]);

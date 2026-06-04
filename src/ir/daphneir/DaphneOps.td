@@ -1226,7 +1226,7 @@ def Daphne_GroupJoinOp : Daphne_Op<"groupJoin", [
         FrameOrU:$rhs,
         StrScalar:$lhsOn,
         StrScalar:$rhsOn,
-        Variadic<StrScalar>:$rhsAggCol,
+        Variadic<StrScalar>:$rhsAggCols,
         TypedArrayAttrBase<Daphne_GroupAggEnum, "enum">:$rhsAggFuncs
     );
     // TODO Result `lhsTids` could be made optional.
