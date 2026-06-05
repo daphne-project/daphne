@@ -174,8 +174,8 @@ template <typename ValueType> class DenseMatrix : public Matrix<ValueType> {
      * allocation to a range) 3: ValueType* - the pointer to the actual data
      */
 
-    auto getValuesInternal(const IAllocationDescriptor *alloc_desc = nullptr,
-                           const Range *range = nullptr) -> std::tuple<bool, size_t, ValueType *>;
+    auto getValuesInternal(const IAllocationDescriptor *alloc_desc = nullptr, const Range *range = nullptr)
+        -> std::tuple<bool, size_t, ValueType *>;
 
     [[nodiscard]] size_t offset() const { return this->row_offset * rowSkip + this->col_offset; }
 
@@ -333,9 +333,9 @@ template <typename ValueType> class DenseMatrix : public Matrix<ValueType> {
 
         for (size_t r = 0; r < numRows; ++r) {
             for (size_t c = 0; c < numCols; ++c) {
-                if (*(valuesLhs + c) != *(valuesRhs + c)){
-                    std::cout << "Mismatch at (" << r << ", " << c << "): "
-                              << *(valuesLhs + c) << " != " << *(valuesRhs + c) << std::endl;
+                if (*(valuesLhs + c) != *(valuesRhs + c)) {
+                    std::cout << "Mismatch at (" << r << ", " << c << "): " << *(valuesLhs + c)
+                              << " != " << *(valuesRhs + c) << std::endl;
                     return false;
                 }
             }

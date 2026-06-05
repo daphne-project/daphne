@@ -29,22 +29,25 @@
 #include <random>
 #include <sstream>
 #include <string>
-#include <vector>
 #include <sys/stat.h>
+#include <vector>
 
 // ------------------------------------------------------------
-static inline long long fsize_bytes(const std::string& p) {
-    struct stat st{};
-    if (stat(p.c_str(), &st) == 0) return static_cast<long long>(st.st_size);
+static inline long long fsize_bytes(const std::string &p) {
+    struct stat st {};
+    if (stat(p.c_str(), &st) == 0)
+        return static_cast<long long>(st.st_size);
     return 0LL;
 }
 static inline long long mb_to_bytes(long long mb) { return mb * 1024LL * 1024LL; }
 
 // ------------------------------------------------------------
 // Meta writer: writes <path>.meta with required JSON
-static inline void write_meta(const std::string& data_path, long long numRows, long long numCols, const std::string& valueType) {
+static inline void write_meta(const std::string &data_path, long long numRows, long long numCols,
+                              const std::string &valueType) {
     std::ofstream meta(data_path + ".meta", std::ios::out | std::ios::trunc);
-    if(!meta) throw std::runtime_error("Cannot open meta for write: " + data_path + ".meta");
+    if (!meta)
+        throw std::runtime_error("Cannot open meta for write: " + data_path + ".meta");
     meta << "{\n"
          << "  \"numRows\": " << numRows << ",\n"
          << "  \"numCols\": " << numCols << ",\n"
@@ -56,19 +59,21 @@ static inline void write_meta(const std::string& data_path, long long numRows, l
 // ------------------------------------------------------------
 // CSV generator (row-safe, portable: never writes a partial row)
 // Returns number of data rows written (excludes header)
-long long gen_csv_linesafe(const std::string& path, long long target_mb, int cols, uint32_t seed=42) {
+long long gen_csv_linesafe(const std::string &path, long long target_mb, int cols, uint32_t seed = 42) {
     const long long target = mb_to_bytes(target_mb);
     std::mt19937 rng(seed);
     std::uniform_real_distribution<double> dist(0.0, 1e6);
 
     std::ofstream out(path, std::ios::out | std::ios::trunc);
-    if(!out) throw std::runtime_error("Cannot open CSV for write: " + path);
+    if (!out)
+        throw std::runtime_error("Cannot open CSV for write: " + path);
 
     // header
     std::ostringstream hdr;
-    for(int c=0;c<cols;c++){
-        hdr << "c" << (c+1);
-        if(c+1<cols) hdr << ",";
+    for (int c = 0; c < cols; c++) {
+        hdr << "c" << (c + 1);
+        if (c + 1 < cols)
+            hdr << ",";
     }
     hdr << "\n";
     const std::string header = hdr.str();
@@ -79,11 +84,12 @@ long long gen_csv_linesafe(const std::string& path, long long target_mb, int col
 
     // rows
     long long rows_written = 0;
-    while(true){
+    while (true) {
         std::ostringstream row;
-        for(int c=0;c<cols;c++){
+        for (int c = 0; c < cols; c++) {
             row << std::fixed << std::setprecision(6) << dist(rng);
-            if(c+1<cols) row << ",";
+            if (c + 1 < cols)
+                row << ",";
         }
         row << "\n";
         const std::string s = row.str();
@@ -91,23 +97,24 @@ long long gen_csv_linesafe(const std::string& path, long long target_mb, int col
         // check BEFORE writing (so we never need to truncate)
         auto pos = out.tellp();
         long long next = static_cast<long long>(pos) + static_cast<long long>(s.size());
-        if(next > target) break;
+        if (next > target)
+            break;
 
         out << s;
-        if(!out.good()) throw std::runtime_error("CSV write failed");
+        if (!out.good())
+            throw std::runtime_error("CSV write failed");
         ++rows_written;
     }
     out.close();
     return rows_written;
 }
 
-
 // ------------------------------------------------------------
 // Matrix Market generator (line-safe, correct nnz)
 // Returns n (matrix dimension; rows=cols=n)
 // We write the entries to a temp data file first to avoid keeping 1–2 GB in RAM,
 // then stitch the final file with a correct header.
-int gen_mm_linesafe(const std::string& out_path, long long target_mb, int n=200000, uint32_t seed=42) {
+int gen_mm_linesafe(const std::string &out_path, long long target_mb, int n = 200000, uint32_t seed = 42) {
     const long long target = mb_to_bytes(target_mb);
     const std::string tmp_data = out_path + ".data.tmp";
 
@@ -116,22 +123,25 @@ int gen_mm_linesafe(const std::string& out_path, long long target_mb, int n=2000
     std::uniform_real_distribution<double> uni_val(-1.0, 1.0);
 
     std::ofstream data(tmp_data, std::ios::out | std::ios::trunc);
-    if(!data) throw std::runtime_error("Cannot open temp MM data: " + tmp_data);
+    if (!data)
+        throw std::runtime_error("Cannot open temp MM data: " + tmp_data);
 
     long long bytes = 0;
     long long nnz = 0;
-    while(true){
+    while (true) {
         int i = uni_idx(rng);
         int j = uni_idx(rng);
-        double v = std::round(uni_val(rng)*1e6)/1e6;
+        double v = std::round(uni_val(rng) * 1e6) / 1e6;
 
         std::ostringstream line;
         line << i << " " << j << " " << std::fixed << std::setprecision(6) << v << "\n";
         auto s = line.str();
-        if(bytes + static_cast<long long>(s.size()) > target) break;
+        if (bytes + static_cast<long long>(s.size()) > target)
+            break;
 
         data << s;
-        if(!data.good()) throw std::runtime_error("MM write failed");
+        if (!data.good())
+            throw std::runtime_error("MM write failed");
         bytes += static_cast<long long>(s.size());
         ++nnz;
     }
@@ -139,9 +149,11 @@ int gen_mm_linesafe(const std::string& out_path, long long target_mb, int n=2000
 
     // Stitch final file with correct header
     std::ifstream in(tmp_data, std::ios::in | std::ios::binary);
-    if(!in) throw std::runtime_error("Cannot reopen temp MM data");
+    if (!in)
+        throw std::runtime_error("Cannot reopen temp MM data");
     std::ofstream out(out_path, std::ios::out | std::ios::trunc | std::ios::binary);
-    if(!out) throw std::runtime_error("Cannot open MM output: " + out_path);
+    if (!out)
+        throw std::runtime_error("Cannot open MM output: " + out_path);
 
     out << "%%MatrixMarket matrix coordinate real general\n%\n";
     out << n << " " << n << " " << nnz << "\n";
@@ -156,8 +168,8 @@ int gen_mm_linesafe(const std::string& out_path, long long target_mb, int n=2000
 // Parquet generator (Arrow C++; write row groups until size >= target)
 // Returns total row count written
 // NOTE: No appending. We keep the writer open and check sink->Tell() after each row group.
-long long gen_parquet_arrow(const std::string& path, long long target_mb, int cols,
-                            int64_t batch_rows = 250000, uint32_t seed = 42) {
+long long gen_parquet_arrow(const std::string &path, long long target_mb, int cols, int64_t batch_rows = 250000,
+                            uint32_t seed = 42) {
     const int64_t target = mb_to_bytes(target_mb);
 
     // Schema: cols of float64
@@ -172,12 +184,12 @@ long long gen_parquet_arrow(const std::string& path, long long target_mb, int co
     PARQUET_ASSIGN_OR_THROW(auto sink, arrow::io::FileOutputStream::Open(path));
 
     parquet::WriterProperties::Builder wpb;
-    wpb.compression(parquet::Compression::ZSTD);   // adjust if your toolchain lacks zstd
+    wpb.compression(parquet::Compression::ZSTD); // adjust if your toolchain lacks zstd
     auto writer_props = wpb.build();
 
     std::unique_ptr<parquet::arrow::FileWriter> writer;
-    PARQUET_THROW_NOT_OK(parquet::arrow::FileWriter::Open(
-        *schema, arrow::default_memory_pool(), sink, writer_props, &writer));
+    PARQUET_THROW_NOT_OK(
+        parquet::arrow::FileWriter::Open(*schema, arrow::default_memory_pool(), sink, writer_props, &writer));
 
     std::mt19937 rng(seed);
     std::uniform_real_distribution<double> dist(0.0, 1e6);
@@ -206,7 +218,8 @@ long long gen_parquet_arrow(const std::string& path, long long target_mb, int co
 
         // Check current file size without closing
         PARQUET_ASSIGN_OR_THROW(int64_t pos, sink->Tell());
-        if (pos >= target) break;
+        if (pos >= target)
+            break;
     }
 
     // Clean close
@@ -216,25 +229,27 @@ long long gen_parquet_arrow(const std::string& path, long long target_mb, int co
     return total_rows;
 }
 
-
 // ------------------------------------------------------------
-int main(int argc, char** argv){
+int main(int argc, char **argv) {
     // Minimal CLI
     std::string outdir;
     long long target_mb = 1500;
     int cols = 8;
 
-    for(int i=1;i<argc;i++){
+    for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
-        if(a=="--outdir" && i+1<argc) outdir = argv[++i];
-        else if(a=="--target-size-mb" && i+1<argc) target_mb = std::stoll(argv[++i]);
-        else if(a=="--cols" && i+1<argc) cols = std::stoi(argv[++i]);
-        else if(a=="-h" || a=="--help") {
+        if (a == "--outdir" && i + 1 < argc)
+            outdir = argv[++i];
+        else if (a == "--target-size-mb" && i + 1 < argc)
+            target_mb = std::stoll(argv[++i]);
+        else if (a == "--cols" && i + 1 < argc)
+            cols = std::stoi(argv[++i]);
+        else if (a == "-h" || a == "--help") {
             std::cout << "Usage: " << argv[0] << " --outdir DIR [--target-size-mb N] [--cols M]\n";
             return 0;
         }
     }
-    if(outdir.empty()){
+    if (outdir.empty()) {
         std::cerr << "[error] --outdir is required\n";
         return 1;
     }
@@ -246,8 +261,8 @@ int main(int argc, char** argv){
     }
 
     const std::string csv_path = outdir + "/gen.csv";
-    const std::string mm_path  = outdir + "/gen.mtx";
-    const std::string pq_path  = outdir + "/gen.parquet";
+    const std::string mm_path = outdir + "/gen.mtx";
+    const std::string pq_path = outdir + "/gen.parquet";
 
     try {
         /*std::cout << "[gen] Parquet -> " << pq_path << " (~" << target_mb << " MB)\n";
@@ -262,10 +277,9 @@ int main(int argc, char** argv){
         std::cout << "[gen] MM  -> " << mm_path  << " (~" << target_mb << " MB)\n";
         int mm_n = gen_mm_linesafe(mm_path, target_mb);
         write_meta(mm_path, mm_n, mm_n, "f64");*/
-        
 
         std::cout << "[done]\n" << csv_path << "\n" << pq_path << "\n" << mm_path << "\n";
-    } catch (const std::exception& ex){
+    } catch (const std::exception &ex) {
         std::cerr << "[error] " << ex.what() << "\n";
         return 2;
     }

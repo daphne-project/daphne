@@ -30,7 +30,6 @@
 
 static Frame *emptyFrame = DataObjectFactory::create<Frame>(0, 0, nullptr, nullptr, false);
 
-
 TEMPLATE_PRODUCT_TEST_CASE("Read CSV", TAG_KERNELS, (DenseMatrix), (double)) {
     using DT = TestType;
     DT *m = nullptr;

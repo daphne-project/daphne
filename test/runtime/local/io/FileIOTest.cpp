@@ -1,24 +1,24 @@
-#include <iostream>
 #include <catch.hpp>
+#include <iostream>
 
-#include <string>
-#include <filesystem>
-#include <dlfcn.h>
 #include <cstdint>
-#include <tags.h>
+#include <dlfcn.h>
+#include <filesystem>
+#include <string>
 #include <sys/resource.h>
+#include <tags.h>
 
+#include "runtime/local/context/DaphneContext.h"
+#include "runtime/local/datastructures/DataObjectFactory.h"
+#include "runtime/local/datastructures/DenseMatrix.h"
+#include "runtime/local/datastructures/Frame.h"
+#include "runtime/local/datastructures/ValueTypeCode.h"
 #include "runtime/local/io/FileIOCatalogParser.h"
 #include "runtime/local/io/FileIORegistry.h"
 #include "runtime/local/io/FileMetaData.h"
-#include "runtime/local/context/DaphneContext.h"
-#include "runtime/local/datastructures/Frame.h"
-#include "runtime/local/datastructures/DenseMatrix.h"
-#include "runtime/local/datastructures/DataObjectFactory.h"
-#include "runtime/local/datastructures/ValueTypeCode.h"
+#include <runtime/local/kernels/CreateFrame.h>
 #include <runtime/local/kernels/Read.h>
 #include <runtime/local/kernels/Write.h>
-#include <runtime/local/kernels/CreateFrame.h>
 
 #include <arrow/api.h>
 #include <arrow/io/api.h>
@@ -34,7 +34,7 @@ IODataType matrixHash = DENSEMATRIX;
 static const std::string CSV_FILE = "scripts/examples/extensions/csv/data.csv";
 static const std::string specialCSV = "scripts/examples/extensions/csv/specialCSV.csv";
 
-DaphneContext* ctx = nullptr;
+DaphneContext *ctx = nullptr;
 static Frame *emptyFrame = DataObjectFactory::create<Frame>(0, 0, nullptr, nullptr, false);
 FileIOCatalogParser parser;
 auto &registry = FileIORegistry::instance();
@@ -49,32 +49,27 @@ TEST_CASE("FileIOCatalogParser registers CSV plugin via registry", "[io][catalog
     loadBuiltInIOPlugins();
 
     // Should parse without throwing
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
 
     // Now registry should have reader and writer for .csv and Frame type
-    
+
     REQUIRE_NOTHROW(registry.getReader(".csv", matrixHash));
     REQUIRE_NOTHROW(registry.getWriter(".csv", matrixHash));
     registry.resetToBaseline();
 }
 
 TEST_CASE("FileIORegistry registerReader and getReader", "[io][registry]") {
-    
+
     IOOptions opts;
 
     // Register a dummy reader for Frame type
     registry.registerReader(
-        ".test",
-        frameHash,
-        opts,
-        [](void* res, const FileMetaData &fmd, const char* filename, IOOptions opts, DaphneContext* ctx) {
+        ".test", frameHash, opts,
+        [](void *res, const FileMetaData &fmd, const char *filename, IOOptions opts, DaphneContext *ctx) {
             // no-op
-        }
-    );
+        });
 
-    SECTION("Lookup existing reader succeeds") {
-        REQUIRE_NOTHROW(registry.getReader(".test", frameHash));
-    }
+    SECTION("Lookup existing reader succeeds") { REQUIRE_NOTHROW(registry.getReader(".test", frameHash)); }
 
     SECTION("Lookup non-registered reader throws") {
         REQUIRE_THROWS_AS(registry.getReader(".unknown", frameHash), std::out_of_range);
@@ -84,8 +79,8 @@ TEST_CASE("FileIORegistry registerReader and getReader", "[io][registry]") {
 
 TEST_CASE("FileIO Plugin dynamic load and registration validity", "[io][plugin]") {
     // The parser already loads and registers the plugin
-    
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
+
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
 
     // Verify registry lookups work
     auto reader = registry.getReader(".csv", matrixHash);
@@ -114,19 +109,19 @@ TEST_CASE("FileIO csv_read loads numeric CSV into DenseMatrix<int32_t>", "[csv][
     IOOptions opts;
 
     // Register the CSV plugin
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
-    auto reader = registry.getReader(".csv", matrixHash,"Daphne");
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
+    auto reader = registry.getReader(".csv", matrixHash, "Daphne");
 
     // Invoke reader
-    Structure* res = nullptr;
+    Structure *res = nullptr;
     // Create metadata: rows=2, cols=2, single value type int32
     FileMetaData fmd(2, 2, true, ValueTypeCode::SI32);
-    DaphneContext* ctx = nullptr;
+    DaphneContext *ctx = nullptr;
     REQUIRE_NOTHROW(reader(&res, fmd, csvPath.c_str(), opts, ctx));
 
     // Check result matrix
-    auto *mat = dynamic_cast<DenseMatrix<int32_t>*>(res);
-    //REQUIRE(mat != nullptr);
+    auto *mat = dynamic_cast<DenseMatrix<int32_t> *>(res);
+    // REQUIRE(mat != nullptr);
     REQUIRE(mat->getNumRows() == 2);
     REQUIRE(mat->getNumCols() == 2);
     const int32_t *data = mat->getValues();
@@ -142,18 +137,19 @@ TEST_CASE("FileIO csv_write writes DenseMatrix<double> to CSV", "[csv][write]") 
     size_t rows = 2, cols = 2;
     auto *mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, false);
     double *vals = mat->getValues();
-    vals[0] = 1.5; vals[1] = 2.5;
-    vals[2] = 3.5; vals[3] = 4.5;
+    vals[0] = 1.5;
+    vals[1] = 2.5;
+    vals[2] = 3.5;
+    vals[3] = 4.5;
 
     // Prepare output file path
     auto tempDir = std::filesystem::temp_directory_path();
     auto outPath = tempDir / "test_write.csv";
 
-    //IOOptions opts;
-
+    // IOOptions opts;
 
     // Register the CSV plugin
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
 
     write(mat, outPath.c_str(), emptyFrame, ctx);
     // Read back file
@@ -168,15 +164,14 @@ TEST_CASE("FileIO csv_write writes DenseMatrix<double> to CSV", "[csv][write]") 
     REQUIRE(lines[0] == "1.5,2.5");
     REQUIRE(lines[1] == "3.5,4.5");
     registry.resetToBaseline();
-
 }
 
-TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader via Registry and Read kernel for matrix", TAG_IO, (DenseMatrix), (std::string)) {
+TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader via Registry and Read kernel for matrix", TAG_IO, (DenseMatrix),
+                           (std::string)) {
     using DT = TestType;
     DT *m = nullptr;
 
-
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
 
     REQUIRE_NOTHROW(read(m, CSV_FILE.c_str(), emptyFrame, nullptr));
 
@@ -185,32 +180,31 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader via Registry and Read kernel for m
     REQUIRE(m->getNumCols() == 3);
 
     // Check values (all read as strings)
-    CHECK(m->get(0,0) == "Alice");
-    CHECK(m->get(0,1) == "30");
-    CHECK(m->get(0,2) == "60000.0");
+    CHECK(m->get(0, 0) == "Alice");
+    CHECK(m->get(0, 1) == "30");
+    CHECK(m->get(0, 2) == "60000.0");
 
-    CHECK(m->get(1,0) == "Bob");
-    CHECK(m->get(1,1) == "25");
-    CHECK(m->get(1,2) == "55000.5");
+    CHECK(m->get(1, 0) == "Bob");
+    CHECK(m->get(1, 1) == "25");
+    CHECK(m->get(1, 2) == "55000.5");
 
-    CHECK(m->get(2,0) == "Charlie");
-    CHECK(m->get(2,1) == "35");
-    CHECK(m->get(2,2) == "70000.75");
+    CHECK(m->get(2, 0) == "Charlie");
+    CHECK(m->get(2, 1) == "35");
+    CHECK(m->get(2, 2) == "70000.75");
 
     // Clean up
     DataObjectFactory::destroy(m);
     registry.resetToBaseline();
-
 }
 
 TEST_CASE("FileIOCatalogParser parses options correctly", "[io][catalog]") {
     // Parse the catalog
 
     // Retrieve the parsed options from the registry
-    
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
 
-    IOOptions opts = registry.getOptions(".csv", IODataType::DENSEMATRIX,"Daphne");
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
+
+    IOOptions opts = registry.getOptions(".csv", IODataType::DENSEMATRIX, "Daphne");
 
     // Validate options fields
 
@@ -221,22 +215,22 @@ TEST_CASE("FileIOCatalogParser parses options correctly", "[io][catalog]") {
     FileIORegistry::instance().resetToBaseline();
 }
 
-
-TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header using options Frame", TAG_IO, (DenseMatrix), (std::string)) {
+TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header using options Frame", TAG_IO,
+                           (DenseMatrix), (std::string)) {
     using DT = TestType;
     DT *m = nullptr;
 
     // Parse catalog (to simulate normal system setup)
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH,registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
 
     // Create override options in a Frame
-    std::vector<Structure*> columns(2);
+    std::vector<Structure *> columns(2);
 
-    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
-    auto* valCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    auto *keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    auto *valCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
 
-    auto* val1 = keyCol->getValues();
-    auto* val2 = valCol->getValues();
+    auto *val1 = keyCol->getValues();
+    auto *val2 = valCol->getValues();
 
     val1[0] = "false";
     val2[0] = "!";
@@ -244,9 +238,9 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header u
     columns[0] = keyCol;
     columns[1] = valCol;
 
-    const char* labels[2] = {"hasHeader", "delimiter"};
+    const char *labels[2] = {"hasHeader", "delimiter"};
 
-    Frame* optsFrame = nullptr;
+    Frame *optsFrame = nullptr;
     createFrame(optsFrame, columns.data(), 2, labels, 2, ctx);
 
     // Read CSV using the options Frame
@@ -256,16 +250,16 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header u
     REQUIRE(m->getNumRows() == 3);
     REQUIRE(m->getNumCols() == 3);
 
-    CHECK(m->get(0,0) == "Alice");
-    CHECK(m->get(0,1) == "30");
-    CHECK(m->get(0,2) == "60000.0");
+    CHECK(m->get(0, 0) == "Alice");
+    CHECK(m->get(0, 1) == "30");
+    CHECK(m->get(0, 2) == "60000.0");
 
-    CHECK(m->get(1,0) == "Bob");
-    CHECK(m->get(1,1) == "25");
-    CHECK(m->get(1,2) == "55000.5");
+    CHECK(m->get(1, 0) == "Bob");
+    CHECK(m->get(1, 1) == "25");
+    CHECK(m->get(1, 2) == "55000.5");
 
-    CHECK(m->get(2,1) == "35");
-    CHECK(m->get(2,2) == "70000.75");
+    CHECK(m->get(2, 1) == "35");
+    CHECK(m->get(2, 2) == "70000.75");
 
     // Step 6: Cleanup
     DataObjectFactory::destroy(m);
@@ -277,11 +271,9 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO ReadParquet, DenseMatrix", TAG_IO, (DenseMatr
     using DT = TestType;
     DT *m = nullptr;
     FileIORegistry::instance().resetToBaseline();
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json",registry));
-
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry));
 
     read(m, "./test/runtime/local/io/ReadParquet1.parquet", emptyFrame, ctx);
-  
 
     CHECK(m->get(0, 0) == -0.1);
     CHECK(m->get(0, 1) == -0.2);
@@ -292,7 +284,7 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO ReadParquet, DenseMatrix", TAG_IO, (DenseMatr
     CHECK(m->get(1, 1) == 5.41);
     CHECK(m->get(1, 2) == 6.22216);
     CHECK(m->get(1, 3) == 5);
-    
+
     FileIORegistry::instance().resetToBaseline();
     DataObjectFactory::destroy(m);
 }
@@ -301,13 +293,16 @@ TEST_CASE("FileIO parquet_write_frame writes Frame to Parquet", "[parquet][write
     const size_t rows = 2;
     const size_t cols = 3;
 
-    auto *c0 = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, 1, /*alloc*/false);
-    auto *c1 = DataObjectFactory::create<DenseMatrix<double>>( rows, 1, /*alloc*/false);
-    auto *c2 = DataObjectFactory::create<DenseMatrix<std::string>>(rows, 1, /*alloc*/false);
+    auto *c0 = DataObjectFactory::create<DenseMatrix<int32_t>>(rows, 1, /*alloc*/ false);
+    auto *c1 = DataObjectFactory::create<DenseMatrix<double>>(rows, 1, /*alloc*/ false);
+    auto *c2 = DataObjectFactory::create<DenseMatrix<std::string>>(rows, 1, /*alloc*/ false);
 
-    c0->getValues()[0] = 1;   c0->getValues()[1] = 2;
-    c1->getValues()[0] = 1.5; c1->getValues()[1] = 2.5;
-    c2->getValues()[0] = "a"; c2->getValues()[1] = "b";
+    c0->getValues()[0] = 1;
+    c0->getValues()[1] = 2;
+    c1->getValues()[0] = 1.5;
+    c1->getValues()[1] = 2.5;
+    c2->getValues()[0] = "a";
+    c2->getValues()[1] = "b";
 
     Structure *dataCols[3] = {c0, c1, c2};
     const char *dataLabels[3] = {"id", "value", "name"};
@@ -321,19 +316,20 @@ TEST_CASE("FileIO parquet_write_frame writes Frame to Parquet", "[parquet][write
 
     // Temp output path
     auto outPath = std::filesystem::temp_directory_path() / "test_frame_write.parquet";
-    if (std::filesystem::exists(outPath)) std::filesystem::remove(outPath);
+    if (std::filesystem::exists(outPath))
+        std::filesystem::remove(outPath);
 
     // Register catalog (must map ".parquet"+"Frame" to parquet_write_frame)
 
     REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry));
 
-    std::vector<Structure*> columns(1);
-    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
-    auto* val1 = keyCol->getValues();
+    std::vector<Structure *> columns(1);
+    auto *keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    auto *val1 = keyCol->getValues();
     val1[0] = "Daphne";
     columns[0] = keyCol;
-    const char* labels[1] = {"engine"};
-    Frame* optsFrame = nullptr;
+    const char *labels[1] = {"engine"};
+    Frame *optsFrame = nullptr;
     createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
 
     // ---------- Act ----------
@@ -392,12 +388,14 @@ TEST_CASE("FileIO parquet_write_frame writes Frame to Parquet", "[parquet][write
 TEST_CASE("FileIO parquet_write writes DenseMatrix<double> to Parquet", "[parquet][write]") {
     // --- Arrange ---
     const size_t rows = 2, cols = 2;
-    auto *mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, /*alloc*/false);
+    auto *mat = DataObjectFactory::create<DenseMatrix<double>>(rows, cols, /*alloc*/ false);
     double *vals = mat->getValues();
     // Row-major: [ [1.5, 2.5],
     //              [3.5, 4.5] ]
-    vals[0] = 1.5; vals[1] = 2.5;
-    vals[2] = 3.5; vals[3] = 4.5;
+    vals[0] = 1.5;
+    vals[1] = 2.5;
+    vals[2] = 3.5;
+    vals[3] = 4.5;
 
     auto tempDir = std::filesystem::temp_directory_path();
     auto outPath = tempDir / "test_write.parquet";
@@ -407,13 +405,13 @@ TEST_CASE("FileIO parquet_write writes DenseMatrix<double> to Parquet", "[parque
     // Registry + catalog (must include the parquet_write symbol mapping)
     REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry));
 
-    std::vector<Structure*> columns(1);
-    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
-    auto* val1 = keyCol->getValues();
+    std::vector<Structure *> columns(1);
+    auto *keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    auto *val1 = keyCol->getValues();
     val1[0] = "Daphne";
     columns[0] = keyCol;
-    const char* labels[1] = {"engine"};
-    Frame* optsFrame = nullptr;
+    const char *labels[1] = {"engine"};
+    Frame *optsFrame = nullptr;
     createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
 
     // --- Act: write via generic write() that dispatches through the registry ---
@@ -457,38 +455,38 @@ TEST_CASE("FileIO parquet_write writes DenseMatrix<double> to Parquet", "[parque
 static std::atomic<int> MYREADER_CALLS{0};
 static std::atomic<int> YOURREADER_CALLS{0};
 
-
-static void myReader(void* res, const FileMetaData&, const char*, const IOOptions&, DaphneContext*) {
+static void myReader(void *res, const FileMetaData &, const char *, const IOOptions &, DaphneContext *) {
     MYREADER_CALLS.fetch_add(1);
-    *reinterpret_cast<Frame**>(res) = DataObjectFactory::create<Frame>(0,0,nullptr,nullptr,false);
+    *reinterpret_cast<Frame **>(res) = DataObjectFactory::create<Frame>(0, 0, nullptr, nullptr, false);
 }
-static void yourReader(void* res, const FileMetaData&, const char*, const IOOptions&, DaphneContext*) {
+static void yourReader(void *res, const FileMetaData &, const char *, const IOOptions &, DaphneContext *) {
     YOURREADER_CALLS.fetch_add(1);
-    *reinterpret_cast<Frame**>(res) = DataObjectFactory::create<Frame>(0,0,nullptr,nullptr,false);
+    *reinterpret_cast<Frame **>(res) = DataObjectFactory::create<Frame>(0, 0, nullptr, nullptr, false);
 }
 
 TEST_CASE("FileIO Direct call proves selected engine runs") {
     auto &reg = FileIORegistry::instance();
     reg.resetToBaseline();
-    MYREADER_CALLS = 0; YOURREADER_CALLS = 0;
+    MYREADER_CALLS = 0;
+    YOURREADER_CALLS = 0;
 
     IOOptions opts;
     // Register both engines for the same (.csv, FRAME)
-    reg.registerReader(".csv", IODataType::FRAME, "myReader", 5,  opts, myReader);
-    reg.registerReader(".csv", IODataType::FRAME, "yourReader",10, opts, yourReader);
+    reg.registerReader(".csv", IODataType::FRAME, "myReader", 5, opts, myReader);
+    reg.registerReader(".csv", IODataType::FRAME, "yourReader", 10, opts, yourReader);
 
-    std::vector<Structure*> columns(1);
-    auto* keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
-    auto* val1 = keyCol->getValues();
+    std::vector<Structure *> columns(1);
+    auto *keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
+    auto *val1 = keyCol->getValues();
     val1[0] = "myReader";
     columns[0] = keyCol;
-    const char* labels[1] = {"engine"};
-    Frame* optsFrame = nullptr;
+    const char *labels[1] = {"engine"};
+    Frame *optsFrame = nullptr;
     createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
 
     // ----- A) No engine hint -> highest priority -> yourReader -----
     {
-        Frame* out = nullptr;
+        Frame *out = nullptr;
         REQUIRE_NOTHROW(read(out, CSV_FILE.c_str(), emptyFrame, ctx));
         REQUIRE(YOURREADER_CALLS.load() == 1);
         REQUIRE(MYREADER_CALLS.load() == 0);
@@ -497,7 +495,7 @@ TEST_CASE("FileIO Direct call proves selected engine runs") {
 
     // ----- B) Explicit engine -> myReader even if lower priority -----
     {
-        Frame* out = nullptr;
+        Frame *out = nullptr;
         read(out, CSV_FILE.c_str(), optsFrame, ctx);
         REQUIRE(YOURREADER_CALLS.load() == 1);
         REQUIRE(MYREADER_CALLS.load() == 1);
@@ -510,8 +508,8 @@ TEST_CASE("FileIO Direct call proves selected engine runs") {
 TEST_CASE("FileIO Duplicate Registration is rejected") {
     IOOptions opts;
 
-    registry.registerReader(".csv", IODataType::FRAME, "myReader", 5,  opts, myReader);
-    REQUIRE_THROWS( registry.registerReader(".csv", IODataType::FRAME, "myReader",5, opts, yourReader));
+    registry.registerReader(".csv", IODataType::FRAME, "myReader", 5, opts, myReader);
+    REQUIRE_THROWS(registry.registerReader(".csv", IODataType::FRAME, "myReader", 5, opts, yourReader));
 
     registry.resetToBaseline();
 }
@@ -519,8 +517,9 @@ TEST_CASE("FileIO Duplicate Registration is rejected") {
 TEST_CASE("FileIO Duplicate lazy Registration is rejected") {
     IOOptions opts;
 
-    registry.registerLazy(".csv", IODataType::FRAME,"lib.so", "myReader", "mywriter", opts, "daphne",5);
-    REQUIRE_THROWS( registry.registerLazy(".csv", IODataType::FRAME, "lib.so", "myReader", "mywriter", opts, "daphne", 5));
+    registry.registerLazy(".csv", IODataType::FRAME, "lib.so", "myReader", "mywriter", opts, "daphne", 5);
+    REQUIRE_THROWS(
+        registry.registerLazy(".csv", IODataType::FRAME, "lib.so", "myReader", "mywriter", opts, "daphne", 5));
 
     registry.resetToBaseline();
 }

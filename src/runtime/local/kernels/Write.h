@@ -41,7 +41,7 @@
 // ****************************************************************************
 
 template <class DTArg> struct Write {
-    static void apply(const DTArg *arg, const char *filename, Frame* opts, DCTX(ctx)) = delete;
+    static void apply(const DTArg *arg, const char *filename, Frame *opts, DCTX(ctx)) = delete;
 };
 
 // ****************************************************************************
@@ -64,7 +64,7 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
     static void apply(const DenseMatrix<VT> *arg, const char *filename, Frame *optsFrame, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
         try {
-            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
+            auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
             IODataType typeHash = DENSEMATRIX;
             std::string engine = extractEngineFromFrame(optsFrame);
             auto writer = registry.getWriter(ext, typeHash, engine);
@@ -74,13 +74,12 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
 
             // Merge user overrides from optsFrame
             IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
-            
+
             writer(arg, fmd, filename, mergedOpts, ctx);
-            //std::cout << "using registry\n";
+            // std::cout << "using registry\n";
             return;
-        }
-        catch (const std::out_of_range &e) {
-             std::cerr << "no suitable writer found in the registry";
+        } catch (const std::out_of_range &e) {
+            std::cerr << "no suitable writer found in the registry";
         }
 #if USE_HDFS
         if (ext == ".hdfs") {
@@ -110,7 +109,7 @@ template <> struct Write<Frame> {
         std::string ext(std::filesystem::path(filename).extension());
 
         try {
-            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
+            auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
             IODataType typeHash = FRAME;
             std::string engine = extractEngineFromFrame(optsFrame);
             auto writer = registry.getWriter(ext, typeHash, engine);
@@ -120,7 +119,7 @@ template <> struct Write<Frame> {
                 vtcs.push_back(arg->getSchema()[i]);
                 labels.push_back(arg->getLabels()[i]);
             }
-            FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), false, vtcs, labels);            
+            FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), false, vtcs, labels);
             MetaDataParser::writeMetaData(filename, fmd);
 
             // Merge user overrides from optsFrame
@@ -128,8 +127,7 @@ template <> struct Write<Frame> {
 
             writer(arg, fmd, filename, mergedOpts, ctx);
             return;
-        }
-        catch (const std::out_of_range &e) {
+        } catch (const std::out_of_range &e) {
             throw std::runtime_error("No suitable writer found in the registry");
         }
     }
@@ -143,7 +141,7 @@ template <typename VT> struct Write<Matrix<VT>> {
     static void apply(const Matrix<VT> *arg, const char *filename, Frame *optsFrame, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
         try {
-            auto& registry = ctx ? ctx->config.registry : FileIORegistry::instance();  
+            auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
             IODataType typeHash = CSRMATRIX;
             std::string engine = extractEngineFromFrame(optsFrame);
             auto writer = registry.getWriter(ext, typeHash, engine);
@@ -153,14 +151,12 @@ template <typename VT> struct Write<Matrix<VT>> {
 
             // Merge user overrides from optsFrame
             IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
-            
+
             writer(arg, fmd, filename, mergedOpts, ctx);
             return;
-        }
-        catch (const std::out_of_range &e) {
+        } catch (const std::out_of_range &e) {
             throw std::runtime_error("no suitable writer found in the registry");
         }
-            
     }
 };
 
