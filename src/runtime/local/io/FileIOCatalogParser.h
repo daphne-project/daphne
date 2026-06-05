@@ -1,67 +1,70 @@
 #pragma once
 #include "runtime/local/io/FileIORegistry.h"
-#include <nlohmannjson/json.hpp>
+#include <dlfcn.h>
 #include <filesystem>
 #include <fstream>
-#include <stdexcept>
-#include <dlfcn.h>
+#include <nlohmannjson/json.hpp>
+#include <optional>
 #include <runtime/local/datastructures/Frame.h>
+#include <stdexcept>
 #include <string>
-#include <optional>  
 
 /**
- * @brief Parses a JSON catalog of I/O plugins, discovers its reader/writer functions by name, and registers them as lazy
+ * @brief Parses a JSON catalog of I/O plugins, discovers its reader/writer functions by name, and registers them as
+ * lazy
  */
 class FileIOCatalogParser {
-public:
+  public:
     FileIOCatalogParser() = default;
 
     /**
      * Parses the given JSON file and registers each plugin's reader & writer.
      * @param filePath Path to the catalog JSON
      */
-    void parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry, std::optional<int> promptPriority = std::nullopt) const;
+    void parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry,
+                            std::optional<int> promptPriority = std::nullopt) const;
 };
 
-inline void FileIOCatalogParser::parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry, std::optional<int> promptPriority) const {
+inline void FileIOCatalogParser::parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry,
+                                                    std::optional<int> promptPriority) const {
     namespace fs = std::filesystem;
     fs::path dir = fs::path(filePath).parent_path();
 
     std::ifstream in(filePath);
-    if(!in.good())
+    if (!in.good())
         throw std::runtime_error("Could not open I/O catalog: " + filePath);
 
     // Parse JSON array of plugin entries
     nlohmann::json jsonData = nlohmann::json::parse(in);
-    for(const auto &entry : jsonData) {
+    for (const auto &entry : jsonData) {
         // Read metadata
-        const std::string ext      = entry.at("extension").get<std::string>();
-        const std::string rdrName  = entry.at("readerFuncName").get<std::string>();
-        const std::string wtrName  = entry.at("writerFuncName").get<std::string>();
-        const std::string libRel   = entry.at("libPath").get<std::string>();
-        const std::string libPath  = (dir / libRel).string();
+        const std::string ext = entry.at("extension").get<std::string>();
+        const std::string rdrName = entry.at("readerFuncName").get<std::string>();
+        const std::string wtrName = entry.at("writerFuncName").get<std::string>();
+        const std::string libRel = entry.at("libPath").get<std::string>();
+        const std::string libPath = (dir / libRel).string();
         const std::string engine = entry.value("engine", "default");
 
         int jsonPriority = entry.value("priority", 0);
-        int effPriority  = promptPriority.has_value() ? *promptPriority : jsonPriority;
+        int effPriority = promptPriority.has_value() ? *promptPriority : jsonPriority;
 
-        const std::string typeName  = entry.value("type", "Frame");
+        const std::string typeName = entry.value("type", "Frame");
 
         // Map typeName string to actual type_info
         IODataType typeHash;
-        if(typeName == "Frame") {
+        if (typeName == "Frame") {
             typeHash = FRAME;
-        } else if(typeName == "DenseMatrix") {
+        } else if (typeName == "DenseMatrix") {
             typeHash = DENSEMATRIX;
-        } else if(typeName == "CSRMatrix") {
+        } else if (typeName == "CSRMatrix") {
             typeHash = CSRMATRIX;
         } else {
             throw std::runtime_error("Unknown type in I/O catalog: " + typeName);
         }
 
         IOOptions opts;
-        if(auto it = entry.find("options"); it != entry.end()) {
-            for(auto jt = it->begin(); jt != it->end(); ++jt) {
+        if (auto it = entry.find("options"); it != entry.end()) {
+            for (auto jt = it->begin(); jt != it->end(); ++jt) {
                 // Each key/value in JSON becomes a string→string pair
                 // e.g. "delimiter":"", "hasHeader":"", etc.
                 opts.extra[jt.key()] = jt.value().get<std::string>();
@@ -69,6 +72,5 @@ inline void FileIOCatalogParser::parseFileIOCatalog(const std::string &filePath,
         }
 
         registry.registerLazy(ext, typeHash, libPath, rdrName, wtrName, opts, engine, effPriority);
-
     }
 }
