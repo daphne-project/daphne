@@ -217,8 +217,7 @@ class FileIORegistry {
             IODataType dt = static_cast<IODataType>(std::get<2>(k));
             int prio = std::get<3>(k);
             os << "  [lazy  ] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
-               << "'  priority=" << prio << "  symbol='" << spec.readerSymbol << "'"
-               << "  lib='" << spec.libPath << "'"
+               << "'  priority=" << prio << "  symbol='" << spec.readerSymbol << "'" << "  lib='" << spec.libPath << "'"
                << "\n";
         }
         os << std::flush;
@@ -266,8 +265,7 @@ class FileIORegistry {
             IODataType dt = static_cast<IODataType>(std::get<2>(k));
             int prio = std::get<3>(k);
             os << "  [lazy  ] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
-               << "'  priority=" << prio << "  symbol='" << spec.writerSymbol << "'"
-               << "  lib='" << spec.libPath << "'"
+               << "'  priority=" << prio << "  symbol='" << spec.writerSymbol << "'" << "  lib='" << spec.libPath << "'"
                << "\n";
         }
         os << std::flush;
