@@ -17,6 +17,7 @@
 #ifndef SRC_RUNTIME_LOCAL_KERNELS_GROUPJOIN_H
 #define SRC_RUNTIME_LOCAL_KERNELS_GROUPJOIN_H
 
+#include "ir/daphneir/Daphne.h"
 #include <runtime/local/context/DaphneContext.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
@@ -25,8 +26,12 @@
 #include <runtime/local/datastructures/ValueTypeUtils.h>
 
 #include <stdexcept>
+#include <string>
 #include <tuple>
+#include <type_traits>
 #include <unordered_map>
+#include <variant>
+#include <vector>
 
 #include <cstddef>
 #include <cstdint>
@@ -40,98 +45,88 @@
 // ****************************************************************************
 // TODO Maybe this should be a kernel on its own.
 
-template <typename VTLhs, typename VTRhs, typename VTAgg, typename VTTid>
-void groupJoinCol(
-    // results
-    Frame *&res, DenseMatrix<VTTid> *&resLhsTid,
-    // arguments
-    const DenseMatrix<VTLhs> *argLhs, const DenseMatrix<VTRhs> *argRhs, const DenseMatrix<VTAgg> *argAgg,
-    // context
-    DCTX(ctx)) {
-    if (argLhs->getNumCols() != 1)
-        throw std::runtime_error("parameter argLhs must be a single-column matrix");
-    if (argRhs->getNumCols() != 1)
-        throw std::runtime_error("parameter argRhs must be a single-column matrix");
-    if (argAgg->getNumCols() != 1)
-        throw std::runtime_error("parameter argAgg must be a single-column matrix");
-    if (argRhs->getNumRows() != argAgg->getNumRows())
-        throw std::runtime_error("parameters argRhs and argAgg must have the same number of rows");
+using AggValue = std::variant<int64_t, uint64_t, double, std::string>;
 
-    std::unordered_map<VTLhs, std::tuple<size_t, VTAgg, bool>> ht;
+struct AggState {
+    const char *col;
+    mlir::daphne::GroupEnum func;
+    ValueTypeCode inputType;
+    ValueTypeCode outputType;
+    std::string label;
+    AggValue value = int64_t{0};
+    size_t count = 0;         // for COUNT and AVG
+    bool initialized = false; // for MIN and MAX
+};
 
-    // ------------------------------------------------------------------------
-    // Build phase on argLhs.
-    // ------------------------------------------------------------------------
-    const size_t numArgLhs = argLhs->getNumRows();
-    for (size_t i = 0; i < numArgLhs; i++)
-        ht.emplace(argLhs->get(i, 0), std::make_tuple(i, 0, false));
+struct JoinState {
+    size_t lhsRow;
+    bool matched;
+    std::vector<AggState> aggStates;
 
-    // ------------------------------------------------------------------------
-    // Probe phase on argRhs.
-    // ------------------------------------------------------------------------
-    const size_t numArgRhs = argRhs->getNumRows();
-    for (size_t i = 0; i < numArgRhs; i++) {
-        auto it = ht.find(argRhs->get(i, 0));
-        if (it != ht.end()) {
-            std::get<1>(it->second) += argAgg->get(i, 0);
-            std::get<2>(it->second) = true;
+    JoinState(size_t lhsRow, std::vector<AggState> aggStates)
+        : lhsRow(lhsRow), matched(false), aggStates(std::move(aggStates)) {}
+};
+
+template <typename VTAgg> void updateAggState(AggState &aggState, VTAgg value) {
+    using mlir::daphne::GroupEnum;
+    switch (aggState.func) {
+    case GroupEnum::COUNT:
+        aggState.value = std::get<uint64_t>(aggState.value) + uint64_t{1};
+        break;
+    case GroupEnum::SUM:
+        aggState.value += value;
+        break;
+    case GroupEnum::MIN:
+        if (!aggState.initialized) {
+            aggState.value = value;
+            aggState.initialized = true;
         }
-    }
-
-    // ------------------------------------------------------------------------
-    // Output phase.
-    // ------------------------------------------------------------------------
-
-    // Determine the number of output rows.
-    size_t numRes = 0;
-    for (auto it = ht.begin(); it != ht.end(); it++)
-        if (std::get<2>(it->second))
-            numRes++;
-
-    // Create the output data objects.
-    if (res == nullptr) {
-        ValueTypeCode schema[] = {ValueTypeUtils::codeFor<VTLhs>, ValueTypeUtils::codeFor<VTAgg>};
-        res = DataObjectFactory::create<Frame>(numRes, 2, schema, nullptr, false);
-    }
-    auto resLhs = res->getColumn<VTLhs>(0);
-    auto resAgg = res->getColumn<VTAgg>(1);
-    if (resLhsTid == nullptr)
-        resLhsTid = DataObjectFactory::create<DenseMatrix<VTTid>>(numRes, 1, false);
-
-    // Write the results.
-    size_t pos = 0;
-    for (auto it = ht.begin(); it != ht.end(); it++)
-        if (std::get<2>(it->second)) {
-            resLhs->set(pos, 0, it->first);
-            resAgg->set(pos, 0, std::get<1>(it->second));
-            resLhsTid->set(pos, 0, std::get<0>(it->second));
-            pos++;
+        aggState.value = std::min(aggState.value, value);
+        break;
+    case GroupEnum::MAX:
+        if (!aggState.initialized) {
+            aggState.value = value;
+            aggState.initialized = true;
         }
-
-    // Free intermediate data objects.
-    // TODO This is not possible at the moment due to a bug in Frame (ownership
-    // of the underlying data is not shared correctly).
-    //    DataObjectFactory::destroy(resLhs);
-    //    DataObjectFactory::destroy(resAgg);
+        aggState.value = std::max(aggState.value, value);
+        break;
+    case GroupEnum::AVG:
+        aggState.value += value;
+        aggState.count++;
+        break;
+    }
 }
 
-template <typename VTLhs, typename VTRhs, typename VTAgg, typename VTTid>
-void groupJoinColIf(
-    // value type known only at run-time
-    ValueTypeCode vtcLhs, ValueTypeCode vtcRhs, ValueTypeCode vtcAgg,
-    // results
-    Frame *&res, DenseMatrix<VTTid> *&resLhsTid,
-    // input frames
-    const Frame *lhs, const Frame *rhs,
-    // input column names
-    const char *lhsOn, const char *rhsOn, const char *rhsAgg,
-    // context
-    DCTX(ctx)) {
-    if (vtcLhs == ValueTypeUtils::codeFor<VTLhs> && vtcRhs == ValueTypeUtils::codeFor<VTRhs> &&
-        vtcAgg == ValueTypeUtils::codeFor<VTAgg>) {
-        groupJoinCol<VTLhs, VTRhs, VTAgg, VTTid>(res, resLhsTid, lhs->getColumn<VTLhs>(lhsOn),
-                                                 rhs->getColumn<VTRhs>(rhsOn), rhs->getColumn<VTAgg>(rhsAgg), ctx);
+template <typename VTAgg>
+bool groupJoinColIf(ValueTypeCode vtcAgg, AggState &aggState, const Frame *rhs, size_t rhsRow, DCTX(ctx)) {
+    if (vtcAgg != ValueTypeUtils::codeFor<VTAgg>)
+        return false;
+    updateAggState<VTAgg>(aggState, rhs->getColumn<VTAgg>(aggState.col)->get(rhsRow, 0));
+    return true;
+}
+
+inline AggValue initAggValue(mlir::daphne::GroupEnum func, ValueTypeCode inputType) {
+    using mlir::daphne::GroupEnum;
+    switch (func) {
+    case GroupEnum::COUNT:
+        return uint64_t(0);
+    case GroupEnum::AVG:
+        return double(0);
+    case GroupEnum::SUM:
+    case GroupEnum::MIN:
+    case GroupEnum::MAX:
+        switch (inputType) {
+        case ValueTypeCode::SI64:
+            return int64_t(0);
+        case ValueTypeCode::UI64:
+            return uint64_t(0);
+        case ValueTypeCode::F64:
+            return double(0);
+        default:
+            throw std::runtime_error("unsupported aggregate column value type in groupJoin");
+        }
     }
+    throw std::runtime_error("unsupported aggregation function in groupJoin");
 }
 
 // ****************************************************************************
@@ -145,25 +140,77 @@ void groupJoin(
     // input frames
     const Frame *lhs, const Frame *rhs,
     // input column names
-    const char *lhsOn, const char *rhsOn, const char *rhsAgg,
+    const char *lhsOn, const char *rhsOn,
+    // input aggs
+    const char **rhsCols, size_t numRhsCols, mlir::daphne::GroupEnum *rhsAggFuncs, size_t numRhsAggFuncs,
     // context
     DCTX(ctx)) {
     // Find out the value types of the columns to process.
     ValueTypeCode vtcLhsOn = lhs->getColumnType(lhsOn);
     ValueTypeCode vtcRhsOn = rhs->getColumnType(rhsOn);
-    ValueTypeCode vtcRhsAgg = rhs->getColumnType(rhsAgg);
+    if (numRhsCols != numRhsAggFuncs)
+        throw std::runtime_error("number of aggregate columns and aggregate functions must match");
+    if (vtcLhsOn != ValueTypeUtils::codeFor<int64_t> || vtcRhsOn != ValueTypeUtils::codeFor<int64_t>)
+        throw std::runtime_error("groupJoin currently supports only int64_t join key columns");
 
-    // Call the groupJoin-kernel on columns for the actual combination of
-    // value types.
-    // Repeat this for all type combinations...
-    groupJoinColIf<int64_t, int64_t, double, VTLhsTid>(vtcLhsOn, vtcRhsOn, vtcRhsAgg, res, lhsTid, lhs, rhs, lhsOn,
-                                                       rhsOn, rhsAgg, ctx);
-    groupJoinColIf<int64_t, int64_t, int64_t, VTLhsTid>(vtcLhsOn, vtcRhsOn, vtcRhsAgg, res, lhsTid, lhs, rhs, lhsOn,
-                                                        rhsOn, rhsAgg, ctx);
+    std::unordered_map<int64_t, JoinState> ht;
+    auto argLhs = lhs->getColumn<int64_t>(lhsOn);
+    auto argRhs = rhs->getColumn<int64_t>(rhsOn);
 
-    // Set the column labels of the result frame.
-    std::string labels[] = {lhsOn, std::string("SUM(") + rhsAgg + std::string(")")};
-    res->setLabels(labels);
+    std::vector<AggState> aggStates(numRhsCols);
+    for (size_t i = 0; i < numRhsCols; i++) {
+        AggState aggState;
+        aggState.col = rhsCols[i];
+        aggState.inputType = rhs->getColumnType(rhsCols[i]);
+        aggState.func = rhsAggFuncs[i];
+        aggState.label = mlir::daphne::stringifyGroupEnum(aggState.func).str() + "(" + std::string(aggState.col) + ")";
+
+        switch (aggState.func) {
+        case mlir::daphne::GroupEnum::COUNT:
+            aggState.outputType = ValueTypeCode::UI64;
+            break;
+        case mlir::daphne::GroupEnum::SUM:
+        case mlir::daphne::GroupEnum::MIN:
+        case mlir::daphne::GroupEnum::MAX:
+            aggState.outputType = rhs->getColumnType(rhsCols[i]);
+            break;
+        case mlir::daphne::GroupEnum::AVG:
+            aggState.outputType = ValueTypeCode::F64;
+            break;
+        }
+        aggState.value = initAggValue(aggState.func, aggState.inputType);
+        aggStates[i] = aggState;
+    }
+
+    // ================================================================
+    // Build phase
+    const size_t numArgLhs = lhs->getNumRows();
+    for (size_t i = 0; i < numArgLhs; i++)
+        ht.emplace(argLhs->get(i, 0), JoinState(i, aggStates));
+    // ================================================================
+
+    // ================================================================
+    // Probe phase
+    const size_t numArgRhs = rhs->getNumRows();
+    for (size_t r = 0; r < numArgRhs; r++) {
+        auto it = ht.find(argRhs->get(r, 0));
+        if (it == ht.end())
+            continue;
+
+        it->second.matched = true;
+        for (size_t a = 0; a < it->second.aggStates.size(); a++) {
+            AggState &aggState = it->second.aggStates[a];
+            const bool updated = groupJoinColIf<int64_t>(aggState.inputType, aggState, rhs, r, ctx) ||
+                                 groupJoinColIf<uint64_t>(aggState.inputType, aggState, rhs, r, ctx) ||
+                                 groupJoinColIf<double>(aggState.inputType, aggState, rhs, r, ctx);
+            if (!updated)
+                throw std::runtime_error("unsupported aggregate column value type in groupJoin");
+        }
+    }
+    // ================================================================
+    // Combine into final res frame
+
+    // res->setLabels(labels.data());
 }
 
 #endif // SRC_RUNTIME_LOCAL_KERNELS_GROUPJOIN_H
