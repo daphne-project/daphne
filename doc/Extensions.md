@@ -49,7 +49,10 @@ A kernel extension consists at least of the following:
 
 **(*)** *We will add a concrete list of DaphneIR operations for which custom kernels can be added later.
 This list will be understandable by DAPHNE users, and will contain the operations' mnemonics, arguments, results, as well as expected C++ kernel function interfaces.
-In the meantime, developers familiar with DAPHNE internals can already find references of the DaphneIR operations in `src/ir/daphneir/DaphneOps.td` and a reference of the kernel interfaces in `build/runtime/local/kernels/kernels.cpp` (generated during the DAPHNE build).*
+In the meantime, developers familiar with DAPHNE internals can already find references of the DaphneIR operations in `src/ir/daphneir/DaphneOps.td` and a reference of the kernel interfaces in `build/runtime/local/kernels/kernels_*.cpp` (generated during the DAPHNE build; search the directory for the name of the desired kernel).
+For instance, the DaphneIR operation for a full summation over all elements of a matrix is `AllAggSumOp`.
+This operation has the mnemonic `sumAll`, which we can find out eiter in `DaphneOps.td` or by invoking `daphne` with `--explain parsing_simplified` on some DaphneDSL script that contains this operation.
+Then, searching for `sumAll` in `build/runtime/local/kernels/`, we find the kernel function signatures for various combinations of argument and result data/value types; the function/parameter names can be changed (see the code example below).*
 
 *Running example:*
 
