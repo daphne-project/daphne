@@ -815,13 +815,14 @@ For instance, a user could force the use of a certain custom kernel at a certain
 ### Kernel Hints
 
 Users can provide hints on the physical kernel that should be used for a specific occurrence of a DaphneDSL operation.
-So far, kernel hints are only supported for DaphneDSL built-in functions.
-Here, the name of the pre-compiled kernel function can optionally be attached to the name of the built-in function, separated by `::`.
+So far, kernel hints are only supported for DaphneDSL built-in functions and *some* DaphneDSL operators (`+`, `-`, `*`, `/`).
+Here, the name of the pre-compiled kernel function can optionally be attached to the name of the built-in function or the operator symbol, separated by `::`.
 
 *Examples:*
 
 ```r
 res = sum::my_custom_sum_kernel(X);
+res = X +::my_custom_add_kernel Y;
 ```
 
 ## Example Scripts
