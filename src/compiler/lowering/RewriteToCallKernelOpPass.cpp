@@ -18,6 +18,7 @@
 #include "ir/daphneir/Daphne.h"
 #include "ir/daphneir/Passes.h"
 #include <compiler/utils/TypePrinting.h>
+#include <llvm/Support/Casting.h>
 #include <util/ErrorHandler.h>
 #include <util/KernelDispatchMapping.h>
 
@@ -34,7 +35,6 @@
 #include "mlir/IR/Location.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include <iostream>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -58,6 +58,8 @@ class KernelReplacement : public RewritePattern {
             return 4;
         if (llvm::isa<daphne::GroupOp>(op))
             return 3;
+        if (llvm::isa<daphne::GroupJoinOp>(op))
+            return 6; // (lhs, rhs, lhsk, rhsk, aggsCols, aggFuncs)
         if (llvm::isa<daphne::CreateFrameOp, daphne::SetColLabelsOp>(op))
             return 2;
         if (llvm::isa<daphne::DistributedComputeOp, daphne::CreateListOp>(op))
@@ -93,6 +95,11 @@ class KernelReplacement : public RewritePattern {
         if (auto concreteOp = llvm::dyn_cast<daphne::DistributedComputeOp>(op)) {
             auto idxAndLen = concreteOp.getODSOperandIndexAndLength(index);
             static bool isVariadic[] = {true};
+            return std::make_tuple(idxAndLen.first, idxAndLen.second, isVariadic[index]);
+        }
+        if (auto concreteOp = llvm::dyn_cast<daphne::GroupJoinOp>(op)) {
+            auto idxAndLen = concreteOp.getODSOperandIndexAndLength(index);
+            static bool isVariadic[] = {false, false, false, false, true, true};
             return std::make_tuple(idxAndLen.first, idxAndLen.second, isVariadic[index]);
         }
         if (auto concreteOp = llvm::dyn_cast<daphne::GroupOp>(op)) {

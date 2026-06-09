@@ -1181,15 +1181,39 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
             .getResults();
     }
     if (func == "groupJoin") {
-        checkNumArgsExact(loc, func, numArgs, 5);
+        checkNumArgsExact(loc, func, numArgs, 6);
+        // (lhs, rhs, lhs_key, rhs_key, "agg1", "aggcol1", ...)
         mlir::Value lhs = args[0];
         mlir::Value rhs = args[1];
         mlir::Value lhsOn = args[2];
         mlir::Value rhsOn = args[3];
-        mlir::Value rhsAgg = args[4];
+        std::vector<mlir::Value> rhsAggCols;
+        std::vector<mlir::Attribute> rhsAggFuncs;
+        size_t aggColPairs = (numArgs - 4) / 2;
+        std::vector<mlir::Type> colTypes(aggColPairs + 1, utils.unknownType);
+
+        // Collecting the shape of ("agg", "aggcol", ...)
+        // into separate (agg1, agg2, agg3) and (aggcol1, aggcol2, aggcol3)
+        // e.g:
+        //  ("sum", "col1", "count", "*", ...)
+        // -> ("sum", "count")
+        // -> ("col1", "*")
+        for (size_t i = 4; i < numArgs; i += 2) {
+            rhsAggCols.push_back(args[i]);
+
+            // validate agg funcs
+            auto aggFuncStr = CompilerUtils::constantOrThrow<std::string>(
+                args[i + 1], "aggregation function of groupJoin must be a constant string");
+            auto aggFuncOpts = mlir::daphne::symbolizeGroupEnum(aggFuncStr);
+            if (!aggFuncOpts)
+                throw ErrorHandler::compilerError(loc, "DSLBuiltins",
+                                                  "unsupported aggregation function `" + aggFuncStr + "` in groupJoin");
+
+            rhsAggFuncs.push_back(mlir::daphne::GroupEnumAttr::get(builder.getContext(), *aggFuncOpts));
+        }
         return builder
-            .create<GroupJoinOp>(loc, FrameType::get(builder.getContext(), {utils.unknownType, utils.unknownType}),
-                                 utils.matrixOfSizeType, lhs, rhs, lhsOn, rhsOn, rhsAgg)
+            .create<GroupJoinOp>(loc, FrameType::get(builder.getContext(), colTypes), utils.matrixOfSizeType, lhs, rhs,
+                                 lhsOn, rhsOn, rhsAggCols, builder.getArrayAttr(rhsAggFuncs))
             .getResults();
     }
 
