@@ -21,6 +21,7 @@ set(TEST_SOURCES
 
         api/cli/algorithms/AlgorithmsTest.cpp
         api/cli/algorithms/DecisionTreeRandomForestTest.cpp
+        api/cli/algorithms/Kmeans.cpp
         api/cli/config/ConfigTest.cpp
         api/cli/controlflow/ControlFlowTest.cpp
         api/cli/distributed/DistributedTest.cpp

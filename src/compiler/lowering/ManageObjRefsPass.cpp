@@ -101,7 +101,8 @@ void processValue(OpBuilder builder, Value v) {
     // have no clue which of its two arguments (2nd or 3rd one) it will return.
     // Unless we do something about it, the reference counter of the result will
     // be too low by 1. Thus, we increase the result's reference counter here.
-    if (defOp && llvm::isa<arith::SelectOp>(defOp) && llvm::isa<daphne::StringType>(v.getType())) {
+    if (defOp && llvm::isa<arith::SelectOp>(defOp) &&
+        llvm::isa<daphne::MatrixType, daphne::FrameType, daphne::ListType, daphne::StringType>(v.getType())) {
         builder.setInsertionPointAfter(defOp);
         builder.create<daphne::IncRefOp>(v.getLoc(), v);
     }
