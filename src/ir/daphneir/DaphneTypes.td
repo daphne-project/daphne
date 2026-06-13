@@ -27,6 +27,7 @@ include "mlir/IR/EnumAttr.td"
 // The base for all DaphneIR-specific types.
 class Daphne_Type<string name> : TypeDef<Daphne_Dialect, name> {
     let typeName = name;
+    let mnemonic = name;
 }
 
 // ****************************************************************************
@@ -55,6 +56,7 @@ def Structure : Daphne_Type<"Structure"> {
 // A matrix type.
 def Matrix : Daphne_Type<"Matrix"> {
     let summary = "matrix";
+    let hasCustomAssemblyFormat = 1;
 
     // TODO Maybe we should rename "element type" to "value type" everywhere.
     let parameters = (ins
@@ -156,6 +158,7 @@ class MatrixOf<list<Type> allowedTypes> : AnyTypeOf<[
 
 def Frame : Daphne_Type<"Frame"> {
     let summary = "frame";
+    let hasCustomAssemblyFormat = 1;
 
     let parameters = (ins
         "std::vector<::mlir::Type>":$columnTypes,
@@ -238,6 +241,7 @@ def FrameOrU : AnyTypeOf<[Frame, Unknown]>;
 
 def Column : Daphne_Type<"Column"> {
     let summary = "column";
+    let hasCustomAssemblyFormat = 1;
 
     let parameters = (ins "::mlir::Type":$valueType, "ssize_t":$numRows);
 
@@ -306,6 +310,7 @@ class ColumnOf<list<Type> allowedTypes> : AnyTypeOf<[
 
 def List : Daphne_Type<"List"> {
     let summary = "list";
+    let hasCustomAssemblyFormat = 1;
 
     let parameters = (ins
         "::mlir::Type":$elementType
@@ -320,6 +325,7 @@ def ListOrU : AnyTypeOf<[List, Unknown]>;
 
 def Handle : Daphne_Type<"Handle"> {
     let summary = "handle to distributed data";
+    let hasCustomAssemblyFormat = 1;
 
     let parameters = (ins "::mlir::Type":$dataType);
     let genVerifyDecl = 1;
@@ -384,6 +390,7 @@ def VariadicPack : Daphne_Type<"VariadicPack"> {
         stack. It is introduced during the lowering to kernel calls and
         converted when lowering to the LLVM dialect.
     }];
+    let hasCustomAssemblyFormat = 1;
     let parameters = (ins "::mlir::Type":$containedType);
 }
 
