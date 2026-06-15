@@ -32,8 +32,7 @@ from daphne.operator.nodes.while_loop import WhileLoop
 from daphne.operator.nodes.do_while_loop import DoWhileLoop
 from daphne.operator.nodes.multi_return import MultiReturn
 from daphne.operator.operation_node import OperationNode
-from daphne.utils.consts import VALID_INPUT_TYPES, VALID_COMPUTED_TYPES, TMP_PATH, F64, F32, SI64, SI32, SI8, UI64, UI32, UI8, STR
-
+from daphne.utils.consts import VALID_INPUT_TYPES, VALID_COMPUTED_TYPES, TMP_PATH, F64, F32, SI64, SI32, SI8, UI64, UI32, UI8, STR, FIXEDSTR16
 import numpy as np
 import pandas as pd
 try:
@@ -119,7 +118,7 @@ class DaphneContext(object):
         # Return the matrix, and the original shape if return_shape is set to True.
         return (matrix, (original_mat_length, original_mat_dim2_length, original_mat_dim3_length)) if return_shape else matrix
     
-    def from_numpy(self, mat: np.array, shared_memory=True, verbose=False, return_shape=False):
+    def from_numpy(self, mat: np.ndarray, shared_memory=True, verbose=False, return_shape=False):
         """Generates a `DAGNode` representing a matrix with data given by a numpy `array`.
         :param mat: The numpy array.
         :param shared_memory: Whether to use shared memory data transfer (True) or not (False).
@@ -144,17 +143,80 @@ class DaphneContext(object):
             rows, cols = mat.shape
 
         if shared_memory:
-            # Data transfer via shared memory.
-            address = mat.ctypes.data_as(np.ctypeslib.ndpointer(dtype=mat.dtype, ndim=1, flags='C_CONTIGUOUS')).value
+            d_type = mat.dtype
 
             # Change the data type, if int16 or uint16 is handed over.
-            # TODO This could change the input DataFrame.
-            if mat.dtype == np.int16:
+            if d_type == np.int16:
                 mat = mat.astype(np.int32, copy=False)
-            elif mat.dtype == np.uint16:
+            elif d_type == np.uint16:
                 mat = mat.astype(np.uint32, copy=False)
+            elif d_type.kind == 'S':
+                if d_type.itemsize > 15 and mat.size:
+                    # TODO time inefficient
+                    if np.any(np.char.str_len(mat) > 15):
+                        # TODO Support for STR(std::string) for longer strings.
+                        raise RuntimeError(
+                            "transferring a numpy array of strings longer than 15 bytes "
+                            "to DAPHNE via shared memory is not supported yet"
+                        )
+                mat = mat.astype('S16', copy=False)
+            elif d_type.kind == 'U':
+                # U.itemsize is UTF-32 storage width(fixed 4 bytes)
+                encoded = np.char.encode(mat, encoding='utf-8')
+                if encoded.size:
+                    max_len = int(np.char.str_len(encoded).max())
+                    if max_len > 15:
+                        # TODO Support for STR(std::string) for longer strings
+                        raise RuntimeError(
+                            "transferring a numpy array of strings longer than 15 bytes "
+                            "to DAPHNE via shared memory is not supported yet"
+                        )
+                mat = encoded.astype('S16', copy=False)
+            elif d_type.kind == 'O':
+                fixed = np.empty(mat.shape, dtype='S16')
+                for i, value in enumerate(mat.flat):
+                    if value is None:
+                        encoded = b"None"
+                    elif isinstance(value, float) and np.isnan(value):
+                        encoded = b"np.nan"
+                    elif isinstance(value, np.floating) and np.isnan(value):
+                        encoded = b"np.nan"
+                    # pandas.NA
+                    elif type(value).__name__ == "NAType":
+                        encoded = b"pd.NA"
+                    # pandas.NaT
+                    elif type(value).__name__ == "NaTType":
+                        encoded = b"pd.NaT"
+                    elif isinstance(value, str):
+                        encoded = value.encode('utf-8')
+                    elif isinstance(value, np.str_):
+                        encoded = str(value).encode('utf-8')
+                    elif isinstance(value, bytes):
+                        encoded = value
+                    elif isinstance(value, np.bytes_):
+                        encoded = bytes(value)
+                    elif isinstance(value, bytearray):
+                        encoded = bytes(value)
+                    elif isinstance(value, memoryview):
+                        encoded = value.tobytes()
+                    else:
+                        raise TypeError(
+                            "object arrays transferred as FixedStr16 may only contain "
+                            "str, numpy.str_, bytes, numpy.bytes_, bytearray, memoryview, "
+                            "None, np.nan, pd.NA, or pd.NaT values"
+                        )
+                    if len(encoded) > 15:
+                        # TODO Support STR(std::string) for longer strings.
+                        raise RuntimeError(
+                            "transferring a numpy array of strings longer than 15 bytes "
+                            "to DAPHNE via shared memory is not supported yet"
+                        )
+                    fixed.flat[i] = encoded
+                mat = fixed
 
+            # dtype might have been changed above
             d_type = mat.dtype
+
             if d_type == np.double or d_type == np.float64:
                 vtc = F64
             elif d_type == np.float32:
@@ -171,11 +233,22 @@ class DaphneContext(object):
                 vtc = UI32
             elif d_type == np.uint64:
                 vtc = UI64
-            elif mat.dtype.kind in {'U', 'S', 'O'}:
-                raise RuntimeError("transfering a numpy array of strings to DAPHNE via shared memory is not supported yet")
+            elif d_type == 'S16':
+                vtc = FIXEDSTR16
+            elif d_type.kind in {'U', 'S'}:
+                # TODO Convert to STR.
+                raise RuntimeError(
+                    "transfering a numpy array of strings longer than 15 bytes"
+                    " to DAPHNE via shared memory is not supported yet"
+                )
+            elif d_type.kind == 'O':
+                raise RuntimeError("transfering a numpy array of objects to DAPHNE via shared memory is not supported yet")
             else:
                 # TODO Raise an error here?
                 print("unsupported numpy dtype")
+
+            # Data transfer via shared memory.
+            address = mat.ctypes.data
 
             res = Matrix(self, 'receiveFromNumpy', [address, rows, cols, vtc], local_data=mat)
         else:
