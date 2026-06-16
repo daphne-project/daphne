@@ -37,3 +37,7 @@ template class ContiguousTensor<int>;
 template class ContiguousTensor<long>;
 template class ContiguousTensor<unsigned int>;
 template class ContiguousTensor<unsigned long>;
+#if defined(__APPLE__) && defined(__aarch64__)
+template class ContiguousTensor<long long>;
+template class ContiguousTensor<unsigned long long>;
+#endif

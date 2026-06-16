@@ -502,8 +502,9 @@ class DistributedPipelineKernelReplacement : public OpConversionPattern<daphne::
             rewriter.create<daphne::StoreVariadicPackOp>(loc, cvpInputs, op.getInputs()[i],
                                                          rewriter.getI64IntegerAttr(i));
         // Constants for #inputs.
-        auto coNumInputs = rewriter.create<daphne::ConstantOp>(loc, numInputs);
-        [[maybe_unused]] auto coNumOutputs = rewriter.create<daphne::ConstantOp>(loc, numOutputs);
+        auto coNumInputs = rewriter.create<daphne::ConstantOp>(loc, static_cast<uint64_t>(numInputs));
+        [[maybe_unused]] auto coNumOutputs =
+            rewriter.create<daphne::ConstantOp>(loc, static_cast<uint64_t>(numOutputs));
         // Variadic pack for out_rows.
         auto cvpOutRows =
             rewriter.create<daphne::CreateVariadicPackOp>(loc, vptSize, rewriter.getI64IntegerAttr(numOutputs));

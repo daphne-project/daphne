@@ -300,7 +300,7 @@ template <class AllAggOp> std::vector<daphne::VectorSplit> getVectorSplits_AllAg
 }
 template <class AllAggOp>
 std::vector<std::pair<Value, Value>> createOpsOutputSizes_AllAggOp(AllAggOp *op, OpBuilder &builder) {
-    auto cst1 = builder.create<daphne::ConstantOp>(op->getLoc(), size_t(1));
+    auto cst1 = builder.create<daphne::ConstantOp>(op->getLoc(), static_cast<uint64_t>(1));
     return {{cst1, cst1}};
 }
 

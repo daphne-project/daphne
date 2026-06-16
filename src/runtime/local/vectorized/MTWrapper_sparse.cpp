@@ -33,10 +33,12 @@ void MTWrapper<CSRMatrix<VT>>::executeCpuQueues(
     std::vector<TaskQueue *> qvector;
     if (ctx->getUserConfig().pinWorkers) {
         for (int i = 0; i < this->_numQueues; i++) {
+#ifdef __linux__
             cpu_set_t cpuset;
             CPU_ZERO(&cpuset);
             CPU_SET(i, &cpuset);
             sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
+#endif
             std::unique_ptr<TaskQueue> tmp = std::make_unique<BlockingTaskQueue>(len);
             q.push_back(std::move(tmp));
             qvector.push_back(q[i].get());

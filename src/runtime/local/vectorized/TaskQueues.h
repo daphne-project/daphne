@@ -64,11 +64,13 @@ class BlockingTaskQueue : public TaskQueue {
     }
 
     void enqueueTask(Task *t, int targetCPU) override {
+#ifdef __linux__
         // Change CPU pinning before enqueue to utilize NUMA first-touch policy
         cpu_set_t cpuset;
         CPU_ZERO(&cpuset);
         CPU_SET(targetCPU, &cpuset);
         sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
+#endif
         enqueueTask(t);
     }
 

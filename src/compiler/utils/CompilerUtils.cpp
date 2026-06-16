@@ -93,6 +93,20 @@ template <> std::pair<bool, bool> CompilerUtils::isConstant<bool>(mlir::Value v)
     return isConstantHelper<bool, mlir::BoolAttr>(v, [](mlir::BoolAttr attr) { return attr.getValue(); });
 }
 
+#if defined(__APPLE__) && defined(__aarch64__)
+// On macOS ARM64, long/unsigned long are distinct types from int64_t/uint64_t
+// (long = long, int64_t = long long), so we need separate instantiations.
+template <> std::pair<bool, long> CompilerUtils::isConstant<long>(mlir::Value v) {
+    return isConstantHelper<long, mlir::IntegerAttr>(
+        v, [](mlir::IntegerAttr attr) { return static_cast<long>(attr.getValue().getLimitedValue()); });
+}
+
+template <> std::pair<bool, unsigned long> CompilerUtils::isConstant<unsigned long>(mlir::Value v) {
+    return isConstantHelper<unsigned long, mlir::IntegerAttr>(
+        v, [](mlir::IntegerAttr attr) { return static_cast<unsigned long>(attr.getValue().getLimitedValue()); });
+}
+#endif
+
 // **************************************************************************************************
 // Specializations of constantOrThrow for various types
 // **************************************************************************************************
@@ -159,6 +173,18 @@ template <> double CompilerUtils::constantOrDefault<double>(mlir::Value v, doubl
 template <> bool CompilerUtils::constantOrDefault<bool>(mlir::Value v, bool d) {
     return constantOrDefaultHelper<bool, mlir::BoolAttr>(v, d, [](mlir::BoolAttr attr) { return attr.getValue(); });
 }
+
+#if defined(__APPLE__) && defined(__aarch64__)
+template <> long CompilerUtils::constantOrDefault<long>(mlir::Value v, long d) {
+    return constantOrDefaultHelper<long, mlir::IntegerAttr>(
+        v, d, [](mlir::IntegerAttr attr) { return static_cast<long>(attr.getValue().getLimitedValue()); });
+}
+
+template <> unsigned long CompilerUtils::constantOrDefault<unsigned long>(mlir::Value v, unsigned long d) {
+    return constantOrDefaultHelper<unsigned long, mlir::IntegerAttr>(
+        v, d, [](mlir::IntegerAttr attr) { return static_cast<unsigned long>(attr.getValue().getLimitedValue()); });
+}
+#endif
 
 // **************************************************************************************************
 // Other

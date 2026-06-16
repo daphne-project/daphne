@@ -133,7 +133,7 @@ struct CTable<CSRMatrix<VTWeight>, DenseMatrix<VTCoord>, DenseMatrix<VTCoord>, V
             if (isResNumColsFromRhs)
                 resNumCols = *std::max_element(rhsVals, &rhsVals[rhsNumRows]) + 1;
             res = DataObjectFactory::create<CSRMatrix<VTWeight>>(
-                resNumRows, resNumCols, std::min(static_cast<ssize_t>(lhsNumRows), resNumRows * resNumCols), true);
+                resNumRows, resNumCols, std::min(static_cast<int64_t>(lhsNumRows), resNumRows * resNumCols), true);
         }
 
         if (isResNumRowsFromLhs && isResNumColsFromRhs) {

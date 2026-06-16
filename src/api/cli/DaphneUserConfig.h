@@ -24,6 +24,11 @@
 #include <util/LogConfig.h>
 class DaphneLogger;
 
+#ifdef __APPLE__
+#include <climits>
+#include <mach-o/dyld.h>
+#endif
+
 #include <filesystem>
 #include <limits>
 #include <map>
@@ -148,8 +153,14 @@ struct DaphneUserConfig {
     void resolveLibDir() {
         const std::string exedirPlaceholder = "{exedir}/";
         if (libdir.substr(0, exedirPlaceholder.size()) == exedirPlaceholder) {
-            // This next line adds to our Linux platform lock-in.
+#ifdef __APPLE__
+            char pathBuf[PATH_MAX];
+            uint32_t size = sizeof(pathBuf);
+            _NSGetExecutablePath(pathBuf, &size);
+            std::filesystem::path daphneExeDir(std::filesystem::canonical(pathBuf).parent_path());
+#else
             std::filesystem::path daphneExeDir(std::filesystem::canonical("/proc/self/exe").parent_path());
+#endif
             libdir = daphneExeDir / libdir.substr(exedirPlaceholder.size());
         }
     }

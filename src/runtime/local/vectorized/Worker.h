@@ -19,7 +19,9 @@
 #include <runtime/local/vectorized/Tasks.h>
 
 #include <numeric>
+#ifdef __linux__
 #include <sched.h>
+#endif
 #include <thread>
 
 class Worker {

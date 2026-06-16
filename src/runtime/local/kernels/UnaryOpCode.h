@@ -85,7 +85,7 @@ static std::string_view unary_op_codes[] = {
  * @tparam VTRes The result value type.
  * @tparam VTArg The argument value type.
  */
-template <UnaryOpCode op, typename VTRes, typename VTArg> static constexpr bool supportsUnaryOp = false;
+template <UnaryOpCode op, typename VTRes, typename VTArg> inline constexpr bool supportsUnaryOp = false;
 
 // Macros for concisely specifying which unary operations should be
 // supported on which value types.
@@ -93,7 +93,7 @@ template <UnaryOpCode op, typename VTRes, typename VTArg> static constexpr bool 
 // Generates code specifying that the unary operation `Op` should be supported
 // on the value type `VT` (for both the result and the argument, for
 // simplicity).
-#define SUPPORT(Op, VT) template <> constexpr bool supportsUnaryOp<UnaryOpCode::Op, VT, VT> = true;
+#define SUPPORT(Op, VT) template <> inline constexpr bool supportsUnaryOp<UnaryOpCode::Op, VT, VT> = true;
 
 // Generates code specifying that all unary operations typically supported on
 // numeric value types should be supported on the given value type `VT`
