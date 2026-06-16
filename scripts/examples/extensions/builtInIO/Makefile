@@ -1,12 +1,13 @@
 # Paths
-DAPHNE_ROOT   := /home/yazan/daphneFork/daphne
+# TODO this absolute path works in the container, but we should avoid absolute paths
+DAPHNE_ROOT   := /daphne
 TP_INC_DIR    := $(DAPHNE_ROOT)/thirdparty/installed/include
 TP_LIB_DIR    := $(DAPHNE_ROOT)/thirdparty/installed/lib
 DS_LIB_DIR    := $(DAPHNE_ROOT)/build/src/runtime/local/datastructures
 
 # Compiler & flags
 CXX           := g++
-CXXFLAGS      := -std=c++17 -O3 -march=native -DNDEBUG -flto \
+CXXFLAGS      := -std=gnu++20 -O3 -march=native -DNDEBUG -flto \
                  -fPIC -fvisibility=hidden -fno-semantic-interposition -fno-plt \
                  -ffunction-sections -fdata-sections \
                   -I$(DAPHNE_ROOT)/src \
