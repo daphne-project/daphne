@@ -54,6 +54,7 @@ function printHelp {
     echo "  --cleanAll        Remove all build output and reset the directory of the third party dependencies"
     echo "  -nf, --no-fancy   Suppress all colored and animated output"
     echo "  -nd, --no-deps    Avoid building third party dependencies at all"
+    echo "  --deps-only       Build third party dependencies and exit before configuring DAPHNE"
     echo "  -y, --yes         Accept all prompts"
     echo "  --cuda            Compile with support for CUDA ops"
     echo "  --debug           Compile with support for debug mode"
@@ -455,6 +456,7 @@ BUILD_HDFS="-DUSE_HDFS=OFF"
 BUILD_IO_URING="-DUSE_IO_URING=OFF"
 BUILD_PAPI="-DUSE_PAPI=ON"
 WITH_DEPS=1
+DEPS_ONLY=0
 WITH_SUBMODULE_UPDATE=1
 
 while [[ $# -gt 0 ]]; do
@@ -525,6 +527,9 @@ while [[ $# -gt 0 ]]; do
     -nd | --no-deps)
         WITH_DEPS=0
         ;;
+    --deps-only)
+        DEPS_ONLY=1
+        ;;
     -ns | --no-submodule-update)
         WITH_SUBMODULE_UPDATE=0
         ;;
@@ -543,6 +548,12 @@ fi
 if [ "$par_printHelp" -eq 1 ]; then
     printHelp
     exit 0
+fi
+
+if [ "$DEPS_ONLY" -eq 1 ] && [ "$WITH_DEPS" -eq 0 ]; then
+    printf "'--deps-only' cannot be combined with '--no-deps'.\n\n"
+    printHelp
+    exit 1
 fi
 
 if [ "$par_clean" -gt 0 ]; then
@@ -1099,6 +1110,11 @@ if [ $WITH_DEPS -gt 0 ]; then
             cd - >/dev/null
         fi
     fi
+fi
+
+if [ "$DEPS_ONLY" -eq 1 ]; then
+    daphne_msg "Successfully built third-party dependencies only"
+    exit 0
 fi
 
 #******************************************************************************
