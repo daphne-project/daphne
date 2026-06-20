@@ -451,8 +451,7 @@ mlir::Type mlirTypeForCode(ValueTypeCode type, Builder builder) {
     case ValueTypeCode::STR:
         return mlir::daphne::StringType::get(builder.getContext());
     case ValueTypeCode::FIXEDSTR16:
-        // TODO how can FIXEDSTR16 be supported in MLIR?
-        return mlir::daphne::StringType::get(builder.getContext());
+        return mlir::daphne::FixedStr16Type::get(builder.getContext());
     default:
         throw std::runtime_error("mlirTypeForCode: unknown value type code");
     }

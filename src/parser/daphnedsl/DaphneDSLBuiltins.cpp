@@ -1332,8 +1332,7 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
         else if (valueTypeCode == (int64_t)ValueTypeCode::STR)
             vt = builder.getType<mlir::daphne::StringType>();
         else if (valueTypeCode == (int64_t)ValueTypeCode::FIXEDSTR16)
-            // TODO how can FIXEDSTR16 be supported in MLIR?
-            vt = builder.getType<mlir::daphne::StringType>();
+            vt = builder.getType<mlir::daphne::FixedStr16Type>();
         else
             throw ErrorHandler::compilerError(loc, "DSLBuiltins", "invalid value type code");
 

@@ -218,6 +218,8 @@ mlir::Type mlir::daphne::DaphneDialect::parseType(mlir::DialectAsmParser &parser
         return mlir::daphne::HandleType::get(parser.getBuilder().getContext(), dataType);
     } else if (keyword == "String") {
         return StringType::get(parser.getBuilder().getContext());
+    } else if (keyword == "FixedStr16") {
+        return FixedStr16Type::get(parser.getBuilder().getContext());
     } else if (keyword == "Column") {
         if (parser.parseLess())
             return nullptr;
@@ -297,6 +299,8 @@ void mlir::daphne::DaphneDialect::printType(mlir::Type type, mlir::DialectAsmPri
         os << "Handle<" << handle.getDataType() << ">";
     } else if (llvm::isa<mlir::daphne::StringType>(type))
         os << "String";
+    else if (llvm::isa<mlir::daphne::FixedStr16Type>(type))
+        os << "FixedStr16";
     else if (auto t = llvm::dyn_cast<mlir::daphne::VariadicPackType>(type))
         os << "VariadicPack<" << t.getContainedType() << '>';
     else if (llvm::isa<mlir::daphne::DaphneContextType>(type))
