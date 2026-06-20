@@ -26,12 +26,14 @@
 #include <runtime/local/io/ReadCsv.h>
 #include <runtime/local/io/ReadDaphne.h>
 #include <runtime/local/io/ReadMM.h>
+#include <runtime/local/io/ReadOrc.h>
 #include <runtime/local/io/ReadParquet.h>
 #if USE_HDFS
 #include <runtime/local/io/HDFS/ReadHDFS.h>
 #endif
 
 #include <filesystem>
+#include <map>
 #include <string>
 
 // ****************************************************************************
@@ -79,6 +81,15 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
                 if (res == nullptr)
                     res = DataObjectFactory::create<DenseMatrix<VT>>(fmd.numRows, fmd.numCols, false);
                 readParquet(res, filename, fmd.numRows, fmd.numCols);
+            }
+        } else if (ext == ".orc") {
+            if constexpr (std::is_same<VT, std::string>::value)
+                throw std::runtime_error("reading string-valued ORC files is not supported (yet)");
+            else {
+                if (res == nullptr)
+                    res = DataObjectFactory::create<DenseMatrix<VT>>(fmd.numRows, fmd.numCols, false);
+                std::map<std::string, std::string> options;
+                readOrc(reinterpret_cast<void *>(&res), fmd, filename, options, ctx);
             }
         } else if (ext == ".dbdf") {
             if constexpr (std::is_same<VT, std::string>::value)
@@ -162,6 +173,32 @@ template <> struct Read<Frame> {
                 res = DataObjectFactory::create<Frame>(fmd.numRows, fmd.numCols, schema, labels, false);
 
             readCsv(res, filename, fmd.numRows, fmd.numCols, ',', schema);
+
+            if (fmd.isSingleValueType)
+                delete[] schema;
+        } else if (ext == ".orc") {
+            ValueTypeCode *schema;
+            if (fmd.isSingleValueType) {
+                schema = new ValueTypeCode[fmd.numCols];
+                for (size_t i = 0; i < fmd.numCols; i++)
+                    schema[i] = fmd.schema[0];
+            } else
+                schema = fmd.schema.data();
+
+            std::string *labels;
+            if (fmd.labels.empty())
+                labels = nullptr;
+            else
+                labels = fmd.labels.data();
+
+            if (res == nullptr)
+                res = DataObjectFactory::create<Frame>(fmd.numRows, fmd.numCols, schema, labels, false);
+
+            // Force readOrc into its Frame path by passing a per-column schema.
+            std::vector<ValueTypeCode> expandedSchema(schema, schema + fmd.numCols);
+            FileMetaData fmdFrame(fmd.numRows, fmd.numCols, false, std::move(expandedSchema), fmd.labels);
+            std::map<std::string, std::string> options;
+            readOrc(reinterpret_cast<void *>(&res), fmdFrame, filename, options, ctx);
 
             if (fmd.isSingleValueType)
                 delete[] schema;
