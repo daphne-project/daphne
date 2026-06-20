@@ -80,6 +80,8 @@ MAKE_TEST_CASE("data_transfer_numpy_array_int64_1d_vector")
 MAKE_TEST_CASE("data_transfer_numpy_array_string_1d")
 MAKE_TEST_CASE("data_transfer_numpy_array_string_1d_vector")
 MAKE_TEST_CASE("data_transfer_numpy_array_string_2d")
+MAKE_TEST_CASE_STR("data_transfer_numpy_array_fixedstr16_bytes_shared_memory", "DenseMatrix(2x2, FixedStr)\n")
+MAKE_TEST_CASE_STR("data_transfer_numpy_array_fixedstr16_unicode_shared_memory", "DenseMatrix(3x1, FixedStr)\n")
 
 MAKE_TEST_CASE("data_transfer_python_list_float64_1d")
 MAKE_TEST_CASE("data_transfer_python_list_float64_1d_shared_memory")
