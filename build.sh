@@ -897,6 +897,7 @@ if [ $WITH_DEPS -gt 0 ]; then
     if ! is_dependency_installed "${dep_arrow[@]}"; then
         cmake -G Ninja -S "${sourcePrefix}/${arrowDirName}/cpp" -B "${buildPrefix}/${arrowDirName}" \
             -DCMAKE_INSTALL_PREFIX="${installPrefix}" -DARROW_CSV=ON -DARROW_FILESYSTEM=ON -DARROW_PARQUET=ON \
+            -DARROW_ORC=ON \
             -DARROW_WITH_BROTLI=ON -DARROW_WITH_BZ2=ON -DARROW_WITH_LZ4=ON -DARROW_WITH_SNAPPY=ON -DARROW_WITH_ZLIB=ON \
             -DARROW_WITH_ZSTD=ON
 
