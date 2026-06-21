@@ -5,4 +5,9 @@ enum class AnalysisFlag { min, mean, sparsity, symmetry, numDistinct };
 template <AnalysisFlag... Fs> struct AnalysisFlags {
     // variable template to check if an AnalysisFlag is present.
     template <AnalysisFlag F> constexpr static bool contains = ((F == Fs) || ...);
+    // this doesn't work :(
+    // template <AnalysisFlag... F>    constexpr static bool contains =
+    //     (((F == Fs) || ...) && ...);
+    template <AnalysisFlag... F> constexpr static bool containsAll = (contains<F> && ...);
+    template <AnalysisFlag... F> constexpr static bool containsAny = (contains<F> || ...);
 };

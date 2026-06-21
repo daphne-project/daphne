@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_RUNTIME_LOCAL_KERNELS_EWUNARYMAT_H
-#define SRC_RUNTIME_LOCAL_KERNELS_EWUNARYMAT_H
+#ifndef SRC_RUNTIME_LOCAL_KERNELS_EWUNARYMATANALYSIS_H
+#define SRC_RUNTIME_LOCAL_KERNELS_EWUNARYMATANALYSIS_H
 
 #include "ir/daphneir/DataPropertyTypes.h"
 #include <limits>
@@ -33,7 +33,6 @@
 
 #include <cstddef>
 
-#include <runtime/local/kernels/EwUnaryMat.h>
 #include <runtime/local/kernels/analysis-fusion/AnalysisFlags.h>
 #include <unordered_set>
 
@@ -256,7 +255,6 @@ struct EwUnaryMatAnalysis<CSRMatrix<VT>, CSRMatrix<VT>, AnalysisFlags<Fs...>> {
                         }
                         if constexpr (anal_t::template contains<AnalysisFlag::symmetry>)
                             if (isSymmetric) {
-                                // const size_t r = rowOffsetsArg[i];
                                 const size_t c = colIdxsArg[i];
                                 if (r < c) {
                                     symVec[c].push({r, tmp});
@@ -359,7 +357,17 @@ struct EwUnaryMatAnalysis<CSRMatrix<VT>, CSRMatrix<VT>, AnalysisFlags<Fs...>> {
         if constexpr (anal_t::template contains<AnalysisFlag::sparsity>)
             res->sparsity = res->getNumNonZeros() / (double)(numCols * numRows);
         if constexpr (anal_t::template contains<AnalysisFlag::symmetry>)
-            res->symmetric = isSymmetric ? BoolOrUnknown::True : BoolOrUnknown::False;
+            if (isSymmetric) {
+                // Check that all symmetric positions are checked.
+                // TODO: do this within the loop.
+                for (auto q : symVec) {
+                    if (!q.empty()) {
+                        isSymmetric = false;
+                        break;
+                    }
+                }
+                res->symmetric = isSymmetric ? BoolOrUnknown::True : BoolOrUnknown::False;
+            }
     }
 };
 
@@ -426,14 +434,13 @@ template <typename VT, AnalysisFlag... Fs> struct EwUnaryMatAnalysis<Matrix<VT>,
 
         if constexpr (anal_t::template contains<AnalysisFlag::numDistinct>)
             res->numDistinct = distinct.size();
-        if constexpr (anal_t::template contains<AnalysisFlag::symmetry>)
-            if (isSquare) {
-                if (isSymmetric) {
-                    res->symmetric = BoolOrUnknown::True;
-                } else
-                    res->symmetric = BoolOrUnknown::False;
-            }
+        if constexpr (anal_t::template contains<AnalysisFlag::symmetry>) {
+            if (isSymmetric)
+                res->symmetric = BoolOrUnknown::True;
+            else
+                res->symmetric = BoolOrUnknown::False;
+        }
     }
 };
 
-#endif // SRC_RUNTIME_LOCAL_KERNELS_EWUNARYMAT_H
+#endif // SRC_RUNTIME_LOCAL_KERNELS_EWUNARYMATANALYSIS_H
