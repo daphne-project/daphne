@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 """
-gen_orc_test_data.py — generate the ORC fixtures consumed by ReadOrcTest.cpp.
+Generate the ORC test fixtures used by ReadOrcTest.cpp.
 
-Run once whenever fixtures need to be (re)generated:
+You only need to run this if you're changing or adding a fixture. The .orc
+files and their .meta sidecars are committed to the repo, so running the
+tests does not require pyarrow.
+
+To regenerate:
 
     source daphne-venv/bin/activate
     pip install pyarrow
     cd test/runtime/local/io
     python3 gen_orc_test_data.py
 
-The script is deterministic. All produced .orc files and .meta sidecars are
-committed alongside the script so reviewers don't need pyarrow to run the
-tests.
+The output is deterministic, so the same inputs always produce the same
+bytes on disk.
 
-ORC fixtures here intentionally use TINY tables (2-3 rows) for fast tests.
-Real ORC files in production are megabytes-to-gigabytes. The reader is
-agnostic to size — Apache ORC's stripe iteration handles both transparently.
+Each fixture has only 2 or 3 rows. That is enough to exercise the reader
+and keeps the test suite fast. The reader does not care about file size:
+ORC's stripe iteration scales the same way for tiny and large files.
 """
 
 import json
@@ -41,9 +44,7 @@ def write_meta(basename, payload):
     print(f"  wrote {basename}.meta")
 
 
-# ---------------------------------------------------------------------------
-# 1. DenseMatrix<double> 2x4
-# ---------------------------------------------------------------------------
+# DenseMatrix<double>, 2x4
 write_orc(
     pa.table(
         {
@@ -61,9 +62,7 @@ write_meta(
 )
 
 
-# ---------------------------------------------------------------------------
-# 2. DenseMatrix<int64_t> 2x4
-# ---------------------------------------------------------------------------
+# DenseMatrix<int64_t>, 2x4
 write_orc(
     pa.table(
         {
@@ -81,9 +80,7 @@ write_meta(
 )
 
 
-# ---------------------------------------------------------------------------
-# 3. Frame mixed types 3x3
-# ---------------------------------------------------------------------------
+# Frame with mixed types, 3x3
 write_orc(
     pa.table(
         {
@@ -108,10 +105,8 @@ write_meta(
 )
 
 
-# ---------------------------------------------------------------------------
-# 4. Negative fixture: string column (the meta declares a string type
-#    so that the string-rejection check fires in readOrc()).
-# ---------------------------------------------------------------------------
+# String column. The meta declares str so the reader's string-rejection
+# path is exercised.
 write_orc(
     pa.table({"s": pa.array(["alpha", "beta"], type=pa.string())}),
     "ReadOrc_StringCol.orc",
@@ -122,9 +117,7 @@ write_meta(
 )
 
 
-# ---------------------------------------------------------------------------
-# 5. Negative fixture: null values (one cell is null).
-# ---------------------------------------------------------------------------
+# A column with one null cell, for the null-rejection test.
 write_orc(
     pa.table({"x": pa.array([1.0, None], type=pa.float64())}),
     "ReadOrc_HasNulls.orc",
@@ -134,4 +127,4 @@ write_meta(
     {"numRows": 2, "numCols": 1, "valueType": "f64"},
 )
 
-print("\nAll fixtures generated.")
+print("\nDone.")
