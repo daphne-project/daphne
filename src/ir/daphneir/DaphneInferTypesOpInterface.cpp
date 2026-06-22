@@ -321,7 +321,7 @@ std::vector<Type> daphne::GroupJoinOp::inferTypes() {
     for (size_t i = 0; i < aggFuncNames.size() && i < aggColValues.size(); i++) {
         std::string groupAggFunction = aggFuncNames.at(i);
         if (groupAggFunction == "COUNT") {
-            newColumnTypes.push_back(builder.getIntegerType(64, true));
+            newColumnTypes.push_back(builder.getIntegerType(64, false));
         } else if (groupAggFunction == "AVG") {
             newColumnTypes.push_back(builder.getF64Type());
         } else { // DEFAULT OPTION (The Type of the named column)
@@ -393,7 +393,7 @@ std::vector<Type> daphne::GroupOp::inferTypes() {
     for (size_t i = 0; i < aggFuncNames.size() && i < aggColValues.size(); i++) {
         std::string groupAggFunction = aggFuncNames.at(i);
         if (groupAggFunction == "COUNT") {
-            newColumnTypes.push_back(builder.getIntegerType(64, true));
+            newColumnTypes.push_back(builder.getIntegerType(64, false));
         } else if (groupAggFunction == "AVG") {
             newColumnTypes.push_back(builder.getF64Type());
         } else { // DEFAULT OPTION (The Type of the named column)

@@ -3206,7 +3206,8 @@
                 },
                 {
                     "type": "const char **",
-                    "name": "rhsCols"
+                    "name": "rhsCols",
+                    "isVariadic": true
                 },
                 {
                     "type": "size_t",

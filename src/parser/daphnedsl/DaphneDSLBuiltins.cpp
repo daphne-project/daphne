@@ -81,7 +81,6 @@ const std::unordered_map<std::string, BuiltinParamInfo> &builtinParamInfos() {
         {"ctable", {{"lhs", "rhs", "weight", "resNumRows", "resNumCols"}, 2}},
         {"innerJoin", {{"lhs", "rhs", "lhsOn", "rhsOn", "numRowRes"}, 4}},
         {"semiJoin", {{"lhs", "rhs", "lhsOn", "rhsOn", "numRowRes"}, 4}},
-        {"groupJoin", {{"lhs", "rhs", "lhsOn", "rhsOn", "rhsAgg"}, 5}},
         {"setColLabelsPrefix", {{"frame", "prefix"}, 2}},
         {"quantize", {{"arg", "min", "max"}, 3}},
         {"print", {{"arg", "newline", "err"}, 1}},
@@ -1181,7 +1180,8 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
             .getResults();
     }
     if (func == "groupJoin") {
-        checkNumArgsExact(loc, func, numArgs, 6);
+        checkNumArgsMin(loc, func, numArgs, 6);
+        checkNumArgsEven(loc, func, numArgs);
         // (lhs, rhs, lhs_key, rhs_key, "agg1", "aggcol1", ...)
         mlir::Value lhs = args[0];
         mlir::Value rhs = args[1];
@@ -1199,17 +1199,16 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
         // -> ("sum", "count")
         // -> ("col1", "*")
         for (size_t i = 4; i < numArgs; i += 2) {
-            rhsAggCols.push_back(args[i]);
-
             // validate agg funcs
             auto aggFuncStr = CompilerUtils::constantOrThrow<std::string>(
-                args[i + 1], "aggregation function of groupJoin must be a constant string");
+                args[i], "aggregation function of groupJoin must be a constant string");
             auto aggFuncOpts = mlir::daphne::symbolizeGroupEnum(aggFuncStr);
             if (!aggFuncOpts)
                 throw ErrorHandler::compilerError(loc, "DSLBuiltins",
                                                   "unsupported aggregation function `" + aggFuncStr + "` in groupJoin");
 
             rhsAggFuncs.push_back(mlir::daphne::GroupEnumAttr::get(builder.getContext(), *aggFuncOpts));
+            rhsAggCols.push_back(args[i + 1]);
         }
         return builder
             .create<GroupJoinOp>(loc, FrameType::get(builder.getContext(), colTypes), utils.matrixOfSizeType, lhs, rhs,

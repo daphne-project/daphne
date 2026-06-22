@@ -59,7 +59,7 @@ class KernelReplacement : public RewritePattern {
         if (llvm::isa<daphne::GroupOp>(op))
             return 3;
         if (llvm::isa<daphne::GroupJoinOp>(op))
-            return 6; // (lhs, rhs, lhsk, rhsk, aggsCols, aggFuncs)
+            return 5; // (lhs, rhs, lhsk, rhsk, aggsCols)
         if (llvm::isa<daphne::CreateFrameOp, daphne::SetColLabelsOp>(op))
             return 2;
         if (llvm::isa<daphne::DistributedComputeOp, daphne::CreateListOp>(op))
@@ -99,7 +99,7 @@ class KernelReplacement : public RewritePattern {
         }
         if (auto concreteOp = llvm::dyn_cast<daphne::GroupJoinOp>(op)) {
             auto idxAndLen = concreteOp.getODSOperandIndexAndLength(index);
-            static bool isVariadic[] = {false, false, false, false, true, true};
+            static bool isVariadic[] = {false, false, false, false, true};
             return std::make_tuple(idxAndLen.first, idxAndLen.second, isVariadic[index]);
         }
         if (auto concreteOp = llvm::dyn_cast<daphne::GroupOp>(op)) {
@@ -121,6 +121,29 @@ class KernelReplacement : public RewritePattern {
                                           "lowering to kernel call not yet supported for this variadic "
                                           "operation: " +
                                               op->getName().getStringRef().str());
+    }
+
+    // converts a GroupEnum array attribute into a variadic pack plus its length
+    // and appends both as kernel arguments.
+    static void appendGroupEnumAttrPack(PatternRewriter &rewriter, Location loc, ArrayAttr aggFuncs,
+                                        std::vector<Value> &kernelArgs) {
+        const size_t numAggFuncs = aggFuncs.size();
+        const Type t = rewriter.getIntegerType(32, false);
+        auto cvpOp = rewriter.create<daphne::CreateVariadicPackOp>(
+            loc, daphne::VariadicPackType::get(rewriter.getContext(), t), rewriter.getI64IntegerAttr(numAggFuncs));
+        size_t k = 0;
+
+        for (Attribute aggFunc : aggFuncs.getValue())
+            rewriter.create<daphne::StoreVariadicPackOp>(
+                loc, cvpOp,
+                rewriter.create<daphne::ConstantOp>(
+                    loc, t,
+                    rewriter.getIntegerAttr(
+                        t, static_cast<uint32_t>(llvm::dyn_cast<daphne::GroupEnumAttr>(aggFunc).getValue()))),
+                rewriter.getI64IntegerAttr(k++));
+        kernelArgs.push_back(cvpOp);
+        kernelArgs.push_back(
+            rewriter.create<daphne::ConstantOp>(loc, rewriter.getIndexType(), rewriter.getIndexAttr(numAggFuncs)));
     }
 
     /**
@@ -209,7 +232,7 @@ class KernelReplacement : public RewritePattern {
             // AtLeastNOperands... There seems to be no simple way to
             // detect if an operation has variadic ODS operands with any N.
             op->hasTrait<OpTrait::VariadicOperands>() || op->hasTrait<OpTrait::AtLeastNOperands<1>::Impl>() ||
-            op->hasTrait<OpTrait::AtLeastNOperands<2>::Impl>()) {
+            op->hasTrait<OpTrait::AtLeastNOperands<2>::Impl>() || op->hasTrait<OpTrait::AtLeastNOperands<4>::Impl>()) {
             // For operations with variadic ODS operands, we replace all
             // occurrences of a variadic ODS operand by a single operand of
             // type VariadicPack as well as an operand for the number of
@@ -296,24 +319,11 @@ class KernelReplacement : public RewritePattern {
             // attribute. Since attributes do not automatically become
             // inputs to the kernel call, we need to add them explicitly
             // here.
+            appendGroupEnumAttrPack(rewriter, loc, groupOp.getAggFuncs(), kernelArgs);
+        }
 
-            ArrayAttr aggFuncs = groupOp.getAggFuncs();
-            const size_t numAggFuncs = aggFuncs.size();
-            const Type t = rewriter.getIntegerType(32, false);
-            auto cvpOp = rewriter.create<daphne::CreateVariadicPackOp>(
-                loc, daphne::VariadicPackType::get(rewriter.getContext(), t), rewriter.getI64IntegerAttr(numAggFuncs));
-            size_t k = 0;
-            for (Attribute aggFunc : aggFuncs.getValue())
-                rewriter.create<daphne::StoreVariadicPackOp>(
-                    loc, cvpOp,
-                    rewriter.create<daphne::ConstantOp>(
-                        loc, t,
-                        rewriter.getIntegerAttr(
-                            t, static_cast<uint32_t>(llvm::dyn_cast<daphne::GroupEnumAttr>(aggFunc).getValue()))),
-                    rewriter.getI64IntegerAttr(k++));
-            kernelArgs.push_back(cvpOp);
-            kernelArgs.push_back(
-                rewriter.create<daphne::ConstantOp>(loc, rewriter.getIndexType(), rewriter.getIndexAttr(numAggFuncs)));
+        if (auto groupJoinOp = llvm::dyn_cast<daphne::GroupJoinOp>(op)) {
+            appendGroupEnumAttrPack(rewriter, loc, groupJoinOp.getRhsAggFuncs(), kernelArgs);
         }
 
         if (auto thetaJoinOp = llvm::dyn_cast<daphne::ThetaJoinOp>(op)) {
