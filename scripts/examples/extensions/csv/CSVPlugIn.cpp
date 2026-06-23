@@ -428,14 +428,14 @@ static void csv_read_frame_impl(Frame *&outFrame, const FileMetaData &fmd, const
     size_t threads = std::thread::hardware_concurrency();
     if (!threads)
         threads = 4;
-    if (auto it = opts.extra.find("hasHeader"); it != opts.extra.end())
+    if (auto it = opts.find("hasHeader"); it != opts.end())
         hasHeader = (it->second == "true" || it->second == "1");
-    if (auto it = opts.extra.find("delimiter"); it != opts.extra.end()) {
+    if (auto it = opts.find("delimiter"); it != opts.end()) {
         if (it->second.size() != 1)
             throw std::runtime_error("CSV(Frame): delimiter must be 1 char");
         delim = it->second[0];
     }
-    if (auto it = opts.extra.find("threads"); it != opts.extra.end())
+    if (auto it = opts.find("threads"); it != opts.end())
         threads = std::max<size_t>(1, std::stoul(it->second));
 
     // projection: useCols
@@ -443,7 +443,7 @@ static void csv_read_frame_impl(Frame *&outFrame, const FileMetaData &fmd, const
     wanted.reserve(C);
     std::vector<const char *> labels;
     labels.reserve(C);
-    if (auto it = opts.extra.find("useCols"); it != opts.extra.end()) {
+    if (auto it = opts.find("useCols"); it != opts.end()) {
         std::unordered_map<std::string, size_t> L2I;
         L2I.reserve(C * 2);
         for (size_t c = 0; c < C; ++c)
@@ -684,14 +684,14 @@ static void csv_read_impl(Structure *&res, const FileMetaData &fmd, const char *
     char delim = ',';
     size_t threads = 1;
 
-    if (auto it = opts.extra.find("hasHeader"); it != opts.extra.end())
+    if (auto it = opts.find("hasHeader"); it != opts.end())
         hasHeader = (it->second == "true" || it->second == "1");
-    if (auto it = opts.extra.find("delimiter"); it != opts.extra.end()) {
+    if (auto it = opts.find("delimiter"); it != opts.end()) {
         if (it->second.size() != 1)
             throw std::runtime_error("CSV: delimiter must be 1 char");
         delim = it->second[0];
     }
-    if (auto it = opts.extra.find("threads"); it != opts.extra.end())
+    if (auto it = opts.find("threads"); it != opts.end())
         threads = std::max<size_t>(1, std::stoul(it->second));
 
     // type rule for homogeneous matrix
@@ -910,7 +910,7 @@ static void csv_read_impl(Structure *&res, const FileMetaData &fmd, const char *
 static void csv_write_impl(const Structure *matrix, const FileMetaData & /*fmd*/, const char *filename, IOOptions &opts,
                            DaphneContext * /*ctx*/) {
     char delim = ',';
-    if (auto it = opts.extra.find("delimiter"); it != opts.extra.end()) {
+    if (auto it = opts.find("delimiter"); it != opts.end()) {
         const std::string &d = it->second;
         if (d.size() != 1)
             throw std::runtime_error("csv_write: 'delimiter' must be a single character");
@@ -984,9 +984,9 @@ static void csv_write_frame_impl(const Frame *fr, const FileMetaData &fmd, const
 
     bool hasHeader = false;
     char delim = ',';
-    if (auto it = opts.extra.find("hasHeader"); it != opts.extra.end())
+    if (auto it = opts.find("hasHeader"); it != opts.end())
         hasHeader = (it->second == "true" || it->second == "1");
-    if (auto it = opts.extra.find("delimiter"); it != opts.extra.end()) {
+    if (auto it = opts.find("delimiter"); it != opts.end()) {
         const std::string &d = it->second;
         if (d.size() != 1)
             throw std::runtime_error("csv_write_frame: 'delimiter' must be a single character");

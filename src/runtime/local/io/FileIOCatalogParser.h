@@ -1,13 +1,32 @@
+/*
+ * Copyright 2026 The DAPHNE Consortium
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #pragma once
-#include "runtime/local/io/FileIORegistry.h"
-#include <dlfcn.h>
+
+#include <runtime/local/datastructures/Frame.h>
+#include <runtime/local/io/FileIORegistry.h>
+
+#include <nlohmannjson/json.hpp>
+
 #include <filesystem>
 #include <fstream>
-#include <nlohmannjson/json.hpp>
-#include <optional>
-#include <runtime/local/datastructures/Frame.h>
 #include <stdexcept>
 #include <string>
+
+#include <dlfcn.h>
 
 /**
  * @brief Parses a JSON catalog of I/O plugins, discovers its reader/writer functions by name, and registers them as
@@ -21,56 +40,51 @@ class FileIOCatalogParser {
      * Parses the given JSON file and registers each plugin's reader & writer.
      * @param filePath Path to the catalog JSON
      */
-    void parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry,
-                            std::optional<int> promptPriority = std::nullopt) const;
+    void parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry, int64_t priority) const;
 };
 
 inline void FileIOCatalogParser::parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry,
-                                                    std::optional<int> promptPriority) const {
-    namespace fs = std::filesystem;
-    fs::path dir = fs::path(filePath).parent_path();
+                                                    int64_t priority) const {
+    std::filesystem::path dir = std::filesystem::path(filePath).parent_path();
+    try {
+        std::ifstream in(filePath);
+        if (!in.good())
+            throw std::runtime_error("could not open file for reading");
 
-    std::ifstream in(filePath);
-    if (!in.good())
-        throw std::runtime_error("Could not open I/O catalog: " + filePath);
+        // Parse JSON array of plugin entries
+        nlohmann::json jsonData = nlohmann::json::parse(in);
+        for (const auto &entry : jsonData) {
+            // Read metadata
+            const std::string ext = entry.at("extension").get<std::string>();
+            const std::string rdrName = entry.at("readerFuncName").get<std::string>();
+            const std::string wtrName = entry.at("writerFuncName").get<std::string>();
+            const std::string libRel = entry.at("libPath").get<std::string>();
+            const std::string libPath = (dir / libRel).string();
+            const std::string engine = entry.value("engine", "default");
 
-    // Parse JSON array of plugin entries
-    nlohmann::json jsonData = nlohmann::json::parse(in);
-    for (const auto &entry : jsonData) {
-        // Read metadata
-        const std::string ext = entry.at("extension").get<std::string>();
-        const std::string rdrName = entry.at("readerFuncName").get<std::string>();
-        const std::string wtrName = entry.at("writerFuncName").get<std::string>();
-        const std::string libRel = entry.at("libPath").get<std::string>();
-        const std::string libPath = (dir / libRel).string();
-        const std::string engine = entry.value("engine", "default");
+            const std::string typeName = entry.value("type", "Frame");
 
-        int jsonPriority = entry.value("priority", 0);
-        int effPriority = promptPriority.has_value() ? *promptPriority : jsonPriority;
+            // Map typeName string to actual type_info
+            PhyDataType dt;
+            if (typeName == "Frame")
+                dt = PhyDataType::FRAME;
+            else if (typeName == "DenseMatrix")
+                dt = PhyDataType::DENSEMATRIX;
+            else if (typeName == "CSRMatrix")
+                dt = PhyDataType::CSRMATRIX;
+            else
+                throw std::runtime_error("unknown data type in I/O catalog: `" + typeName + "`");
 
-        const std::string typeName = entry.value("type", "Frame");
+            IOOptions opts;
+            if (auto it = entry.find("options"); it != entry.end())
+                for (auto jt = it->begin(); jt != it->end(); ++jt)
+                    // Each key/value in JSON becomes a string→string pair
+                    // e.g. "delimiter":"", "hasHeader":"", etc.
+                    opts[jt.key()] = jt.value().get<std::string>();
 
-        // Map typeName string to actual type_info
-        IODataType typeHash;
-        if (typeName == "Frame") {
-            typeHash = FRAME;
-        } else if (typeName == "DenseMatrix") {
-            typeHash = DENSEMATRIX;
-        } else if (typeName == "CSRMatrix") {
-            typeHash = CSRMATRIX;
-        } else {
-            throw std::runtime_error("Unknown type in I/O catalog: " + typeName);
+            registry.registerLazy(ext, dt, engine, priority, opts, libPath, rdrName, wtrName);
         }
-
-        IOOptions opts;
-        if (auto it = entry.find("options"); it != entry.end()) {
-            for (auto jt = it->begin(); jt != it->end(); ++jt) {
-                // Each key/value in JSON becomes a string→string pair
-                // e.g. "delimiter":"", "hasHeader":"", etc.
-                opts.extra[jt.key()] = jt.value().get<std::string>();
-            }
-        }
-
-        registry.registerLazy(ext, typeHash, libPath, rdrName, wtrName, opts, engine, effPriority);
+    } catch (std::exception &e) {
+        throw std::runtime_error("error while parsing I/O catalog file `" + filePath + "`: " + e.what());
     }
 }

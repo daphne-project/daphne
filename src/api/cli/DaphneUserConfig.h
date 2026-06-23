@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "runtime/local/io/FileIORegistry.h"
 #include <api/daphnelib/DaphneLibResult.h>
 #include <compiler/catalog/KernelCatalog.h>
 #include <runtime/local/datastructures/IAllocationDescriptor.h>
+#include <runtime/local/io/FileIORegistry.h>
 #include <runtime/local/vectorized/LoadPartitioningDefs.h>
 #include <util/DaphneLogger.h>
 #include <util/LogConfig.h>

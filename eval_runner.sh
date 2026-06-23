@@ -502,7 +502,7 @@ for f in "${FORMATS[@]}"; do
           run_eval "csv" "generated" "$fp" "$(basename "$scr")" "$cmd"
         done
         for scr in "${CSV_SCRIPTS_PLUGIN[@]}"; do
-          cmd="$DAPHNE_BIN $args_normal --FileIO-ext \"$CSV_EXT_JSON\" \"$scr\""
+          cmd="$DAPHNE_BIN $args_normal --fileio-ext \"$CSV_EXT_JSON\" \"$scr\""
           run_eval "csv" "generated" "$fp" "$(basename "$scr")" "$cmd"
         done
       fi
@@ -515,7 +515,7 @@ for f in "${FORMATS[@]}"; do
           run_eval "csv" "known" "$fp" "$(basename "$scr")" "$cmd"
         done
         for scr in "${CSV_SCRIPTS_PLUGIN[@]}"; do
-          cmd="$DAPHNE_BIN $args_known --FileIO-ext \"$CSV_EXT_JSON\" \"$scr\""
+          cmd="$DAPHNE_BIN $args_known --fileio-ext \"$CSV_EXT_JSON\" \"$scr\""
           run_eval "csv" "known" "$fp" "$(basename "$scr")" "$cmd"
         done
       fi
@@ -528,11 +528,11 @@ for f in "${FORMATS[@]}"; do
         fp="${GEN_PATH[parquet]-}"
         args_normal=$(make_args "$fp" "$PARQUET_EXTRAS_GEN")
         for scr in "${PARQUET_SCRIPTS_NORMAL[@]}"; do
-          cmd="$DAPHNE_BIN $args_normal --FileIO-ext \"$PARQUET_EXT_JSON\" \"$scr\""
+          cmd="$DAPHNE_BIN $args_normal --fileio-ext \"$PARQUET_EXT_JSON\" \"$scr\""
           run_eval "parquet" "generated" "$fp" "$(basename "$scr")" "$cmd"
         done
         for scr in "${PARQUET_SCRIPTS_PLUGIN[@]}"; do
-          cmd="$DAPHNE_BIN $args_normal --FileIO-ext \"$PARQUET_EXT_JSON\" \"$scr\""
+          cmd="$DAPHNE_BIN $args_normal --fileio-ext \"$PARQUET_EXT_JSON\" \"$scr\""
           run_eval "parquet" "generated" "$fp" "$(basename "$scr")" "$cmd"
         done
       fi
@@ -542,11 +542,11 @@ for f in "${FORMATS[@]}"; do
         for fp in "$DATA_DIR"/known_tlc_parquet/*.parquet; do
           args_known=$(make_args "$fp" "$PARQUET_EXTRAS_KNOWN")
           for scr in "${PARQUET_SCRIPTS_NORMAL[@]}"; do
-            cmd="$DAPHNE_BIN $args_known --FileIO-ext \"$PARQUET_EXT_JSON\" \"$scr\""
+            cmd="$DAPHNE_BIN $args_known --fileio-ext \"$PARQUET_EXT_JSON\" \"$scr\""
             run_eval "parquet" "known" "$fp" "$(basename "$scr")" "$cmd"
           done
           for scr in "${PARQUET_SCRIPTS_PLUGIN[@]}"; do
-            cmd="$DAPHNE_BIN $args_known --FileIO-ext \"$PARQUET_EXT_JSON\" \"$scr\""
+            cmd="$DAPHNE_BIN $args_known --fileio-ext \"$PARQUET_EXT_JSON\" \"$scr\""
             run_eval "parquet" "known" "$fp" "$(basename "$scr")" "$cmd"
           done
         done

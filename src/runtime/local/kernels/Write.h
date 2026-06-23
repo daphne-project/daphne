@@ -17,13 +17,13 @@
 #ifndef SRC_RUNTIME_LOCAL_KERNELS_WRITE_H
 #define SRC_RUNTIME_LOCAL_KERNELS_WRITE_H
 
-#include "runtime/local/io/FileIORegistry.h"
 #include <parser/metadata/MetaDataParser.h>
 #include <runtime/local/context/DaphneContext.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/datastructures/Matrix.h>
 #include <runtime/local/io/File.h>
+#include <runtime/local/io/FileIORegistry.h>
 #include <runtime/local/io/FileMetaData.h>
 #include <runtime/local/io/WriteCsv.h>
 #include <runtime/local/io/WriteDaphne.h>
@@ -41,14 +41,14 @@
 // ****************************************************************************
 
 template <class DTArg> struct Write {
-    static void apply(const DTArg *arg, const char *filename, Frame *opts, DCTX(ctx)) = delete;
+    static void apply(const DTArg *arg, const char *filename, const Frame *opts, DCTX(ctx)) = delete;
 };
 
 // ****************************************************************************
 // Convenience function
 // ****************************************************************************
 
-template <class DTArg> void write(const DTArg *arg, const char *filename, Frame *opts, DCTX(ctx)) {
+template <class DTArg> void write(const DTArg *arg, const char *filename, const Frame *opts, DCTX(ctx)) {
     Write<DTArg>::apply(arg, filename, opts, ctx);
 }
 
@@ -61,22 +61,21 @@ template <class DTArg> void write(const DTArg *arg, const char *filename, Frame 
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct Write<DenseMatrix<VT>> {
-    static void apply(const DenseMatrix<VT> *arg, const char *filename, Frame *optsFrame, DCTX(ctx)) {
+    static void apply(const DenseMatrix<VT> *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
         try {
             auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
-            IODataType typeHash = DENSEMATRIX;
+            PhyDataType dt = PhyDataType::DENSEMATRIX;
             std::string engine = extractEngineFromFrame(optsFrame);
-            auto writer = registry.getWriter(ext, typeHash, engine);
+            auto writer = registry.getWriter(ext, dt, engine);
             FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
 
             MetaDataParser::writeMetaData(filename, fmd);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, ctx);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
-            // std::cout << "using registry\n";
             return;
         } catch (const std::out_of_range &e) {
             std::cerr << "no suitable writer found in the registry";
@@ -105,14 +104,13 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
 // ----------------------------------------------------------------------------
 
 template <> struct Write<Frame> {
-    static void apply(const Frame *arg, const char *filename, Frame *optsFrame, DCTX(ctx)) {
+    static void apply(const Frame *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
-
         try {
             auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
-            IODataType typeHash = FRAME;
+            PhyDataType dt = PhyDataType::FRAME;
             std::string engine = extractEngineFromFrame(optsFrame);
-            auto writer = registry.getWriter(ext, typeHash, engine);
+            auto writer = registry.getWriter(ext, dt, engine);
             std::vector<ValueTypeCode> vtcs;
             std::vector<std::string> labels;
             for (size_t i = 0; i < arg->getNumCols(); i++) {
@@ -123,12 +121,12 @@ template <> struct Write<Frame> {
             MetaDataParser::writeMetaData(filename, fmd);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, ctx);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
             return;
         } catch (const std::out_of_range &e) {
-            throw std::runtime_error("No suitable writer found in the registry");
+            throw std::runtime_error("no suitable writer found in the registry");
         }
     }
 };
@@ -138,19 +136,20 @@ template <> struct Write<Frame> {
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct Write<Matrix<VT>> {
-    static void apply(const Matrix<VT> *arg, const char *filename, Frame *optsFrame, DCTX(ctx)) {
+    static void apply(const Matrix<VT> *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
         try {
             auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
-            IODataType typeHash = CSRMATRIX;
+            // TODO this kernel is not specialized for CSRMatrix
+            PhyDataType dt = PhyDataType::CSRMATRIX;
             std::string engine = extractEngineFromFrame(optsFrame);
-            auto writer = registry.getWriter(ext, typeHash, engine);
+            auto writer = registry.getWriter(ext, dt, engine);
             FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
 
             MetaDataParser::writeMetaData(filename, fmd);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, ctx);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
             return;

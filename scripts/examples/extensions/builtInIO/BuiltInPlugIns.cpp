@@ -107,8 +107,8 @@ template <typename VT> struct ReadCsvFile<DenseMatrix<VT>> {
         size_t numRows = fmd.numRows;
         size_t numCols = fmd.numCols;
         char delim = ',';
-        auto it = opts.extra.find("delimiter");
-        if (it != opts.extra.end()) {
+        auto it = opts.find("delimiter");
+        if (it != opts.end()) {
             const auto &val = it->second;
             if (val.size() != 1)
                 throw std::runtime_error("Invalid delimiter");
@@ -150,8 +150,8 @@ template <> struct ReadCsvFile<DenseMatrix<std::string>> {
         size_t numRows = fmd.numRows;
         size_t numCols = fmd.numCols;
         char delim = ',';
-        auto it = opts.extra.find("delimiter");
-        if (it != opts.extra.end()) {
+        auto it = opts.find("delimiter");
+        if (it != opts.end()) {
             const auto &val = it->second;
             if (val.size() != 1)
                 throw std::runtime_error("Invalid delimiter");
@@ -187,8 +187,8 @@ template <> struct ReadCsvFile<DenseMatrix<FixedStr16>> {
         size_t numRows = fmd.numRows;
         size_t numCols = fmd.numCols;
         char delim = ',';
-        auto it = opts.extra.find("delimiter");
-        if (it != opts.extra.end()) {
+        auto it = opts.find("delimiter");
+        if (it != opts.end()) {
             const auto &val = it->second;
             if (val.size() != 1)
                 throw std::runtime_error("Invalid delimiter");
@@ -228,10 +228,10 @@ template <typename VT> struct ReadCsvFile<CSRMatrix<VT>> {
         size_t numRows = fmd.numRows;
         size_t numCols = fmd.numCols;
         ssize_t numNonZeros = (fmd.numNonZeros >= 0) ? fmd.numNonZeros : -1;
-        bool sorted = opts.extra.count("sorted") && opts.extra.at("sorted") == "true";
+        bool sorted = opts.count("sorted") && opts.at("sorted") == "true";
         char delim = ',';
-        auto it = opts.extra.find("delimiter");
-        if (it != opts.extra.end()) {
+        auto it = opts.find("delimiter");
+        if (it != opts.end()) {
             const auto &val = it->second;
             if (val.size() != 1)
                 throw std::runtime_error("Invalid delimiter");
@@ -341,8 +341,8 @@ template <> struct ReadCsvFile<Frame> {
 
         // --- Step 2: Parse delimiter ---
         char delim = ',';
-        auto it = opts.extra.find("delimiter");
-        if (it != opts.extra.end()) {
+        auto it = opts.find("delimiter");
+        if (it != opts.end()) {
             const auto &val = it->second;
             if (val.size() != 1)
                 throw std::runtime_error("Invalid delimiter: must be a single character.");
@@ -624,7 +624,7 @@ extern "C" DAPHNE_PLUGIN_API void readCsvFromPath_Frame(void *&res, const FileMe
 
 extern "C" DAPHNE_PLUGIN_API void readCsvFromPath_CSR(void *&res, const FileMetaData &fmd, const char *filename,
                                                       IOOptions &opts, DaphneContext *ctx) {
-    // e.g. check an opts.extra flag, or peek at the file, etc.
+    // e.g. check an opts flag, or peek at the file, etc.
 
     if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F32) {
         readCsvFromPath<CSRMatrix<float>>(reinterpret_cast<CSRMatrix<float> *&>(res), fmd, filename, opts, ctx);
@@ -648,7 +648,7 @@ extern "C" DAPHNE_PLUGIN_API void readCsvFromPath_CSR(void *&res, const FileMeta
 
 extern "C" DAPHNE_PLUGIN_API void readCsvFromPath_Dense(void *&res, const FileMetaData &fmd, const char *filename,
                                                         IOOptions &opts, DaphneContext *ctx) {
-    // e.g. check an opts.extra flag, or peek at the file, etc.
+    // e.g. check an opts flag, or peek at the file, etc.
 
     if (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::F64) {
         readCsvFromPath<DenseMatrix<double>>(reinterpret_cast<DenseMatrix<double> *&>(res), fmd, filename, opts, ctx);

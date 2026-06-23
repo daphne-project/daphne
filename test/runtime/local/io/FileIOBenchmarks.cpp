@@ -60,7 +60,7 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO Benchmark double parquet into a densematrix",
     DT *m2 = nullptr;
 
     FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry, 0));
 
     std::vector<Structure *> columns(1);
     auto *keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
@@ -122,7 +122,7 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO Benchmark double parquet into a Frame", TAG_I
     Frame *m2 = nullptr;
 
     FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry, 0));
 
     std::vector<Structure *> columns(1);
     auto *keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);

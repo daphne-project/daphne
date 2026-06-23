@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <dlfcn.h>
 #include <filesystem>
+#include <stdexcept>
 #include <string>
 #include <sys/resource.h>
 #include <tags.h>
@@ -28,8 +29,6 @@ using namespace std;
 
 // Hard-coded path to the example JSON catalog
 static const string JSON_PATH = "scripts/examples/extensions/csv/csv.json";
-IODataType frameHash = FRAME;
-IODataType matrixHash = DENSEMATRIX;
 
 static const std::string CSV_FILE = "scripts/examples/extensions/csv/data.csv";
 static const std::string specialCSV = "scripts/examples/extensions/csv/specialCSV.csv";
@@ -40,7 +39,8 @@ FileIOCatalogParser parser;
 auto &registry = FileIORegistry::instance();
 
 static void loadBuiltInIOPlugins() {
-    parser.parseFileIOCatalog("scripts/examples/extensions/builtInIO/BuiltIns.json", registry);
+    // TODO don't hardcode this path here again, rather use a script-level test (much easier and more useful)
+    parser.parseFileIOCatalog("scripts/examples/extensions/builtInIO/BuiltIns.json", registry, 0);
     registry.captureBaseline();
 }
 
@@ -49,12 +49,12 @@ TEST_CASE("FileIOCatalogParser registers CSV plugin via registry", "[io][catalog
     loadBuiltInIOPlugins();
 
     // Should parse without throwing
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry, 0));
 
     // Now registry should have reader and writer for .csv and Frame type
 
-    REQUIRE_NOTHROW(registry.getReader(".csv", matrixHash));
-    REQUIRE_NOTHROW(registry.getWriter(".csv", matrixHash));
+    REQUIRE_NOTHROW(registry.getReader(".csv", PhyDataType::DENSEMATRIX));
+    REQUIRE_NOTHROW(registry.getWriter(".csv", PhyDataType::DENSEMATRIX));
     registry.resetToBaseline();
 }
 
@@ -64,15 +64,15 @@ TEST_CASE("FileIORegistry registerReader and getReader", "[io][registry]") {
 
     // Register a dummy reader for Frame type
     registry.registerReader(
-        ".test", frameHash, opts,
+        ".test", PhyDataType::FRAME, "default", 0, opts,
         [](void *res, const FileMetaData &fmd, const char *filename, IOOptions opts, DaphneContext *ctx) {
             // no-op
         });
 
-    SECTION("Lookup existing reader succeeds") { REQUIRE_NOTHROW(registry.getReader(".test", frameHash)); }
+    SECTION("Lookup existing reader succeeds") { REQUIRE_NOTHROW(registry.getReader(".test", PhyDataType::FRAME)); }
 
     SECTION("Lookup non-registered reader throws") {
-        REQUIRE_THROWS_AS(registry.getReader(".unknown", frameHash), std::out_of_range);
+        REQUIRE_THROWS_AS(registry.getReader(".unknown", PhyDataType::FRAME), std::runtime_error);
     }
     registry.resetToBaseline();
 }
@@ -80,11 +80,11 @@ TEST_CASE("FileIORegistry registerReader and getReader", "[io][registry]") {
 TEST_CASE("FileIO Plugin dynamic load and registration validity", "[io][plugin]") {
     // The parser already loads and registers the plugin
 
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry, 0));
 
     // Verify registry lookups work
-    auto reader = registry.getReader(".csv", matrixHash);
-    auto writer = registry.getWriter(".csv", matrixHash);
+    auto reader = registry.getReader(".csv", PhyDataType::DENSEMATRIX);
+    auto writer = registry.getWriter(".csv", PhyDataType::DENSEMATRIX);
 
     REQUIRE(reader != nullptr);
     REQUIRE(writer != nullptr);
@@ -109,8 +109,8 @@ TEST_CASE("FileIO csv_read loads numeric CSV into DenseMatrix<int32_t>", "[csv][
     IOOptions opts;
 
     // Register the CSV plugin
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
-    auto reader = registry.getReader(".csv", matrixHash, "Daphne");
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry, 0));
+    auto reader = registry.getReader(".csv", PhyDataType::DENSEMATRIX, "Daphne");
 
     // Invoke reader
     Structure *res = nullptr;
@@ -149,7 +149,7 @@ TEST_CASE("FileIO csv_write writes DenseMatrix<double> to CSV", "[csv][write]") 
     // IOOptions opts;
 
     // Register the CSV plugin
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry, 0));
 
     write(mat, outPath.c_str(), emptyFrame, ctx);
     // Read back file
@@ -171,7 +171,7 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader via Registry and Read kernel for m
     using DT = TestType;
     DT *m = nullptr;
 
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry, 0));
 
     REQUIRE_NOTHROW(read(m, CSV_FILE.c_str(), emptyFrame, nullptr));
 
@@ -202,16 +202,16 @@ TEST_CASE("FileIOCatalogParser parses options correctly", "[io][catalog]") {
 
     // Retrieve the parsed options from the registry
 
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry, 0));
 
-    IOOptions opts = registry.getOptions(".csv", IODataType::DENSEMATRIX, "Daphne");
+    IOOptions opts = registry.getOptions(".csv", PhyDataType::DENSEMATRIX, "Daphne");
 
     // Validate options fields
 
-    REQUIRE(opts.extra.size() == 3);
-    CHECK(opts.extra.at("delimiter") == ",");
-    CHECK(opts.extra.at("hasHeader") == "false");
-    CHECK(opts.extra.at("threads") == "1");
+    REQUIRE(opts.size() == 3);
+    CHECK(opts.at("delimiter") == ",");
+    CHECK(opts.at("hasHeader") == "false");
+    CHECK(opts.at("threads") == "1");
     FileIORegistry::instance().resetToBaseline();
 }
 
@@ -221,7 +221,7 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header u
     DT *m = nullptr;
 
     // Parse catalog (to simulate normal system setup)
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, registry, 0));
 
     // Create override options in a Frame
     std::vector<Structure *> columns(2);
@@ -271,7 +271,7 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO ReadParquet, DenseMatrix", TAG_IO, (DenseMatr
     using DT = TestType;
     DT *m = nullptr;
     FileIORegistry::instance().resetToBaseline();
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry, 0));
 
     read(m, "./test/runtime/local/io/ReadParquet1.parquet", emptyFrame, ctx);
 
@@ -321,7 +321,7 @@ TEST_CASE("FileIO parquet_write_frame writes Frame to Parquet", "[parquet][write
 
     // Register catalog (must map ".parquet"+"Frame" to parquet_write_frame)
 
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry, 0));
 
     std::vector<Structure *> columns(1);
     auto *keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
@@ -403,7 +403,7 @@ TEST_CASE("FileIO parquet_write writes DenseMatrix<double> to Parquet", "[parque
         std::filesystem::remove(outPath);
 
     // Registry + catalog (must include the parquet_write symbol mapping)
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry, 0));
 
     std::vector<Structure *> columns(1);
     auto *keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
@@ -472,8 +472,8 @@ TEST_CASE("FileIO Direct call proves selected engine runs") {
 
     IOOptions opts;
     // Register both engines for the same (.csv, FRAME)
-    reg.registerReader(".csv", IODataType::FRAME, "myReader", 5, opts, myReader);
-    reg.registerReader(".csv", IODataType::FRAME, "yourReader", 10, opts, yourReader);
+    reg.registerReader(".csv", PhyDataType::FRAME, "myReader", 5, opts, myReader);
+    reg.registerReader(".csv", PhyDataType::FRAME, "yourReader", 10, opts, yourReader);
 
     std::vector<Structure *> columns(1);
     auto *keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
@@ -508,8 +508,8 @@ TEST_CASE("FileIO Direct call proves selected engine runs") {
 TEST_CASE("FileIO Duplicate Registration is rejected") {
     IOOptions opts;
 
-    registry.registerReader(".csv", IODataType::FRAME, "myReader", 5, opts, myReader);
-    REQUIRE_THROWS(registry.registerReader(".csv", IODataType::FRAME, "myReader", 5, opts, yourReader));
+    registry.registerReader(".csv", PhyDataType::FRAME, "myReader", 5, opts, myReader);
+    REQUIRE_THROWS(registry.registerReader(".csv", PhyDataType::FRAME, "myReader", 5, opts, yourReader));
 
     registry.resetToBaseline();
 }
@@ -517,9 +517,9 @@ TEST_CASE("FileIO Duplicate Registration is rejected") {
 TEST_CASE("FileIO Duplicate lazy Registration is rejected") {
     IOOptions opts;
 
-    registry.registerLazy(".csv", IODataType::FRAME, "lib.so", "myReader", "mywriter", opts, "daphne", 5);
+    registry.registerLazy(".csv", PhyDataType::FRAME, "daphne", 5, opts, "lib.so", "myReader", "mywriter");
     REQUIRE_THROWS(
-        registry.registerLazy(".csv", IODataType::FRAME, "lib.so", "myReader", "mywriter", opts, "daphne", 5));
+        registry.registerLazy(".csv", PhyDataType::FRAME, "daphne", 5, opts, "lib.so", "myReader", "mywriter"));
 
     registry.resetToBaseline();
 }

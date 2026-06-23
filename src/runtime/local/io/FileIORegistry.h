@@ -1,6 +1,21 @@
+/*
+ * Copyright 2026 The DAPHNE Consortium
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #pragma once
-#include <cstddef>
-#include <dlfcn.h>
+
 #include <functional>
 #include <iostream>
 #include <map>
@@ -9,15 +24,16 @@
 #include <string>
 #include <tuple>
 
+#include <cstddef>
+#include <dlfcn.h>
+
 struct FileMetaData;
 class DaphneContext;
 
-enum IODataType { FRAME, DENSEMATRIX, CSRMATRIX };
+enum class PhyDataType { FRAME, DENSEMATRIX, CSRMATRIX };
 
 // Flexible options passed to readers/writers, stored externally
-struct IOOptions {
-    std::map<std::string, std::string> extra; // plugin-specific flags
-};
+using IOOptions = std::map<std::string, std::string>;
 
 // Lazy spec describing how to load a symbol from a shared lib
 struct LazySpec {
@@ -27,11 +43,11 @@ struct LazySpec {
     IOOptions opts;
 };
 
-// Generic reader signature including options
+// Generic reader signature.
 using GenericReader = std::function<void(void *res, const FileMetaData &fmd, const char *filename,
                                          const IOOptions &opts, DaphneContext *ctx)>;
 
-// Generic writer signature including options
+// Generic writer signature.
 using GenericWriter = std::function<void(const void *data, const FileMetaData &fmd, const char *filename,
                                          const IOOptions &opts, DaphneContext *ctx)>;
 
@@ -45,95 +61,91 @@ class FileIORegistry {
     }
 
     // ---------- Registration (engine + priority explicit) ----------
-    void registerReader(const std::string &ext, IODataType dt, const std::string &engine, int priority,
+    void registerReader(const std::string &ext, PhyDataType dt, const std::string &engine, int priority,
                         const IOOptions &opts, GenericReader fn) {
         std::lock_guard<std::mutex> lk(mtx);
         Key4 k{ext, engine, (size_t)dt, priority};
         if (readers.count(k) || (lazySpecs.count(k) && !lazySpecs.at(k).readerSymbol.empty()))
-            throw std::runtime_error("Duplicate reader for ext=" + ext + " engine=" + engine +
-                                     " dt=" + std::to_string(dt) + " priority=" + std::to_string(priority));
+            // TODO Print the human-readable name of the data type, not the numeric code.
+            throw std::runtime_error("duplicate reader for filename extension `" + ext + "`, engine `" + engine +
+                                     "`, data type `" + std::to_string(static_cast<int>(dt)) + "` and  priority " +
+                                     std::to_string(priority));
         readers[k] = std::move(fn);
         optionsMap[k] = opts;
     }
 
-    void registerWriter(const std::string &ext, IODataType dt, const std::string &engine, int priority,
+    void registerWriter(const std::string &ext, PhyDataType dt, const std::string &engine, int priority,
                         const IOOptions &opts, GenericWriter fn) {
         std::lock_guard<std::mutex> lk(mtx);
         Key4 k{ext, engine, (size_t)dt, priority};
         if (writers.count(k) || (lazySpecs.count(k) && !lazySpecs.at(k).writerSymbol.empty()))
-            throw std::runtime_error("Duplicate writer for ext=" + ext + " engine=" + engine +
-                                     " dt=" + std::to_string(dt) + " priority=" + std::to_string(priority));
+            // TODO Print the human-readable name of the data type, not the numeric code.
+            throw std::runtime_error("duplicate writer for filename extension `" + ext + "`, engine `" + engine +
+                                     "` datatype `" + std::to_string(static_cast<int>(dt)) + "` and priority " +
+                                     std::to_string(priority));
         writers[k] = std::move(fn);
         optionsMap[k] = opts;
     }
 
-    // Back-compat: single impl (engine="default", priority=0)
-    void registerReader(const std::string &ext, IODataType dt, const IOOptions &opts, GenericReader fn) {
-        registerReader(ext, dt, "default", 0, opts, std::move(fn));
-    }
-
-    void registerWriter(const std::string &ext, IODataType dt, const IOOptions &opts, GenericWriter fn) {
-        registerWriter(ext, dt, "default", 0, opts, std::move(fn));
-    }
-
-    void registerLazy(const std::string &ext, IODataType dt, const std::string &libPath,
-                      const std::string &readerSymbol, const std::string &writerSymbol, const IOOptions &opts,
-                      const std::string &engine, int priority) {
+    void registerLazy(const std::string &ext, PhyDataType dt, const std::string &engine, int priority,
+                      const IOOptions &opts, const std::string &libPath, const std::string &readerSymbol,
+                      const std::string &writerSymbol) {
         std::lock_guard<std::mutex> lk(mtx);
         Key4 k{ext, engine, (size_t)dt, priority};
 
         // Reject if anything already exists for this full key
         if (lazySpecs.find(k) != lazySpecs.end() || readers.find(k) != readers.end() ||
-            writers.find(k) != writers.end()) {
-            throw std::runtime_error("registerLazy: duplicate registration for (ext=" + ext + ", engine=" + engine +
-                                     ", dt=" + std::to_string(dt) + ", prio=" + std::to_string(priority) + ")");
-        }
+            writers.find(k) != writers.end())
+            // TODO Print the human-readable name of the data type, not the numeric code.
+            throw std::runtime_error("duplicate lazy registration for filename extension `" + ext + "`, engine `" +
+                                     engine + "`, data type `" + std::to_string(static_cast<int>(dt)) +
+                                     "` and priority " + std::to_string(priority));
 
         lazySpecs[k] = LazySpec{libPath, readerSymbol, writerSymbol, opts};
         optionsMap[k] = opts; // defaults visible pre-load
     }
 
     // ---------- Lookup (engine optional; highest priority wins) ----------
-    GenericReader getReader(const std::string &ext, IODataType dt, const std::string &engine /* may be "" */) {
+    GenericReader getReader(const std::string &ext, PhyDataType dt, const std::string &engine /* may be "" */) {
         std::lock_guard<std::mutex> lk(mtx);
 
         const Key4 *best = findBestKey(readers, ext, (size_t)dt, engine);
         if (!best)
             best = findBestKey(lazySpecs, ext, (size_t)dt, engine);
         if (!best)
-            throw std::out_of_range("No suitable reader found in the registry");
+            throw std::runtime_error("no suitable reader found in the registry");
 
         return ensureReaderLoaded(*best);
     }
 
-    GenericWriter getWriter(const std::string &ext, IODataType dt, const std::string &engine /* may be "" */) {
+    GenericWriter getWriter(const std::string &ext, PhyDataType dt, const std::string &engine /* may be "" */) {
         std::lock_guard<std::mutex> lk(mtx);
 
         const Key4 *best = findBestKey(writers, ext, (size_t)dt, engine);
         if (!best)
             best = findBestKey(lazySpecs, ext, (size_t)dt, engine);
         if (!best)
-            throw std::out_of_range("No suitable writer found in the registry");
+            throw std::runtime_error("no suitable writer found in the registry");
 
         return ensureWriterLoaded(*best);
     }
 
     // Back-compat overloads (default engine selection)
-    GenericReader getReader(const std::string &ext, IODataType dt) {
+    GenericReader getReader(const std::string &ext, PhyDataType dt) {
         return getReader(ext, dt, "" /* default selection */);
     }
-    GenericWriter getWriter(const std::string &ext, IODataType dt) {
+    GenericWriter getWriter(const std::string &ext, PhyDataType dt) {
         return getWriter(ext, dt, "" /* default selection */);
     }
 
     // ---------- Options helpers ----------
     // Returns the IOOptions bound to the selected impl (best by engine/priority)
-    const IOOptions &getOptions(const std::string &ext, IODataType dt, const std::string &engine /* may be "" */) {
+    const IOOptions &getOptions(const std::string &ext, PhyDataType dt, const std::string &engine /* may be "" */) {
         std::lock_guard<std::mutex> lk(mtx);
 
         const Key4 *best = findBestKey(optionsMap, ext, (size_t)dt, engine);
         if (!best)
-            throw std::out_of_range("No suitable options found in the registry");
+            throw std::runtime_error("no suitable options found in the registry");
         return optionsMap.at(*best);
     }
 
@@ -178,13 +190,13 @@ class FileIORegistry {
     void dumpReaders(std::ostream &os = std::cerr) const {
         std::lock_guard<std::mutex> lk(mtx);
 
-        auto ioTypeName = [](IODataType t) {
+        auto ioTypeName = [](PhyDataType t) {
             switch (t) {
-            case FRAME:
+            case PhyDataType::FRAME:
                 return "Frame";
-            case DENSEMATRIX:
+            case PhyDataType::DENSEMATRIX:
                 return "DenseMatrix";
-            case CSRMATRIX:
+            case PhyDataType::CSRMATRIX:
                 return "CSRMatrix";
             }
             return "?";
@@ -197,7 +209,7 @@ class FileIORegistry {
             const auto &k = kv.first;
             const std::string &ext = std::get<0>(k);
             const std::string &engine = std::get<1>(k);
-            IODataType dt = static_cast<IODataType>(std::get<2>(k));
+            PhyDataType dt = static_cast<PhyDataType>(std::get<2>(k));
             int prio = std::get<3>(k);
             os << "  [loaded] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
                << "'  priority=" << prio << "\n";
@@ -214,10 +226,11 @@ class FileIORegistry {
 
             const std::string &ext = std::get<0>(k);
             const std::string &engine = std::get<1>(k);
-            IODataType dt = static_cast<IODataType>(std::get<2>(k));
+            PhyDataType dt = static_cast<PhyDataType>(std::get<2>(k));
             int prio = std::get<3>(k);
             os << "  [lazy  ] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
-               << "'  priority=" << prio << "  symbol='" << spec.readerSymbol << "'" << "  lib='" << spec.libPath << "'"
+               << "'  priority=" << prio << "  symbol='" << spec.readerSymbol << "'"
+               << "  lib='" << spec.libPath << "'"
                << "\n";
         }
         os << std::flush;
@@ -226,13 +239,13 @@ class FileIORegistry {
     void dumpWriters(std::ostream &os = std::cerr) const {
         std::lock_guard<std::mutex> lk(mtx);
 
-        auto ioTypeName = [](IODataType t) {
+        auto ioTypeName = [](PhyDataType t) {
             switch (t) {
-            case FRAME:
+            case PhyDataType::FRAME:
                 return "Frame";
-            case DENSEMATRIX:
+            case PhyDataType::DENSEMATRIX:
                 return "DenseMatrix";
-            case CSRMATRIX:
+            case PhyDataType::CSRMATRIX:
                 return "CSRMatrix";
             }
             return "?";
@@ -245,7 +258,7 @@ class FileIORegistry {
             const auto &k = kv.first;
             const std::string &ext = std::get<0>(k);
             const std::string &engine = std::get<1>(k);
-            IODataType dt = static_cast<IODataType>(std::get<2>(k));
+            PhyDataType dt = static_cast<PhyDataType>(std::get<2>(k));
             int prio = std::get<3>(k);
             os << "  [loaded] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
                << "'  priority=" << prio << "\n";
@@ -262,10 +275,11 @@ class FileIORegistry {
 
             const std::string &ext = std::get<0>(k);
             const std::string &engine = std::get<1>(k);
-            IODataType dt = static_cast<IODataType>(std::get<2>(k));
+            PhyDataType dt = static_cast<PhyDataType>(std::get<2>(k));
             int prio = std::get<3>(k);
             os << "  [lazy  ] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
-               << "'  priority=" << prio << "  symbol='" << spec.writerSymbol << "'" << "  lib='" << spec.libPath << "'"
+               << "'  priority=" << prio << "  symbol='" << spec.writerSymbol << "'"
+               << "  lib='" << spec.libPath << "'"
                << "\n";
         }
         os << std::flush;
@@ -332,23 +346,23 @@ class FileIORegistry {
         // lazy resolve via spec
         auto itL = lazySpecs.find(k);
         if (itL == lazySpecs.end())
-            throw std::out_of_range("No reader (and no lazy spec) for requested key");
+            throw std::runtime_error("no reader (and no lazy spec) for requested key");
 
         const auto &spec = itL->second;
         if (spec.readerSymbol.empty())
-            throw std::runtime_error("No reader symbol specified");
+            throw std::runtime_error("no reader symbol specified");
 
         void *&h = libHandles[spec.libPath];
         if (!h) {
             h = dlopen(spec.libPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
             if (!h)
-                throw std::runtime_error("dlopen failed for " + spec.libPath + ": " + std::string(dlerror()));
+                throw std::runtime_error("dlopen() failed for `" + spec.libPath + "`: " + std::string(dlerror()));
         }
         using ReaderFn = void (*)(void *, const FileMetaData &, const char *, const IOOptions &, DaphneContext *);
         void *sym = dlsym(h, spec.readerSymbol.c_str());
         if (!sym)
-            throw std::runtime_error("dlsym failed for " + spec.readerSymbol + " in " + spec.libPath + ": " +
-                                     std::string(dlerror()));
+            throw std::runtime_error("dlsym() failed for ''" + spec.readerSymbol + "` in `" + spec.libPath +
+                                     "`: " + std::string(dlerror()));
 
         readers[k] = GenericReader(reinterpret_cast<ReaderFn>(sym));
         return readers[k];
@@ -360,29 +374,28 @@ class FileIORegistry {
 
         auto itL = lazySpecs.find(k);
         if (itL == lazySpecs.end())
-            throw std::out_of_range("No writer (and no lazy spec) for requested key");
+            throw std::runtime_error("no writer (and no lazy spec) for requested key");
 
         const auto &spec = itL->second;
         if (spec.writerSymbol.empty())
-            throw std::runtime_error("No writer symbol specified");
+            throw std::runtime_error("no writer symbol specified");
 
         void *&h = libHandles[spec.libPath];
         if (!h) {
             h = dlopen(spec.libPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
             if (!h)
-                throw std::runtime_error("dlopen failed for " + spec.libPath + ": " + std::string(dlerror()));
+                throw std::runtime_error("dlopen() failed for `" + spec.libPath + "`: " + std::string(dlerror()));
         }
         using WriterFn = void (*)(const void *, const FileMetaData &, const char *, const IOOptions &, DaphneContext *);
         void *sym = dlsym(h, spec.writerSymbol.c_str());
         if (!sym)
-            throw std::runtime_error("dlsym failed for " + spec.writerSymbol + " in " + spec.libPath + ": " +
-                                     std::string(dlerror()));
+            throw std::runtime_error("dlsym() failed for `" + spec.writerSymbol + "` in `" + spec.libPath +
+                                     "`: " + std::string(dlerror()));
 
         writers[k] = GenericWriter(reinterpret_cast<WriterFn>(sym));
         return writers[k];
     }
 
-  private:
     mutable std::mutex mtx;
 
     // Core maps now keyed by (ext, engine, dt, priority)

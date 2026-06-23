@@ -1284,28 +1284,14 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
         auto *ctx = builder.getContext();
 
         if (numArgs == 1) {
-            auto strTy = mlir::daphne::StringType::get(ctx);
-
-            auto emptyStr = builder.create<mlir::daphne::ConstantOp>(loc, strTy, builder.getStringAttr(""));
-
-            auto oneIdx = builder.create<mlir::arith::ConstantIndexOp>(loc, 1);
-
-            auto oneByOneMat = builder.create<mlir::daphne::FillOp>(loc, mlir::daphne::MatrixType::get(ctx, strTy),
-                                                                    emptyStr, oneIdx, oneIdx);
-
-            auto labelStr = builder.create<mlir::daphne::ConstantOp>(loc, strTy, builder.getStringAttr("dummy"));
-
-            auto oneByOneFT = mlir::daphne::FrameType::get(ctx, {strTy}, 1, 1, nullptr);
-
-            auto cf = builder.create<mlir::daphne::CreateFrameOp>(loc, oneByOneFT, mlir::ValueRange{oneByOneMat},
-                                                                  mlir::ValueRange{labelStr});
-
+            auto emptyFrmTy = mlir::daphne::FrameType::get(ctx, {}, 1, 0, nullptr);
+            auto cf =
+                builder.create<mlir::daphne::CreateFrameOp>(loc, emptyFrmTy, mlir::ValueRange{}, mlir::ValueRange{});
             mlir::Value optsFrame = cf.getResult();
 
-            return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0], optsFrame));
-        } else {
-            return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, /*filename = */ args[0], args[1]));
-        }
+            return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, args[0], optsFrame));
+        } else
+            return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, args[0], args[1]));
     }
 
     if (func == "readFrame") {
@@ -1313,28 +1299,14 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
         auto *ctx = builder.getContext();
         mlir::Type resType = mlir::daphne::FrameType::get(builder.getContext(), {utils.unknownType});
         if (numArgs == 1) {
-            auto strTy = mlir::daphne::StringType::get(ctx);
-
-            auto emptyStr = builder.create<mlir::daphne::ConstantOp>(loc, strTy, builder.getStringAttr(""));
-
-            auto oneIdx = builder.create<mlir::arith::ConstantIndexOp>(loc, 1);
-
-            auto oneByOneMat = builder.create<mlir::daphne::FillOp>(loc, mlir::daphne::MatrixType::get(ctx, strTy),
-                                                                    emptyStr, oneIdx, oneIdx);
-
-            auto labelStr = builder.create<mlir::daphne::ConstantOp>(loc, strTy, builder.getStringAttr("dummy"));
-
-            auto oneByOneFT = mlir::daphne::FrameType::get(ctx, {strTy}, 1, 1, nullptr);
-
-            auto cf = builder.create<mlir::daphne::CreateFrameOp>(loc, oneByOneFT, mlir::ValueRange{oneByOneMat},
-                                                                  mlir::ValueRange{labelStr});
-
+            auto emptyFrmTy = mlir::daphne::FrameType::get(ctx, {}, 1, 0, nullptr);
+            auto cf =
+                builder.create<mlir::daphne::CreateFrameOp>(loc, emptyFrmTy, mlir::ValueRange{}, mlir::ValueRange{});
             mlir::Value optsFrame = cf.getResult();
 
             return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, args[0], optsFrame));
-        } else {
+        } else
             return static_cast<mlir::Value>(builder.create<ReadOp>(loc, resType, args[0], args[1]));
-        }
     }
 
     if (func == "writeFrame" || func == "writeMatrix" || func == "write") {
@@ -1345,28 +1317,14 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
         mlir::Value arg = args[0];
         mlir::Value filename = args[1];
         if (numArgs == 2) {
-            auto strTy = mlir::daphne::StringType::get(ctx);
-
-            auto emptyStr = builder.create<mlir::daphne::ConstantOp>(loc, strTy, builder.getStringAttr(""));
-
-            auto oneIdx = builder.create<mlir::arith::ConstantIndexOp>(loc, 1);
-
-            auto oneByOneMat = builder.create<mlir::daphne::FillOp>(loc, mlir::daphne::MatrixType::get(ctx, strTy),
-                                                                    emptyStr, oneIdx, oneIdx);
-
-            auto labelStr = builder.create<mlir::daphne::ConstantOp>(loc, strTy, builder.getStringAttr("dummy"));
-
-            auto oneByOneFT = mlir::daphne::FrameType::get(ctx, {strTy}, 1, 1, nullptr);
-
-            auto cf = builder.create<mlir::daphne::CreateFrameOp>(loc, oneByOneFT, mlir::ValueRange{oneByOneMat},
-                                                                  mlir::ValueRange{labelStr});
-
+            auto emptyFrmTy = mlir::daphne::FrameType::get(ctx, {}, 1, 0, nullptr);
+            auto cf =
+                builder.create<mlir::daphne::CreateFrameOp>(loc, emptyFrmTy, mlir::ValueRange{}, mlir::ValueRange{});
             mlir::Value optsFrame = cf.getResult();
 
             return builder.create<WriteOp>(loc, arg, filename, optsFrame).getOperation();
-        } else {
+        } else
             return builder.create<WriteOp>(loc, arg, filename, args[2]).getOperation();
-        }
     }
     if (func == "receiveFromNumpy") {
         checkNumArgsExact(loc, func, numArgs, 4);

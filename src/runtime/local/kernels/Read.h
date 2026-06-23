@@ -17,15 +17,15 @@
 #ifndef SRC_RUNTIME_LOCAL_KERNELS_READ_H
 #define SRC_RUNTIME_LOCAL_KERNELS_READ_H
 
-#include "runtime/local/io/FileIORegistry.h"
-#include <cstddef>
-#include <iostream>
+#include "runtime/local/datastructures/ValueTypeCode.h"
+#include "runtime/local/datastructures/ValueTypeUtils.h"
 #include <parser/metadata/MetaDataParser.h>
 #include <runtime/local/context/DaphneContext.h>
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/datastructures/Frame.h>
 #include <runtime/local/io/File.h>
+#include <runtime/local/io/FileIORegistry.h>
 #include <runtime/local/io/ReadCsv.h>
 #include <runtime/local/io/ReadDaphne.h>
 #include <runtime/local/io/ReadMM.h>
@@ -35,16 +35,18 @@
 #endif
 
 #include <filesystem>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 
-static Frame *dummyFrame = DataObjectFactory::create<Frame>(0, 0, nullptr, nullptr, false);
+#include <cstddef>
 
 // ****************************************************************************
 // Helper: Merge a Frame* of column-label → single-row-value into IOOptions
 // ****************************************************************************
-static IOOptions mergeOptionsFromFrame(const std::string &ext, IODataType dt, const std::string &engine,
-                                       Frame *optsFrame, DCTX(ctx)) {
+
+static IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const std::string &engine,
+                                       const Frame *optsFrame, DCTX(ctx)) {
     auto &reg = ctx ? ctx->config.registry : FileIORegistry::instance();
 
     // Ask the registry for defaults for this (ext, dt, engine).
@@ -53,44 +55,47 @@ static IOOptions mergeOptionsFromFrame(const std::string &ext, IODataType dt, co
 
     IOOptions merged = defaults;
 
-    if (optsFrame != nullptr && optsFrame->getLabels()[0] != "dummy") {
-        const size_t nRows = optsFrame->getNumRows();
-        const size_t nCols = optsFrame->getNumCols();
-        if (nRows == 0)
-            return merged;
+    const size_t numRows = optsFrame->getNumRows();
+    const size_t numCols = optsFrame->getNumCols();
 
-        const std::string *labels = optsFrame->getLabels();
+    if (numRows != 1)
+        throw std::runtime_error("the file reader/writer options must be a frame with exactly one row, but found " +
+                                 std::to_string(numRows) + " rows");
 
-        for (size_t colIdx = 0; colIdx < nCols; ++colIdx) {
-            const std::string &key = labels[colIdx];
+    if (optsFrame == nullptr || numCols == 0)
+        return merged;
 
-            // Ignore non-plugin selection knobs if user sent them in the frame.
-            if (key == "engine" || key == "priority")
-                continue;
+    const std::string *labels = optsFrame->getLabels();
 
-            std::string value;
-            if (auto *strCol = dynamic_cast<DenseMatrix<std::string> *>(optsFrame->getColumn<std::string>(colIdx))) {
-                value = strCol->get(0, 0);
-            } else if (auto *boolCol = dynamic_cast<DenseMatrix<bool> *>(optsFrame->getColumn<bool>(colIdx))) {
-                value = boolCol->get(0, 0) ? "true" : "false";
-            } else if (auto *intCol = dynamic_cast<DenseMatrix<int64_t> *>(optsFrame->getColumn<int64_t>(colIdx))) {
-                value = std::to_string(intCol->get(0, 0));
-            } else if (auto *floatCol = dynamic_cast<DenseMatrix<double> *>(optsFrame->getColumn<double>(colIdx))) {
-                value = std::to_string(floatCol->get(0, 0));
-            } else {
-                throw std::runtime_error("Unsupported column type for option: " + key);
-            }
+    for (size_t c = 0; c < numCols; ++c) {
+        const std::string &key = labels[c];
 
-            // Only override known plugin options
-            auto itKnown = merged.extra.find(key);
-            if (itKnown == merged.extra.end()) {
-                // silently ignore unknown keys instead of throwing if you prefer:
-                // continue;
-                throw std::runtime_error("Unknown option '" + key + "'");
-            }
+        // Ignore non-plugin selection knobs if user sent them in the frame.
+        if (key == "engine" || key == "priority")
+            continue;
 
-            merged.extra[key] = value;
+        std::string value;
+        if (auto *strCol = dynamic_cast<const DenseMatrix<std::string> *>(optsFrame->getColumn<std::string>(c))) {
+            value = strCol->get(0, 0);
+        } else if (auto *boolCol = dynamic_cast<const DenseMatrix<bool> *>(optsFrame->getColumn<bool>(c))) {
+            value = boolCol->get(0, 0) ? "true" : "false";
+        } else if (auto *intCol = dynamic_cast<const DenseMatrix<int64_t> *>(optsFrame->getColumn<int64_t>(c))) {
+            value = std::to_string(intCol->get(0, 0));
+        } else if (auto *floatCol = dynamic_cast<const DenseMatrix<double> *>(optsFrame->getColumn<double>(c))) {
+            value = std::to_string(floatCol->get(0, 0));
+        } else
+            throw std::runtime_error("unsupported column type for option `" + key +
+                                     "`, expected either string, bool, int64_t, or double");
+
+        // Only override known plugin options
+        auto itKnown = merged.find(key);
+        if (itKnown == merged.end()) {
+            // silently ignore unknown keys instead of throwing if you prefer:
+            // continue;
+            throw std::runtime_error("unknown option: `" + key + "`");
         }
+
+        merged[key] = value;
     }
 
     return merged;
@@ -98,28 +103,28 @@ static IOOptions mergeOptionsFromFrame(const std::string &ext, IODataType dt, co
 
 // Extract "engine" (and ignore "priority") from the options Frame if present.
 // Returns "" if not provided (so registry picks highest-priority default).
-static std::string extractEngineFromFrame(Frame *optsFrame) {
-
+static std::string extractEngineFromFrame(const Frame *optsFrame) {
     if (!optsFrame)
         return "";
-    if (optsFrame->getNumRows() == 0)
-        return "";
-    const auto *labels = optsFrame->getLabels();
-    const size_t nCols = optsFrame->getNumCols();
 
-    for (size_t c = 0; c < nCols; ++c) {
+    const size_t numRows = optsFrame->getNumRows();
+    const size_t numCols = optsFrame->getNumCols();
+
+    if (numRows != 1)
+        throw std::runtime_error("the file reader/writer options must be a frame with exactly one row, but found " +
+                                 std::to_string(numRows) + " rows");
+
+    const std::string *labels = optsFrame->getLabels();
+    for (size_t c = 0; c < numCols; ++c)
         if (labels[c] == "engine") {
-            if (auto *strCol = dynamic_cast<DenseMatrix<std::string> *>(optsFrame->getColumn<std::string>(c)))
-                return strCol->get(0, 0);
-            // allow non-string columns too (we’ll stringify)
-            if (auto *boolCol = dynamic_cast<DenseMatrix<bool> *>(optsFrame->getColumn<bool>(c)))
-                return boolCol->get(0, 0) ? "true" : "false";
-            if (auto *intCol = dynamic_cast<DenseMatrix<int64_t> *>(optsFrame->getColumn<int64_t>(c)))
-                return std::to_string(intCol->get(0, 0));
-            if (auto *floatCol = dynamic_cast<DenseMatrix<double> *>(optsFrame->getColumn<double>(c)))
-                return std::to_string(floatCol->get(0, 0));
+            ValueTypeCode vtc = optsFrame->getColumnType(c);
+            if (vtc == ValueTypeCode::STR)
+                return optsFrame->getColumn<std::string>(c)->get(0, 0);
+            else
+                throw std::runtime_error(
+                    "the attribute `engine` of the reader/writer options must be of type string, but found `" +
+                    ValueTypeUtils::cppNameForCode(vtc) + "`");
         }
-    }
     return "";
 }
 
@@ -128,29 +133,30 @@ static std::string extractEngineFromFrame(Frame *optsFrame) {
 // ****************************************************************************
 
 template <class DTRes> struct Read {
-    static void apply(DTRes *&res, const char *filename, Frame *opts, DCTX(ctx)) = delete;
+    static void apply(DTRes *&res, const char *filename, const Frame *opts, DCTX(ctx)) = delete;
 };
 
 // ****************************************************************************
 // Convenience function
 // ****************************************************************************
 
-template <class DTRes> void read(DTRes *&res, const char *filename, Frame *opts, DCTX(ctx)) {
+template <class DTRes> void read(DTRes *&res, const char *filename, const Frame *opts, DCTX(ctx)) {
     Read<DTRes>::apply(res, filename, opts, ctx);
 }
+
+// ****************************************************************************
+// (Partial) template specializations for different data/value types
+// ****************************************************************************
 
 // ----------------------------------------------------------------------------
 // DenseMatrix
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct Read<DenseMatrix<VT>> {
-    // ------------------------------------------------------------------------
-    // Overload: DenseMatrix with an options‐Frame
-    // ------------------------------------------------------------------------
-    static void apply(DenseMatrix<VT> *&res, const char *filename, Frame *optsFrame, DCTX(ctx)) {
+    static void apply(DenseMatrix<VT> *&res, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
-        IODataType typeHash = DENSEMATRIX;
+        PhyDataType dt = PhyDataType::DENSEMATRIX;
         try {
             auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
 
@@ -158,10 +164,10 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
             std::string engine = extractEngineFromFrame(optsFrame);
 
             // Select reader with engine hint
-            auto reader = registry.getReader(ext, typeHash, engine);
+            auto reader = registry.getReader(ext, dt, engine);
 
             // Merge user overrides using defaults for that engine
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, ctx);
 
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
@@ -180,22 +186,19 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
             }
         }
 #endif
-        throw std::runtime_error("no suitable reader found");
+        throw std::runtime_error("no suitable writer found in the registry");
     }
-}; // end Read<DenseMatrix<VT>>
+};
 
 // ----------------------------------------------------------------------------
 // CSRMatrix
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct Read<CSRMatrix<VT>> {
-    // ------------------------------------------------------------------------
-    // Overload: CSRMatrix with an options‐Frame
-    // ------------------------------------------------------------------------
-    static void apply(CSRMatrix<VT> *&res, const char *filename, Frame *optsFrame, DCTX(ctx)) {
+    static void apply(CSRMatrix<VT> *&res, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
-        IODataType typeHash = CSRMATRIX;
+        PhyDataType dt = PhyDataType::CSRMATRIX;
         try {
             auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
 
@@ -203,10 +206,10 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
             std::string engine = extractEngineFromFrame(optsFrame);
 
             // Select reader with engine hint
-            auto reader = registry.getReader(ext, typeHash, engine);
+            auto reader = registry.getReader(ext, dt, engine);
 
             // Merge user overrides using defaults for that engine
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, ctx);
 
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
@@ -214,39 +217,35 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
             throw std::runtime_error("no suitable reader found in the registry");
         }
     }
-}; // end Read<CSRMatrix<VT>>
+};
 
 // ----------------------------------------------------------------------------
 // Frame
 // ----------------------------------------------------------------------------
 
 template <> struct Read<Frame> {
-    // ------------------------------------------------------------------------
-    // Overload: Frame with an options‐Frame
-    // ------------------------------------------------------------------------
-    static void apply(Frame *&res, const char *filename, Frame *optsFrame, DCTX(ctx)) {
+    static void apply(Frame *&res, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
         FileMetaData fmd = MetaDataParser::readMetaData(filename);
         std::string ext(std::filesystem::path(filename).extension());
-        IODataType typeHash = FRAME;
-        std::string engine;
+        PhyDataType dt = PhyDataType::FRAME;
         try {
             auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
 
             // Get the engine (may be "")
-            engine = extractEngineFromFrame(optsFrame);
+            std::string engine = extractEngineFromFrame(optsFrame);
 
             // Select reader with engine hint
-            auto reader = registry.getReader(ext, typeHash, engine);
+            auto reader = registry.getReader(ext, dt, engine);
 
             // Merge user overrides using defaults for that engine
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, typeHash, engine, optsFrame, ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, ctx);
 
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
         } catch (const std::out_of_range &) {
-            throw std::runtime_error("No suitable reader found in the registry");
+            throw std::runtime_error("no suitable reader found in the registry");
         }
     }
-}; // end Read<Frame>
+};
 
 #endif // SRC_RUNTIME_LOCAL_KERNELS_READ_H

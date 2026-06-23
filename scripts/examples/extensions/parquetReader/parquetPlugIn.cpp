@@ -182,7 +182,7 @@ void parquet_read(Structure *&res, const FileMetaData &fmd, const char *filename
 
     // 3) thread count
     int threads = 1;
-    if (auto it = opts.extra.find("threads"); it != opts.extra.end())
+    if (auto it = opts.find("threads"); it != opts.end())
         threads = std::max(1, std::stoi(it->second));
 
     const bool is_si8 = (fmd.isSingleValueType && fmd.schema[0] == ValueTypeCode::SI8);
@@ -1156,7 +1156,7 @@ void parquet_read_frame(Frame *&res, const FileMetaData &fmd, const char *filena
 
     // 4) threading
     int threads = 1;
-    if (auto it = opts.extra.find("threads"); it != opts.extra.end())
+    if (auto it = opts.find("threads"); it != opts.end())
         threads = std::max(1, std::stoi(it->second));
 
     std::mutex mtx;
@@ -1367,7 +1367,7 @@ extern "C" void parquet_write(const void *data, const FileMetaData &fmd, const c
 
     // Chunking to avoid Arrow 2GB-per-array limit
     int64_t chunk_rows = 1024 * 1024; // default: 1M rows
-    if (auto it = opts.extra.find("row_group_size"); it != opts.extra.end()) {
+    if (auto it = opts.find("row_group_size"); it != opts.end()) {
         try {
             chunk_rows = std::max<int64_t>(1, std::stoll(it->second));
         } catch (...) {
@@ -1376,7 +1376,7 @@ extern "C" void parquet_write(const void *data, const FileMetaData &fmd, const c
 
     // Compression (snappy|gzip|zstd|brotli|lz4|none)
     parquet::Compression::type comp = parquet::Compression::SNAPPY;
-    if (auto it = opts.extra.find("compression"); it != opts.extra.end()) {
+    if (auto it = opts.find("compression"); it != opts.end()) {
         std::string s = it->second;
         std::transform(s.begin(), s.end(), s.begin(), ::tolower);
         if (s == "none" || s == "uncompressed")
@@ -1396,7 +1396,7 @@ extern "C" void parquet_write(const void *data, const FileMetaData &fmd, const c
 
     // large string option (use 64-bit offsets)
     bool use_large_str = false;
-    if (auto it = opts.extra.find("large_strings"); it != opts.extra.end()) {
+    if (auto it = opts.find("large_strings"); it != opts.end()) {
         std::string s = it->second;
         std::transform(s.begin(), s.end(), s.begin(), ::tolower);
         use_large_str = (s == "1" || s == "true" || s == "yes");
@@ -1571,7 +1571,7 @@ void parquet_write_frame(const void *data, const FileMetaData &fmd, const char *
 
     // Options: row group size + compression
     int64_t row_group_size = 1024 * 1024; // default 1M rows/rg
-    if (auto it = opts.extra.find("row_group_size"); it != opts.extra.end()) {
+    if (auto it = opts.find("row_group_size"); it != opts.end()) {
         try {
             row_group_size = std::max<int64_t>(1, std::stoll(it->second));
         } catch (...) {
@@ -1579,7 +1579,7 @@ void parquet_write_frame(const void *data, const FileMetaData &fmd, const char *
     }
 
     parquet::Compression::type comp = parquet::Compression::SNAPPY;
-    if (auto it = opts.extra.find("compression"); it != opts.extra.end()) {
+    if (auto it = opts.find("compression"); it != opts.end()) {
         std::string s = it->second;
         std::transform(s.begin(), s.end(), s.begin(), ::tolower);
         if (s == "none" || s == "uncompressed")
