@@ -1,0 +1,3 @@
+// Empty frame literals
+
+print({});

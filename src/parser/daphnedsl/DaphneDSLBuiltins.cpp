@@ -473,7 +473,6 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
         return static_cast<mlir::Value>(builder.create<FillOp>(loc, utils.matrixOf(arg), arg, numRows, numCols));
     }
     if (func == "createFrame") {
-        checkNumArgsMin(loc, func, numArgs, 1);
         // Determine which arguments are column matrices and which are labels.
         std::vector<mlir::Type> colTypes;
         std::vector<mlir::Value> cols;
@@ -490,7 +489,7 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
                 labels.push_back(arg);
             } else
                 throw ErrorHandler::compilerError(loc, "DSLBuiltins",
-                                                  "arguments to createFrame() built-in function must be one "
+                                                  "arguments to createFrame() built-in function must be zero "
                                                   "or "
                                                   "more matrices optionally followed by equally many "
                                                   "strings");

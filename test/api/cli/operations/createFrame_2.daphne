@@ -1,0 +1,4 @@
+// Given neither column matrices nor labels (empty frame).
+
+f = createFrame();
+print(f);

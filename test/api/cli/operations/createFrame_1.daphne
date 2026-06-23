@@ -1,3 +1,5 @@
+// Given column matrices but no labels.
+
 c1 = fill(123, 5, 1);
 c2 = seq(100.5, 140.5, 10.0);
 c3 = seq(-4, 4, 2);

@@ -55,6 +55,10 @@ std::pair<ssize_t, ssize_t> getShape(Value v) {
 }
 
 ssize_t inferNumRowsFromArgs(Operation *op, ValueRange vs) {
+    // If there are no arguments, their common number of rows is unknown.
+    if (vs.empty())
+        return -1;
+
     // If the #rows of all arguments is known and matches, then this is the
     // inferred #rows. If the known #rows of any two arguments mismatch, an
     // exception is thrown. Otherwise, if the #rows of any argument is unknown,

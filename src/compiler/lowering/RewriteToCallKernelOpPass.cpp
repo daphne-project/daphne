@@ -236,7 +236,16 @@ class KernelReplacement : public RewritePattern {
                     // underlying kernel expects an "empty list" (represented
                     // in the DAPHNE compiler by an empty VariadicPack).
                     if (llvm::dyn_cast<daphne::GroupOp>(op) && i == 2)
-                        // A GroupOp may have zero aggregation column names.
+                        // A GroupOp may have zero aggregation column names, but their type is string anyway.
+                        odsOperandTy = daphne::StringType::get(rewriter.getContext());
+                    else if (llvm::dyn_cast<daphne::CreateFrameOp>(op) && i == 0)
+                        // A CreateFrameOp may have zero column matrices, but their type is matrix anyway.
+                        // The unknown value type does not hurt here, since the createFrame-kernel anyway gets the
+                        // column matrices as type Structure.
+                        odsOperandTy = daphne::MatrixType::get(rewriter.getContext(),
+                                                               daphne::UnknownType::get(rewriter.getContext()));
+                    else if (llvm::dyn_cast<daphne::CreateFrameOp>(op) && i == 1)
+                        // A CreateFrameOp may have zero column labels, but their type is string anyway.
                         odsOperandTy = daphne::StringType::get(rewriter.getContext());
                     else
                         throw std::runtime_error("RewriteToCallKernelOpPass encountered a variadic "

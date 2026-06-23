@@ -216,8 +216,6 @@ class Frame : public Structure {
     Frame(const std::vector<Structure *> &colMats, const std::string *labels)
         : Structure(colMats.empty() ? 0 : colMats[0]->getNumRows(), colMats.size()) {
         const size_t numCols = colMats.size();
-        if (numCols == 0)
-            throw std::runtime_error("Frame: at least one column matrix must be provided");
         schema = new ValueTypeCode[numCols];
         this->labels = new std::string[numCols];
         columns = new std::shared_ptr<ColByteType>[numCols];
