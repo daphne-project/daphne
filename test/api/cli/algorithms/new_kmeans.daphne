@@ -1,0 +1,98 @@
+import "../../../../scripts/algorithms/kmeans.daph";
+
+seed = 128;
+
+# Number of clusters
+num_centroids = $arg1;
+# Maximum number of points assigned to each cluster
+max_points = $arg2;
+# Maximum random noise level
+noise_level = $arg3;
+# Dimensionality of the dataset
+dimensions = $arg4;
+# Maximum random values for the data
+max_values = $arg5;
+
+# 1: Random data preperation
+data = fill(0.0, 1, dimensions);
+real_C = fill(0.0, 1, dimensions);
+real_Y = fill(0, 1, 1);
+
+for (i in 1:num_centroids) {
+  seed = seed + 1;
+  # Generate random points with slight variation
+  num_points_variation = 0.05;
+  num_points = as.si64(rand(1, 1, round(max_points - max_points * num_points_variation), round(max_points + max_points * num_points_variation), 1.0, seed));
+  center = rand(1, dimensions, -max_values, max_values, 1.0, seed);
+
+  noise = fill(0.0, num_points, dimensions);
+
+  if (noise_level != 0.0) {
+    noise = rand(num_points, dimensions, -noise_level, noise_level, 1.0, seed);
+  }
+
+  datapoints = (noise * center) + center;
+
+  if (i == 1) {
+    data = datapoints;
+    real_Y = fill(i, num_points, 1);
+    real_C = center;
+  } else {
+    data = rbind(data, datapoints);
+    real_Y = rbind(real_Y, fill(i, num_points, 1));
+    real_C = rbind(real_C, center);
+  }
+}
+
+
+# 2. Algorithm execution
+runs = 25;
+max_iter = 200;
+eps = 0.001;
+avg_sample_size_per_centroid = max_points;
+
+found_C, found_Y = kmeans.m_kmeans(as.matrix<f64>(data), num_centroids, runs, max_iter, eps, as.bool(0), avg_sample_size_per_centroid, seed);
+
+
+# 3. Relabeling of Clusters using pairwise distance calculation and greedy matching
+# Calculate distance matrix
+distance_matrix = fill(0.0, num_centroids, num_centroids);
+
+for (i in 0:num_centroids-1) {
+  for (j in 0:num_centroids-1) {
+    diff = found_C[i,] - real_C[j,];
+    distance_matrix[i, j] = [sqrt(sum(diff * diff))];
+  }
+}
+
+
+# Use greedy algorithm to match the found clusters to the real clusters
+matched_clusters = fill(-1, num_centroids, 1);
+found_match = fill(0, num_centroids, 1);
+
+for (i in 0:num_centroids-1) {
+  min_dist = inf;
+  best_match = -1;
+
+  for (j in 0:num_centroids-1) {
+    if (as.scalar(found_match[j,]) == 0 && as.scalar(distance_matrix[i, j]) < min_dist) {
+      min_dist = as.scalar(distance_matrix[i, j]);
+      best_match = j;
+    }
+  }
+  matched_clusters[i,] = [best_match];
+  found_match[best_match,] = [1];
+}
+
+# adjust for 1 based indexing and remap Y
+matched_clusters = matched_clusters + 1;
+
+new_Y = fill(0, nrow(found_Y), 1);
+
+for (i in 0:nrow(found_Y)-1) {
+  new_Y[i,] = matched_clusters[as.scalar(found_Y[i,]) - 1,];
+}
+
+found_Y = new_Y;
+
+print(sum(real_Y != found_Y) != 0);
