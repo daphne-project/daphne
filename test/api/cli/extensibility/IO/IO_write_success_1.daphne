@@ -1,0 +1,11 @@
+// Use of a CSV writer by specifying the engine without changing the default options
+opts = {"engine": ["Daphne"]};
+
+X = [1, -22, 3, -44,
+     5, -66, 0, 0](2, 4);
+
+write(X, $outPath, opts);
+
+m = readMatrix($outPath, opts);
+
+print(m);

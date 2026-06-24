@@ -86,7 +86,7 @@ void ValueTypeUtils::printValue(std::ostream &os, ValueTypeCode type, const void
         throw std::runtime_error("ValueTypeUtils::printValue: unknown value type code");
     }
 }
-
+template <> const ValueTypeCode ValueTypeUtils::codeFor<bool> = ValueTypeCode::BOOL;
 template <> const ValueTypeCode ValueTypeUtils::codeFor<int8_t> = ValueTypeCode::SI8;
 template <> const ValueTypeCode ValueTypeUtils::codeFor<int32_t> = ValueTypeCode::SI32;
 template <> const ValueTypeCode ValueTypeUtils::codeFor<int64_t> = ValueTypeCode::SI64;

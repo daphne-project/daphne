@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "runtime/local/io/FileIORegistry.h"
 #include <api/daphnelib/DaphneLibResult.h>
 #include <compiler/catalog/KernelCatalog.h>
 #include <runtime/local/datastructures/IAllocationDescriptor.h>
@@ -141,6 +142,7 @@ struct DaphneUserConfig {
     DaphneLibResult *result_struct = nullptr;
 
     KernelCatalog kernelCatalog;
+    FileIORegistry registry;
 
     /**
      * @brief Replaces the prefix `"{exedir}/"` in the field `libdir` by the
