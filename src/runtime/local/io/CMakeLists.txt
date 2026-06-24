@@ -13,6 +13,7 @@
 # limitations under the License.
 
 add_library(IO
+        FileIORegistry.cpp
         utils.cpp
 )
 target_link_libraries(IO)

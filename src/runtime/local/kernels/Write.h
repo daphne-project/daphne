@@ -27,7 +27,6 @@
 #include <runtime/local/io/FileMetaData.h>
 #include <runtime/local/io/WriteCsv.h>
 #include <runtime/local/io/WriteDaphne.h>
-#include <runtime/local/kernels/Read.h>
 
 #if USE_HDFS
 #include <runtime/local/io/HDFS/WriteHDFS.h>
@@ -73,7 +72,7 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
             MetaDataParser::writeMetaData(filename, fmd);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, registry);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
             return;
@@ -121,7 +120,7 @@ template <> struct Write<Frame> {
             MetaDataParser::writeMetaData(filename, fmd);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, registry);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
             return;
@@ -149,7 +148,7 @@ template <typename VT> struct Write<Matrix<VT>> {
             MetaDataParser::writeMetaData(filename, fmd);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, ctx);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, registry);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
             return;

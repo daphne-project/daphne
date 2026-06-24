@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <runtime/local/datastructures/Frame.h>
+
 #include <functional>
 #include <iostream>
 #include <map>
@@ -412,3 +414,11 @@ class FileIORegistry {
 
     std::map<std::string, void *> libHandles;
 };
+
+// Helper: Merge a Frame* of column-label → single-row-value into IOOptions
+IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const std::string &engine,
+                                const Frame *optsFrame, FileIORegistry &reg);
+
+// Extract "engine" (and ignore "priority") from the options Frame if present.
+// Returns "" if not provided (so registry picks highest-priority default).
+std::string extractEngineFromFrame(const Frame *optsFrame);
