@@ -21,6 +21,7 @@
 #include <runtime/local/datastructures/Structure.h>
 
 #include <cstddef>
+#include <optional>
 
 /**
  * @brief The base class of all matrix implementations.
@@ -32,9 +33,9 @@ template <typename ValueType> class Matrix : public Structure {
 
   protected:
     Matrix(size_t numRows, size_t numCols)
-        : Structure(numRows, numCols), sparsity(-1), symmetric(BoolOrUnknown::Unknown){
-                                                         // nothing to do
-                                                     };
+        : Structure(numRows, numCols), sparsity(-1), symmetric(BoolOrUnknown::Unknown) {
+              // nothing to do
+          };
 
   public:
     /**
@@ -56,7 +57,34 @@ template <typename ValueType> class Matrix : public Structure {
      */
     BoolOrUnknown symmetric;
 
-    virtual ~Matrix(){
+    /**
+     * @brief the maximum value in the matrix.
+     *
+     * Only at runtime
+     */
+    std::optional<ValueType> max;
+    /**
+     * @brief the maximum value in the matrix.
+     *
+     * Only at runtime
+     */
+    std::optional<ValueType> min;
+
+    /**
+     * @brief the computed mean of all values in the matrix.
+     *
+     * Only at runtime
+     */
+    std::optional<double> mean;
+
+    /**
+     * @brief the number of distinct elements in the matrix.
+     *
+     * Only at runtime
+     */
+    std::optional<size_t> numDistinct;
+
+    virtual ~Matrix() {
         // nothing to do
     };
 

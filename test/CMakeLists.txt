@@ -176,6 +176,9 @@ set(TEST_SOURCES
         runtime/local/kernels/TransposeTest.cpp
         runtime/local/kernels/TriTest.cpp
 
+        runtime/local/kernels/analysis-fusion/EwUnaryMatAnalysisTest.cpp
+        runtime/local/kernels/analysis-fusion/EwUnaryMatAnalysisBenchmark.cpp
+
         runtime/local/vectorized/MultiThreadedKernelTest.cpp
 
         util/RecordPropertiesTest.cpp
