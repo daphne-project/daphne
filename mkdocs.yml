@@ -62,6 +62,7 @@ nav:
     - SchedulingOptions.md
     - 'Tutorials':
       - tutorial/sqlTutorial.md
+      - tutorial/Translator.md
     - FPGAconfiguration.md
     - MPI-Usage.md
     - Profiling.md
