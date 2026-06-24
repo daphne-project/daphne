@@ -1,0 +1,124 @@
+#-------------------------------------------------------------
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements. See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership. The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at:
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied. See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#-------------------------------------------------------------
+This script has been manually translated from Apache SystemDS 
+# Original file: systemds/scripts/builtin/l2svm.dml
+# This builting function implements binary-class Support Vector Machine (SVM)
+# with squared slack variables (l2 regularization).
+#
+# INPUT:
+# X: Feature matrix (m x n)
+# Y: Label vector (m x 1), assumed binary (-1/+1 or 1/2 encoding)
+# intercept: Boolean, add bias column (default: false)
+# epsilon: Early stopping threshold (default: 0.001)
+# reg: L2 regularization parameter (default: 1.0)
+# maxIterations: Max outer iterations (default: 100)
+# maxii: Max line search iterations (default: 20)
+# verbose: Boolean, print progress (default: false)
+# columnId: Optional class ID for verbose mode (default: -1)
+# OUTPUT:
+# model: Trained weight vector (n x 1, or n+1 with intercept)
+def l2svm(X: Matrix, Y: Matrix, intercept: Boolean = false, epsilon: Float = 0.001, 
+          reg: Float = 1.0, maxIterations: Int = 100, maxii: Int = 20, 
+          verbose: Boolean = false, columnId: Int = -1): Matrix = {
+
+    # Ensure valid input dimensions
+    if (X.numRows < 2) 
+        throw "L2SVM: At least 2 rows are required to learn a classifier."
+    if (epsilon < 0.0)
+        throw "L2SVM: Tolerance (epsilon) must be non-negative."
+    if (reg < 0.0)
+        throw "L2SVM: Regularization constant (reg) must be non-negative."
+    if (maxIterations < 1)
+        throw "L2SVM: Maximum iterations should be a positive integer."
+    if (Y.numCols < 1)
+        throw "L2SVM: Label vector must have at least one column."
+
+    # Convert labels to -1/+1 if needed
+    val minY = Y.min()
+    val maxY = Y.max()
+    val numMin = (Y == minY).sum()
+    val numMax = (Y == maxY).sum()
+
+    if (numMin + numMax != Y.numRows)
+        println("L2SVM: WARNING invalid labels in Y: " + numMin + " " + numMax)
+
+    val normalizedY = if (minY != -1 || maxY != 1)
+        (2.0 / (maxY - minY)) * Y - (minY + maxY) / (maxY - minY)
+    else 
+        Y
+
+    # Add bias column if intercept is enabled
+    val XWithBias = if (intercept) 
+        X.appendCol(Matrix.ones(X.numRows, 1))
+    else 
+        X
+
+    var w = Matrix.zeros(XWithBias.numCols, 1)
+    var Xw = Matrix.zeros(XWithBias.numRows, 1)
+    var gOld = XWithBias.transpose() %*% normalizedY
+    var s = gOld
+    var iter = 0
+    var continueTraining = true
+
+    while (continueTraining && iter < maxIterations) {
+        # Line search initialization
+        var stepSize = 0.0
+        val Xd = XWithBias %*% s
+        val wd = reg * (w * s).sum()
+        val dd = reg * (s * s).sum()
+        var continueLineSearch = true
+        var innerIter = 0
+
+        while (continueLineSearch && innerIter < maxii) {
+            val tempXw = Xw + stepSize * Xd
+            val out = Matrix.maximum(1.0 - (normalizedY * tempXw), 0.0)
+            val sv = (out > 0.0)
+            val g = wd + stepSize * dd - (out * (normalizedY * Xd)).sum()
+            val h = dd + ((Xd * sv) * Xd).sum()
+            stepSize = stepSize - g / h
+            continueLineSearch = (g * g / h >= epsilon)
+            innerIter += 1
+        }
+
+        # Update weights
+        w = w + stepSize * s
+        Xw = Xw + stepSize * Xd
+
+        val out = Matrix.maximum(1.0 - (normalizedY * Xw), 0.0)
+        val obj = 0.5 * (out * out).sum() + 0.5 * reg * (w * w).sum()
+        val gNew = XWithBias.transpose() %*% (out * normalizedY) - reg * w
+
+        if (verbose) {
+            val colStr = if (columnId != -1) s"-- MSVM class=$columnId: " else ""
+            println(s"$colStr Iter: $iter InnerIter: $innerIter --- Obj: $obj")
+        }
+
+        # Check stopping condition
+        val temp = (s * gOld).sum()
+        continueTraining = (stepSize * temp >= epsilon * obj && (s * s).sum() != 0.0)
+
+        # Non-linear conjugate gradient step
+        val beta = (gNew * gNew).sum() / (gOld * gOld).sum()
+        s = beta * s + gNew
+        gOld = gNew
+        iter += 1
+    }
+    
+    return w
+}
+

@@ -1,0 +1,41 @@
+# Test Case for Multiclass SVM with User-Defined Parameters
+def test_multiclass_svm(num_samples: Integer = 100, 
+                        num_features: Integer = 4, 
+                        num_classes: Integer = 3, 
+                        max_iterations: Integer = 100, 
+                        reg_param: Double = 0.1, 
+                        verbose: Boolean = false) -> None 
+{
+    # Generate synthetic data
+    print("Generating synthetic dataset...")
+    X = rand(num_samples, num_features, 0.0, 1.0, 1)  # Feature matrix
+    Y = matrix(0, rows=num_samples, cols=1)
+
+    for i in 1:num_classes {
+        # Assign classes in a round-robin fashion
+        for j in (i-1):(num_samples-1):num_classes {
+            Y[j, 0] = i
+        }
+    }
+
+    print("Dataset generated:")
+    print("Features: ", X)
+    print("Labels: ", Y)
+
+    # Train the Multiclass SVM model
+    print("Training Multiclass SVM with user-defined parameters...")
+    model = multiclass_svm(X, Y, reg_param, max_iterations, verbose)
+
+    # Predict using the trained model
+    print("Predicting using the trained model...")
+    predictions = predict_svm(X, model)
+
+    # Calculate accuracy
+    correct = sum(predictions == Y)
+    accuracy = correct / num_samples * 100.0
+    print("Accuracy: ", accuracy, "%")
+
+   
+}
+
+
