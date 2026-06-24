@@ -1,0 +1,46 @@
+n = 1000;
+gravity = 0.00001;
+step_size = 20.0 / 1000.0;
+half_step_size = step_size / 2.0;
+softening = 0.1;
+
+t1 = now();
+
+position = rand(n, 2, -10.0, 10.0, 1.0, -1);
+velocity = fill(0.0, n, 2);
+acceleration = fill(0.0, n, 2);
+mass = fill(500.0, n, 1);
+
+
+position[0, ] = fill(0.0, 1, 2);
+velocity[0, ] = fill(0.0, 1, 2);
+mass[0, ] = fill(10000.0, 1, 1);
+
+com_p = sum(mass @ position) / (500.0 * n);
+com_v = sum(mass @ velocity) / (500.0 * n);
+
+position = position - com_p;
+velocity = velocity - com_v;
+
+
+#data = cbind(fill(0, n, 1), cbind(position, mass));
+
+for (i in 1:400) {
+  #print(i);
+  velocity = velocity + acceleration * half_step_size;
+  position = position + velocity * step_size;
+
+  dx = fill(1.0, n, 1) @ t(position[,0]) - position[,0];
+  dy = fill(1.0, n, 1) @ t(position[,1]) - position[,1];
+
+  inv_r3 = (dx^2 + dy^2 + softening^2)^(-1.5);
+  ax = gravity * (dx * inv_r3) @ mass;
+  ay = gravity * (dy * inv_r3) @ mass;
+  acceleration = cbind(ax, ay);
+  velocity = velocity + acceleration * half_step_size;
+
+  #data = rbind(data, cbind(fill(i, n, 1), cbind(position, mass)));
+}
+t2 = now();
+print((t2 - t1) / 1000000000.0);
+#write(data, "out.csv");
