@@ -1,0 +1,11 @@
+//get first, middle, and last element of list.
+
+l1 = createList([0],[1],[2],[3],[4]);
+first_elem = getElementInList(l1,0);
+middle_elem = getElementInList(l1,2);
+last_elem = getElementInList(l1,4);
+print(l1);
+print("TEST: RETRIEVED ELEMENTS");
+print(first_elem);
+print(middle_elem);
+print(last_elem);
