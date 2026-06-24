@@ -1,0 +1,48 @@
+def m_img_translate(img_in:matrix<f64>, offset_x:f64, offset_y:f64, out_w:si64, out_h:si64, fill_value:f64) -> matrix<f64> {
+  w = as.si64(ncol(img_in));
+  h = as.si64(nrow(img_in));
+  offset_x = round(offset_x);
+  offset_y = round(offset_y);
+  start_x = 1 - offset_x;
+  start_y = 1 - offset_y;
+  end_x = max(w, out_w) - offset_x;
+  end_y = max(h, out_h) - offset_y;
+  
+  if (start_x < 1) {
+    start_x = as.f64(1);
+  }
+  
+  
+  if (start_y < 1) {
+    start_y = as.f64(1);
+  }
+  
+  
+  if (w < end_x) {
+    end_x = as.f64(w);
+  }
+  
+  
+  if (h < end_y) {
+    end_y = as.f64(h);
+  }
+  
+  
+  if (out_w < end_x + offset_x) {
+    end_x = as.f64(out_w - offset_x);
+  }
+  
+  
+  if (out_h < end_y + offset_y) {
+    end_y = as.f64(out_h - offset_y);
+  }
+  
+  img_out = fill(as.f64(fill_value), out_h, out_w);
+  
+  if (start_x < end_x && start_y < end_y) {
+    img_out[(start_y+offset_y) - 1:(end_y+offset_y), (start_x+offset_x) - 1:(end_x+offset_x)] = img_in[start_y - 1:end_y, start_x - 1:end_x];
+  }
+  
+  return as.matrix<f64>(img_out);
+}
+

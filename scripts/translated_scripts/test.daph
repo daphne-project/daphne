@@ -1,0 +1,7 @@
+def m_test(X:matrix<f64>) -> matrix<f64> {
+  X = fill(as.f64(0), 10, 10);
+  a = sum(X == 1) >= 0;
+  print(a);
+  return X;
+}
+

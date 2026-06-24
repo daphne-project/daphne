@@ -1,0 +1,75 @@
+
+
+def m_multiLogReg (X:matrix<f64>, Y:matrix<f64>, icpt:si64 /*= 2*/, tol:f64 /*= 0.000001*/, reg:f64 /*= 1.0*/, maxi:si64 /*= 100*/, maxii:si64 /*= 20*/, is_verbose:bool /*= true*/) -> matrix<f64> {
+  eta0 = 0.0001;
+  eta1 = 0.25;
+  eta2 = 0.75;
+  sigma1 = 0.25;
+  sigma2 = 0.5;
+  sigma3 = 4.0;
+  psi = 0.1;
+
+  N = nrow(X);
+  D = ncol(X);
+
+  if (is_verbose) {
+    print("BEGIN K-MEANS SCRIPT");
+  }
+
+  # Robustness for datasets with missing values (causing NaN gradients)
+  hasNaNs = sum(isNan(X)) > 0;
+  if (hasNaNs) {
+    if(is_verbose) {
+      print("multiLogReg: matrix X contains ", 0);
+      print("sum(isNan(X))", 0);
+      print(" missing values, replacing with 0.");
+    }
+    X = replace(X, nan, 0); 
+    # TODO: I am not sure if NaN is recognized as a scalar like this.
+  }
+
+  # Introduce the intercept, shift and rescale the columns of X if needed
+  if (icpt == 1 || icpt == 2) {
+    if (N == nrow(X)) {
+      N = nrow(X);
+      # TODO: This is the if statement in the orginal code, does it even do anything at all?
+    }
+    X = cbind(X, fill(1.0, N, 1));
+    D = ncol(X);
+  }
+
+  scale_lambda = fill(1.0, D, 1);
+  if (icpt == 1 || icpt == 2) {
+    scale_lambda[D - 1, 0] = [0.0];
+  }
+
+  if (icpt == 2) {
+    avg_X_cols = t(sum(X, 1)) / N;
+    var_X_cols = (t(sum(X ^ 2, 1)) - N * (avg_X_cols ^ 2)) / (N - 1);
+    is_unsafe = var_X_cols <= 0;
+    scale_X = 1.0 / sqrt(var_X_cols * (1 - is_unsafe) + is_unsafe);
+    scale_X[D - 1, 0] = [1.0];
+    shift_X = -avg_X_cols * scale_X;
+    shift_X[D - 1, 0] = [0.0];
+    rowSums_X_sq = (X ^ 2) @ (scale_X ^ 2) + X @ (2 * scale_X * shift_X) + sum(shift_X ^ 2);
+  } else {
+    scale_X = fill(1.0, D, 1);
+    shift_X = fill(0.0, D, 1);
+    rowSums_X_sq = sum(X ^ 2);
+  }
+
+  # Convert "Y" into indicator matrix:
+  max_y = aggMax(Y);
+  print(max_y);
+
+  if (aggMin(Y) <= 0) {
+  # Category labels "0", "-1" etc, are converted into the largest label
+    Y = Y <= 0 ? max_y + 1 : Y;
+    max_y = max_y + 1;
+  }
+  Y = ctable(seq(1.0, N, 1.0), t(Y), N, max_y);
+  print(Y);
+
+  return X;
+}
+

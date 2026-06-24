@@ -1,0 +1,74 @@
+#-------------------------------------------------------------
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+#-------------------------------------------------------------
+
+# This function scales and center individual features in the input
+# matrix (column wise.) using z-score to scale the values.
+# The transformation is sometimes also called scale and shift,
+# but it is shifted first and then subsequently scaled.
+#
+# The method is not resistant to inputs containing NaN nor overflows
+# of doubles, but handle it by guaranteeing that no extra NaN values
+# are introduced and columns that contain NaN will not be scaled or shifted.
+#
+# INPUT:
+# --------------------------------------------------------------------------------------
+# X       Input feature matrix
+# center  Indicates to center the feature matrix
+# scale   Indicates to scale the feature matrix according to z-score
+# --------------------------------------------------------------------------------------
+#
+# OUTPUT:
+# -------------------------------------------------------------------------------------------
+# Out          Output feature matrix scaled and shifted
+# Centering    The column means of the input, subtracted if Center was TRUE
+# ScaleFactor  The scaling of the values, to make each dimension have similar value ranges
+# -------------------------------------------------------------------------------------------
+
+def m_scale(X:matrix<f64>, center:bool /*= true*/, scale:bool /*= true*/) -> matrix<f64>, matrix<f64>, matrix<f64> {
+  # Allocate the Centering and ScaleFactor as empty matrices,
+  # to return something on the function call.
+  Centering = fill(as.f64(0), 1, 1);
+  ScaleFactor = fill(as.f64(0), 1, 1);
+  
+  if (center) {
+    Centering = mean(X, 1);
+    # Replace entries with Nan with 0 to avoid introducing more NaN values.
+    Centering = replace(Centering, nan, 0);
+    X = as.matrix<f64>(X - Centering);
+  }
+  
+  
+  if (scale) {
+    N = as.si64(nrow(X));
+    ScaleFactor = sqrt(sum(X ^ 2, 1) / (N - 1));
+
+    # Replace entries in the scale factor that are 0 and NaN with 1.
+    # To avoid division by 0 or NaN, introducing NaN to the ouput.
+    ScaleFactor = replace(ScaleFactor, nan, 1);
+    ScaleFactor = replace(ScaleFactor, 0, 1);
+    X = as.matrix<f64>(X / ScaleFactor);
+  }
+
+  # assign output to the returned value.
+  Out = X;
+  return as.matrix<f64>(Out), as.matrix<f64>(Centering), as.matrix<f64>(ScaleFactor);
+}
+
