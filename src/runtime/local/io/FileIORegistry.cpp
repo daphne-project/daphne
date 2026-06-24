@@ -34,12 +34,13 @@ IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const st
     const size_t numRows = optsFrame->getNumRows();
     const size_t numCols = optsFrame->getNumCols();
 
-    if (numRows != 1)
-        throw std::runtime_error("the file reader/writer options must be a frame with exactly one row, but found " +
-                                 std::to_string(numRows) + " rows");
-
-    if (optsFrame == nullptr || numCols == 0)
+    if (optsFrame == nullptr || (numRows == 0 && numCols == 0))
         return merged;
+
+    if (numRows != 1)
+        throw std::runtime_error("the file reader/writer options must be either an empty frame (zero rows and zero "
+                                 "columns) or a frame with exactly one row, but found " +
+                                 std::to_string(numRows) + " rows");
 
     const std::string *labels = optsFrame->getLabels();
 
@@ -80,14 +81,15 @@ IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const st
 // Extract "engine" (and ignore "priority") from the options Frame if present.
 // Returns "" if not provided (so registry picks highest-priority default).
 std::string extractEngineFromFrame(const Frame *optsFrame) {
-    if (!optsFrame)
-        return "";
-
     const size_t numRows = optsFrame->getNumRows();
     const size_t numCols = optsFrame->getNumCols();
 
+    if (optsFrame == nullptr || (numRows == 0 && numCols == 0))
+        return "";
+
     if (numRows != 1)
-        throw std::runtime_error("the file reader/writer options must be a frame with exactly one row, but found " +
+        throw std::runtime_error("the file reader/writer options must be either an empty frame (zero rows and zero "
+                                 "columns) or a frame with exactly one row, but found " +
                                  std::to_string(numRows) + " rows");
 
     const std::string *labels = optsFrame->getLabels();

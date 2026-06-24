@@ -1284,7 +1284,7 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
         auto *ctx = builder.getContext();
 
         if (numArgs == 1) {
-            auto emptyFrmTy = mlir::daphne::FrameType::get(ctx, {}, 1, 0, nullptr);
+            auto emptyFrmTy = mlir::daphne::FrameType::get(ctx, {});
             auto cf =
                 builder.create<mlir::daphne::CreateFrameOp>(loc, emptyFrmTy, mlir::ValueRange{}, mlir::ValueRange{});
             mlir::Value optsFrame = cf.getResult();
@@ -1299,7 +1299,7 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
         auto *ctx = builder.getContext();
         mlir::Type resType = mlir::daphne::FrameType::get(builder.getContext(), {utils.unknownType});
         if (numArgs == 1) {
-            auto emptyFrmTy = mlir::daphne::FrameType::get(ctx, {}, 1, 0, nullptr);
+            auto emptyFrmTy = mlir::daphne::FrameType::get(ctx, {});
             auto cf =
                 builder.create<mlir::daphne::CreateFrameOp>(loc, emptyFrmTy, mlir::ValueRange{}, mlir::ValueRange{});
             mlir::Value optsFrame = cf.getResult();
@@ -1317,7 +1317,7 @@ antlrcpp::Any DaphneDSLBuiltins::build(mlir::Location loc, const std::string &fu
         mlir::Value arg = args[0];
         mlir::Value filename = args[1];
         if (numArgs == 2) {
-            auto emptyFrmTy = mlir::daphne::FrameType::get(ctx, {}, 1, 0, nullptr);
+            auto emptyFrmTy = mlir::daphne::FrameType::get(ctx, {});
             auto cf =
                 builder.create<mlir::daphne::CreateFrameOp>(loc, emptyFrmTy, mlir::ValueRange{}, mlir::ValueRange{});
             mlir::Value optsFrame = cf.getResult();
