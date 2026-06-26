@@ -56,7 +56,7 @@ class Scalar(OperationNode):
         else:
             return super().code_line(var_name, unnamed_input_vars, named_input_vars)
 
-    def compute(self) -> Union[np.array]:
+    def compute(self) -> Union[np.ndarray]:
         return super().compute()
     
     def __add__(self, other: VALID_ARITHMETIC_TYPES) -> 'Scalar':

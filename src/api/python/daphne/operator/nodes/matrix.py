@@ -40,12 +40,12 @@ if TYPE_CHECKING:
     from daphne.context.daphne_context import DaphneContext
     
 class Matrix(OperationNode):
-    _np_array: np.array
+    _np_array: np.ndarray
     __copy: bool
 
     def __init__(self, daphne_context: 'DaphneContext', operation:str, unnamed_input_nodes:Union[str, Iterable[VALID_INPUT_TYPES]]=None, 
                 named_input_nodes:Dict[str, VALID_INPUT_TYPES]=None, 
-                local_data: np.array = None, brackets:bool = False, left_brackets: bool = False, copy: bool = False,
+                local_data: np.ndarray = None, brackets:bool = False, left_brackets: bool = False, copy: bool = False,
                 consumer_list: List['OperationNode'] = None)->'Matrix':
         self.__copy = copy
         if local_data is not None:
@@ -113,7 +113,7 @@ class Matrix(OperationNode):
     def _is_numpy(self) -> bool:
         return self._np_array is not None
     
-    def compute(self, type="shared memory", verbose=False, asTensorFlow=False, asPyTorch=False, shape=None) -> Union[np.array]:
+    def compute(self, type="shared memory", verbose=False, asTensorFlow=False, asPyTorch=False, shape=None) -> Union[np.ndarray]:
         return super().compute(type=type, verbose=verbose, asTensorFlow=asTensorFlow, asPyTorch=asPyTorch, shape=shape)
 
     def __add__(self, other: VALID_ARITHMETIC_TYPES) -> 'Matrix':
