@@ -53,12 +53,12 @@ using GenericReader = std::function<void(void *res, const FileMetaData &fmd, con
 using GenericWriter = std::function<void(const void *data, const FileMetaData &fmd, const char *filename,
                                          const IOOptions &opts, DaphneContext *ctx)>;
 
-class FileIORegistry {
+class FileIOCatalog {
   public:
-    FileIORegistry() = default;
+    FileIOCatalog() = default;
 
-    static FileIORegistry &instance() {
-        static FileIORegistry inst;
+    static FileIOCatalog &instance() {
+        static FileIOCatalog inst;
         return inst;
     }
 
@@ -115,7 +115,7 @@ class FileIORegistry {
         if (!best)
             best = findBestKey(lazySpecs, ext, (size_t)dt, engine);
         if (!best)
-            throw std::runtime_error("no suitable reader found in the registry");
+            throw std::runtime_error("no suitable reader found in the catalog");
 
         return ensureReaderLoaded(*best);
     }
@@ -127,7 +127,7 @@ class FileIORegistry {
         if (!best)
             best = findBestKey(lazySpecs, ext, (size_t)dt, engine);
         if (!best)
-            throw std::runtime_error("no suitable writer found in the registry");
+            throw std::runtime_error("no suitable writer found in the catalog");
 
         return ensureWriterLoaded(*best);
     }
@@ -147,7 +147,7 @@ class FileIORegistry {
 
         const Key4 *best = findBestKey(optionsMap, ext, (size_t)dt, engine);
         if (!best)
-            throw std::runtime_error("no suitable options found in the registry");
+            throw std::runtime_error("no suitable options found in the catalog");
         return optionsMap.at(*best);
     }
 
@@ -166,7 +166,7 @@ class FileIORegistry {
     }
 
     // ---------- Copy/assign & clear ----------
-    FileIORegistry(const FileIORegistry &other) {
+    FileIOCatalog(const FileIOCatalog &other) {
         std::lock_guard<std::mutex> lk(other.mtx);
         readers = other.readers;
         writers = other.writers;
@@ -175,7 +175,7 @@ class FileIORegistry {
         libHandles = other.libHandles; // shallow copy of handles is fine (process-global)
     }
 
-    FileIORegistry &operator=(const FileIORegistry &other) {
+    FileIOCatalog &operator=(const FileIOCatalog &other) {
         if (this != &other) {
             std::unique_lock<std::mutex> lk1(mtx, std::defer_lock);
             std::unique_lock<std::mutex> lk2(other.mtx, std::defer_lock);
@@ -204,7 +204,7 @@ class FileIORegistry {
             return "?";
         };
 
-        os << "=== FileIORegistry: Readers ===\n";
+        os << "=== FileIOCatalog: Readers ===\n";
 
         // 1) Loaded readers
         for (const auto &kv : readers) {
@@ -253,7 +253,7 @@ class FileIORegistry {
             return "?";
         };
 
-        os << "=== FileIORegistry: Writers ===\n";
+        os << "=== FileIOCatalog: Writers ===\n";
 
         // 1) Loaded writers
         for (const auto &kv : writers) {
@@ -297,7 +297,7 @@ class FileIORegistry {
         baselineCaptured = true;
     }
 
-    // Reset registry back to the captured baseline (keeps built-ins, drops recent)
+    // Reset catalog back to the captured baseline (keeps built-ins, drops recent)
     void resetToBaseline() {
         std::lock_guard<std::mutex> lk(mtx);
         if (!baselineCaptured) {
@@ -417,8 +417,8 @@ class FileIORegistry {
 
 // Helper: Merge a Frame* of column-label → single-row-value into IOOptions
 IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const std::string &engine,
-                                const Frame *optsFrame, FileIORegistry &reg);
+                                const Frame *optsFrame, FileIOCatalog &cat);
 
 // Extract "engine" (and ignore "priority") from the options Frame if present.
-// Returns "" if not provided (so registry picks highest-priority default).
+// Returns "" if not provided (so catalog picks highest-priority default).
 std::string extractEngineFromFrame(const Frame *optsFrame);

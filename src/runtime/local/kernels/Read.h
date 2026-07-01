@@ -23,7 +23,7 @@
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/datastructures/Frame.h>
 #include <runtime/local/io/File.h>
-#include <runtime/local/io/FileIORegistry.h>
+#include <runtime/local/io/FileIOCatalog.h>
 #include <runtime/local/io/ReadCsv.h>
 #include <runtime/local/io/ReadDaphne.h>
 #include <runtime/local/io/ReadMM.h>
@@ -67,21 +67,21 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
         std::string ext(std::filesystem::path(filename).extension());
         PhyDataType dt = PhyDataType::DENSEMATRIX;
         try {
-            auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
+            auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
 
             // Get the engine (may be "")
             std::string engine = extractEngineFromFrame(optsFrame);
 
             // Select reader with engine hint
-            auto reader = registry.getReader(ext, dt, engine);
+            auto reader = catalog.getReader(ext, dt, engine);
 
             // Merge user overrides using defaults for that engine
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, registry);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
         } catch (const std::out_of_range &e) {
-            std::cerr << "no suitable reader found in the registry";
+            std::cerr << "no suitable reader found in the catalog";
         }
 #if USE_HDFS
         if (ext == ".hdfs") {
@@ -95,7 +95,7 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
             }
         }
 #endif
-        throw std::runtime_error("no suitable writer found in the registry");
+        throw std::runtime_error("no suitable writer found in the catalog");
     }
 };
 
@@ -109,21 +109,21 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
         std::string ext(std::filesystem::path(filename).extension());
         PhyDataType dt = PhyDataType::CSRMATRIX;
         try {
-            auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
+            auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
 
             // Get the engine (may be "")
             std::string engine = extractEngineFromFrame(optsFrame);
 
             // Select reader with engine hint
-            auto reader = registry.getReader(ext, dt, engine);
+            auto reader = catalog.getReader(ext, dt, engine);
 
             // Merge user overrides using defaults for that engine
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, registry);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
         } catch (const std::out_of_range &) {
-            throw std::runtime_error("no suitable reader found in the registry");
+            throw std::runtime_error("no suitable reader found in the catalog");
         }
     }
 };
@@ -138,21 +138,21 @@ template <> struct Read<Frame> {
         std::string ext(std::filesystem::path(filename).extension());
         PhyDataType dt = PhyDataType::FRAME;
         try {
-            auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
+            auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
 
             // Get the engine (may be "")
             std::string engine = extractEngineFromFrame(optsFrame);
 
             // Select reader with engine hint
-            auto reader = registry.getReader(ext, dt, engine);
+            auto reader = catalog.getReader(ext, dt, engine);
 
             // Merge user overrides using defaults for that engine
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, registry);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
             reader(&res, fmd, filename, mergedOpts, ctx);
             return;
         } catch (const std::out_of_range &) {
-            throw std::runtime_error("no suitable reader found in the registry");
+            throw std::runtime_error("no suitable reader found in the catalog");
         }
     }
 };

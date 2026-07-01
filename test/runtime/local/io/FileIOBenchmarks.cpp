@@ -19,7 +19,7 @@
 #include "runtime/local/datastructures/DenseMatrix.h"
 #include "runtime/local/datastructures/Frame.h"
 #include "runtime/local/io/FileIOCatalogParser.h"
-#include "runtime/local/io/FileIORegistry.h"
+#include "runtime/local/io/FileIOCatalog.h"
 #include <runtime/local/kernels/CreateFrame.h>
 #include <runtime/local/kernels/Read.h>
 
@@ -54,13 +54,13 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO Benchmark double parquet into a densematrix",
     }
 
     using DT = TestType;
-    FileIORegistry::instance().resetToBaseline();
-    FileIORegistry &registry = FileIORegistry::instance();
+    FileIOCatalog::instance().resetToBaseline();
+    FileIOCatalog &catalog = FileIOCatalog::instance();
     DT *m1 = nullptr;
     DT *m2 = nullptr;
 
     FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry, 0));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", catalog, 0));
 
     std::vector<Structure *> columns(1);
     auto *keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
@@ -106,7 +106,7 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO Benchmark double parquet into a densematrix",
     DataObjectFactory::destroy(m1);
     DataObjectFactory::destroy(m2);
 
-    FileIORegistry::instance().resetToBaseline();
+    FileIOCatalog::instance().resetToBaseline();
 }
 
 // 2) Frame parquet benchmark (1 thread vs 16 threads)
@@ -116,13 +116,13 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO Benchmark double parquet into a Frame", TAG_I
         return;
     }
 
-    FileIORegistry::instance().resetToBaseline();
-    FileIORegistry &registry = FileIORegistry::instance();
+    FileIOCatalog::instance().resetToBaseline();
+    FileIOCatalog &catalog = FileIOCatalog::instance();
     Frame *m1 = nullptr;
     Frame *m2 = nullptr;
 
     FileIOCatalogParser parser;
-    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", registry, 0));
+    REQUIRE_NOTHROW(parser.parseFileIOCatalog("scripts/examples/extensions/parquetReader/parquet.json", catalog, 0));
 
     std::vector<Structure *> columns(1);
     auto *keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
@@ -167,5 +167,5 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO Benchmark double parquet into a Frame", TAG_I
     DataObjectFactory::destroy(m1);
     DataObjectFactory::destroy(m2);
 
-    FileIORegistry::instance().resetToBaseline();
+    FileIOCatalog::instance().resetToBaseline();
 }

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "runtime/local/io/FileIOCatalogParser.h"
-#include "runtime/local/io/FileIORegistry.h"
 #include <runtime/local/datagen/GenGivenVals.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/datastructures/Frame.h>

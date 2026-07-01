@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <runtime/local/io/FileIORegistry.h>
+#include <runtime/local/io/FileIOCatalog.h>
 
 #include <stdexcept>
 #include <string>
@@ -24,10 +24,10 @@
 
 // Helper: Merge a Frame* of column-label → single-row-value into IOOptions
 IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const std::string &engine,
-                                const Frame *optsFrame, FileIORegistry &reg) {
-    // Ask the registry for defaults for this (ext, dt, engine).
-    // If engine == "", registry should pick highest-priority impl.
-    const IOOptions &defaults = reg.getOptions(ext, dt, engine);
+                                const Frame *optsFrame, FileIOCatalog &cat) {
+    // Ask the catalog for defaults for this (ext, dt, engine).
+    // If engine == "", catalog should pick highest-priority impl.
+    const IOOptions &defaults = cat.getOptions(ext, dt, engine);
 
     IOOptions merged = defaults;
 
@@ -79,7 +79,7 @@ IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const st
 }
 
 // Extract "engine" (and ignore "priority") from the options Frame if present.
-// Returns "" if not provided (so registry picks highest-priority default).
+// Returns "" if not provided (so catalog picks highest-priority default).
 std::string extractEngineFromFrame(const Frame *optsFrame) {
     const size_t numRows = optsFrame->getNumRows();
     const size_t numCols = optsFrame->getNumCols();

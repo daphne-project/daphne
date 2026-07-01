@@ -23,7 +23,7 @@
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/datastructures/Matrix.h>
 #include <runtime/local/io/File.h>
-#include <runtime/local/io/FileIORegistry.h>
+#include <runtime/local/io/FileIOCatalog.h>
 #include <runtime/local/io/FileMetaData.h>
 #include <runtime/local/io/WriteCsv.h>
 #include <runtime/local/io/WriteDaphne.h>
@@ -63,21 +63,21 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
     static void apply(const DenseMatrix<VT> *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
         try {
-            auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
+            auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
             PhyDataType dt = PhyDataType::DENSEMATRIX;
             std::string engine = extractEngineFromFrame(optsFrame);
-            auto writer = registry.getWriter(ext, dt, engine);
+            auto writer = catalog.getWriter(ext, dt, engine);
             FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
 
             MetaDataParser::writeMetaData(filename, fmd);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, registry);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
             return;
         } catch (const std::out_of_range &e) {
-            std::cerr << "no suitable writer found in the registry";
+            std::cerr << "no suitable writer found in the catalog";
         }
 #if USE_HDFS
         if (ext == ".hdfs") {
@@ -94,7 +94,7 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
             return;
         }
 #endif
-        throw std::runtime_error("no suitable writer found in the registry");
+        throw std::runtime_error("no suitable writer found in the catalog");
     }
 };
 
@@ -106,10 +106,10 @@ template <> struct Write<Frame> {
     static void apply(const Frame *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
         try {
-            auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
+            auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
             PhyDataType dt = PhyDataType::FRAME;
             std::string engine = extractEngineFromFrame(optsFrame);
-            auto writer = registry.getWriter(ext, dt, engine);
+            auto writer = catalog.getWriter(ext, dt, engine);
             std::vector<ValueTypeCode> vtcs;
             std::vector<std::string> labels;
             for (size_t i = 0; i < arg->getNumCols(); i++) {
@@ -120,12 +120,12 @@ template <> struct Write<Frame> {
             MetaDataParser::writeMetaData(filename, fmd);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, registry);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
             return;
         } catch (const std::out_of_range &e) {
-            throw std::runtime_error("no suitable writer found in the registry");
+            throw std::runtime_error("no suitable writer found in the catalog");
         }
     }
 };
@@ -138,22 +138,22 @@ template <typename VT> struct Write<Matrix<VT>> {
     static void apply(const Matrix<VT> *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
         std::string ext(std::filesystem::path(filename).extension());
         try {
-            auto &registry = ctx ? ctx->config.registry : FileIORegistry::instance();
+            auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
             // TODO this kernel is not specialized for CSRMatrix
             PhyDataType dt = PhyDataType::CSRMATRIX;
             std::string engine = extractEngineFromFrame(optsFrame);
-            auto writer = registry.getWriter(ext, dt, engine);
+            auto writer = catalog.getWriter(ext, dt, engine);
             FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
 
             MetaDataParser::writeMetaData(filename, fmd);
 
             // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, registry);
+            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
             return;
         } catch (const std::out_of_range &e) {
-            throw std::runtime_error("no suitable writer found in the registry");
+            throw std::runtime_error("no suitable writer found in the catalog");
         }
     }
 };

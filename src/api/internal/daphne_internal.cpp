@@ -29,8 +29,8 @@
 #include <parser/catalog/KernelCatalogParser.h>
 #include <parser/config/ConfigParser.h>
 #include <parser/daphnedsl/DaphneDSLParser.h>
+#include <runtime/local/io/FileIOCatalog.h>
 #include <runtime/local/io/FileIOCatalogParser.h>
-#include <runtime/local/io/FileIORegistry.h>
 #include <runtime/local/vectorized/LoadPartitioningDefs.h>
 #include <util/DaphneLogger.h>
 #include <util/KernelDispatchMapping.h>
@@ -638,7 +638,7 @@ int startDAPHNE(int argc, const char **argv, DaphneLibResult *daphneLibRes, int 
     // Populate FileIO extension catalog
     // ************************************************************************
 
-    FileIORegistry &fc = executor.getUserConfig().registry;
+    FileIOCatalog &fc = executor.getUserConfig().fileioCatalog;
 
     try {
         FileIOCatalogParser fcp;

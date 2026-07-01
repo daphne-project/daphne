@@ -17,7 +17,7 @@
 #pragma once
 
 #include <runtime/local/datastructures/Frame.h>
-#include <runtime/local/io/FileIORegistry.h>
+#include <runtime/local/io/FileIOCatalog.h>
 
 #include <nlohmannjson/json.hpp>
 
@@ -40,10 +40,10 @@ class FileIOCatalogParser {
      * Parses the given JSON file and registers each plugin's reader & writer.
      * @param filePath Path to the catalog JSON
      */
-    void parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry, int64_t priority) const;
+    void parseFileIOCatalog(const std::string &filePath, FileIOCatalog &catalog, int64_t priority) const;
 };
 
-inline void FileIOCatalogParser::parseFileIOCatalog(const std::string &filePath, FileIORegistry &registry,
+inline void FileIOCatalogParser::parseFileIOCatalog(const std::string &filePath, FileIOCatalog &catalog,
                                                     int64_t priority) const {
     std::filesystem::path dir = std::filesystem::path(filePath).parent_path();
     try {
@@ -82,7 +82,7 @@ inline void FileIOCatalogParser::parseFileIOCatalog(const std::string &filePath,
                     // e.g. "delimiter":"", "hasHeader":"", etc.
                     opts[jt.key()] = jt.value().get<std::string>();
 
-            registry.registerLazy(ext, dt, engine, priority, opts, libPath, rdrName, wtrName);
+            catalog.registerLazy(ext, dt, engine, priority, opts, libPath, rdrName, wtrName);
         }
     } catch (std::exception &e) {
         throw std::runtime_error("error while parsing I/O catalog file `" + filePath + "`: " + e.what());
