@@ -633,4 +633,14 @@ void compareDaphneToSomeRefSimple(const std::string &dirPath, const std::string 
  */
 std::string generalizeDataTypes(const std::string &str);
 
+/**
+ * @brief Checks if the given string represents a floating-point number acceptable by `std::stod()` and nothing else (no
+ * leading whitespace, no trailing characters).
+ *
+ * @param str The string to check.
+ * @param res The parsed double value (if this function returns `true`) or unspecified (otherwise).
+ * @return `true` if the given string fulfills the condition; or `false`, otherwise.
+ */
+bool isFloatRepr(const std::string &str, double &res);
+
 #endif // TEST_API_CLI_UTILS_H

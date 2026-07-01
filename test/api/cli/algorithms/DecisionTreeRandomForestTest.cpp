@@ -45,10 +45,26 @@ void runDecisionTree(int testNr, const std::string &dataFilePath, double minAcc,
     const std::string argMaxV = "maxV=" + std::to_string(maxV);
     std::stringstream out;
     std::stringstream err;
+
+    // Run DAPHNE.
     int status = runDaphne(out, err, scriptFileName.c_str(), argData.c_str(), argDt.c_str(), argMaxV.c_str());
+
+    // DAPHNE must parse/compile/execute successfully.
     CHECK(status == StatusCode::SUCCESS);
-    double acc = std::stod(out.str());
+
+    // DAPHNE's stdout must represent a floating-point value (the accuracy printed by the DaphneDSL script) and...
+    double acc;
+    auto myIsFloatRepr = [&](std::string const &str) -> bool { return isFloatRepr(str, acc); };
+    // Note: REQUIRE_THAT and Predicate ensure that out.str() is printed if and only if the predicate fails (important
+    // for interpreting the output).
+    REQUIRE_THAT(out.str(),
+                 Catch::Matchers::Predicate<std::string>(
+                     myIsFloatRepr, "the string must represent a floating-point number acceptable by std::stod() and "
+                                    "nothing else (no leading whitespace, no trailing characters)"));
+    // ...this floating-point value (the accuracy) must be greater than or equal to a certain threshold.
     CHECK(acc >= minAcc);
+
+    // DAPHNE's stderr must be empty.
     CHECK(err.str() == "");
 }
 

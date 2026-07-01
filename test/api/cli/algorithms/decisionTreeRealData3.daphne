@@ -97,4 +97,4 @@ yhat2 = mn + (yhat - 1 + 0.5) * w;
 
 R = lmPredictStats_.lmPredictStats(yhat2, as.matrix<f64>(F[,ncol(F) - 2]), false, false);
 acc = as.scalar(R[2,]);
-print(acc);
+print(acc, false);

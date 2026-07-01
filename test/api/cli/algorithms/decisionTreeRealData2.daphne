@@ -89,4 +89,4 @@ else {
 }
 
 acc = mean(yhat == Y);
-print(acc);
+print(acc, false);

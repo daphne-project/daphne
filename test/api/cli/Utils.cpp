@@ -26,6 +26,9 @@
 #include <stdexcept>
 #include <string>
 
+#include <cctype>
+#include <cstring>
+
 std::string readTextFile(const std::string &filePath) {
     std::ifstream ifs(filePath, std::ios::in);
     if (!ifs.good())
@@ -40,4 +43,28 @@ std::string readTextFile(const std::string &filePath) {
 std::string generalizeDataTypes(const std::string &str) {
     std::regex re("(DenseMatrix|CSRMatrix)");
     return std::regex_replace(str, re, "<SomeMatrix>");
+}
+
+bool isFloatRepr(const std::string &str, double &res) {
+    // An empty string obviously doesn't represent any floating-point number.
+    if (str.empty())
+        return false;
+    // std::stod() skips any whitespace at the beginning of the string, but we don't want to tolerate such whitespace.
+    if (std::isspace(str[0]))
+        return false;
+    try {
+        // Try to apply std::stod().
+        size_t pos;
+        res = std::stod(str, &pos);
+
+        // std::stod() must have consumed the entire string, because we don't want to tolerate any left-over characters
+        // after the floating-point number.
+        if (pos != std::strlen(str.c_str()))
+            return false;
+    } catch (...) {
+        // Applying std::stod() to the string must not throw.
+        return false;
+    }
+    // All checks passed.
+    return true;
 }
