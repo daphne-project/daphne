@@ -47,7 +47,8 @@ KernelCatalogParser::KernelCatalogParser(mlir::MLIRContext *mctx) {
                                            builder.getIntegerType(8, false),
                                            builder.getI1Type(),
                                            builder.getIndexType(),
-                                           mlir::daphne::StringType::get(mctx)};
+                                           mlir::daphne::StringType::get(mctx),
+                                           mlir::daphne::FixedStr16Type::get(mctx)};
     for (mlir::Type st : scalarTypes) {
         // Scalar type.
         typeMap.emplace(CompilerUtils::mlirTypeToCppTypeName(st), st);
@@ -74,10 +75,11 @@ KernelCatalogParser::KernelCatalogParser(mlir::MLIRContext *mctx) {
         typeMap.emplace(CompilerUtils::mlirTypeToCppTypeName(ct), ct);
 
         // MemRef type.
-        if (!llvm::isa<mlir::daphne::StringType>(st)) {
-            // DAPHNE's StringType is not supported as the element type of a
-            // MemRef. The shape of the MemRef is explicitly set to `ShapedType::kDynamic` for each dimension as the
-            // kernel is shape agnostic and handles shapes dynamically.
+        if (!llvm::isa<mlir::daphne::StringType, mlir::daphne::FixedStr16Type>(st)) {
+            // DAPHNE's string-like types are not supported as the element type
+            // of a MemRef. The shape of the MemRef is explicitly set to
+            // `ShapedType::kDynamic` for each dimension as the kernel is shape
+            // agnostic and handles shapes dynamically.
             mlir::Type mrt1d = mlir::MemRefType::get({mlir::ShapedType::kDynamic}, st);
             mlir::Type mrt2d = mlir::MemRefType::get({mlir::ShapedType::kDynamic, mlir::ShapedType::kDynamic}, st);
             typeMap.emplace(CompilerUtils::mlirTypeToCppTypeName(mrt1d), mrt1d);

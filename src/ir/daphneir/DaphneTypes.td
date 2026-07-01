@@ -333,6 +333,12 @@ def Handle : Daphne_Type<"Handle"> {
 def StrScalar : Daphne_Type<"String"> {
     let summary = "string";
 }
+
+// A fixed-size character string type with the runtime representation FixedStr16.
+def FixedStr16Scalar : Daphne_Type<"FixedStr16"> {
+    let summary = "fixed-size string with 16 bytes of storage";
+}
+
 def MatrixOrFrameOrString : AnyTypeOf<[Matrix, Frame, StrScalar, Unknown]>;
 
 def SIntScalar : AnyTypeOf<[SI8, SI32, SI64, Unknown], "signed integer">;

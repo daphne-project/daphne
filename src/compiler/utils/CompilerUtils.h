@@ -192,6 +192,8 @@ struct CompilerUtils {
             std::string vtName;
             if (llvm::isa<mlir::daphne::StringType>(matTy.getElementType()))
                 vtName = "std::string";
+            else if (llvm::isa<mlir::daphne::FixedStr16Type>(matTy.getElementType()))
+                vtName = "FixedStr16";
             else
                 vtName = mlirTypeToCppTypeName(matTy.getElementType(), angleBrackets, false);
             switch (matTy.getRepresentation()) {
@@ -213,6 +215,8 @@ struct CompilerUtils {
             std::string vtName;
             if (llvm::isa<mlir::daphne::StringType>((colTy.getValueType())))
                 vtName = "std::string";
+            else if (llvm::isa<mlir::daphne::FixedStr16Type>(colTy.getValueType()))
+                vtName = "FixedStr16";
             else
                 vtName = mlirTypeToCppTypeName(colTy.getValueType(), angleBrackets, false);
             return angleBrackets ? ("Column<" + vtName + ">") : ("Column_" + vtName);
@@ -226,6 +230,8 @@ struct CompilerUtils {
             // strings) when inserted into the typical "const DT *" template of
             // kernel input parameters.
             return "char";
+        else if (llvm::isa<mlir::daphne::FixedStr16Type>(t))
+            return "FixedStr16";
         else if (llvm::isa<mlir::daphne::DaphneContextType>(t))
             return "DaphneContext";
         else if (auto handleTy = llvm::dyn_cast<mlir::daphne::HandleType>(t)) {

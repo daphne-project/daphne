@@ -49,12 +49,12 @@ if TYPE_CHECKING:
     from daphne.context.daphne_context import DaphneContext
     
 class OperationNode(DAGNode):  
-    _result_var:Optional[Union[float,np.array]]
+    _result_var:Optional[Union[float,np.ndarray]]
     _script:Optional[DaphneDSLScript]
     _output_types: Optional[Iterable[VALID_INPUT_TYPES]]
     _source_node: Optional["DAGNode"]
     _brackets: bool
-    data: Optional[Union[pd.DataFrame, np.array]]
+    data: Optional[Union[pd.DataFrame, np.ndarray]]
 
     def __init__(self, daphne_context,operation:str, 
                 unnamed_input_nodes: Union[str, Iterable[VALID_INPUT_TYPES]]=None,
@@ -91,7 +91,7 @@ class OperationNode(DAGNode):
         current_index = self._unnamed_input_nodes.index(current_node)
         self._unnamed_input_nodes[current_index] = new_node
 
-    def compute(self, type="shared memory", verbose=False, asTensorFlow=False, asPyTorch=False, shape=None, useIndexColumn=False) -> Union[np.array, pd.DataFrame, 'tf.Tensor', 'torch.Tensor', float]:
+    def compute(self, type="shared memory", verbose=False, asTensorFlow=False, asPyTorch=False, shape=None, useIndexColumn=False) -> Union[np.ndarray, pd.DataFrame, 'tf.Tensor', 'torch.Tensor', float]:
         """
         Compute function for processing the Daphne Object or operation node and returning the results.
         The function builds a DaphneDSL script from the node and its context, executes it, and processes the results
