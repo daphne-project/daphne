@@ -29,26 +29,26 @@ IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const st
     // If engine == "", catalog should pick highest-priority impl.
     const IOOptions &defaults = cat.getOptions(ext, dt, engine);
 
-    IOOptions merged = defaults;
-
     const size_t numRows = optsFrame->getNumRows();
     const size_t numCols = optsFrame->getNumCols();
 
     if (optsFrame == nullptr || (numRows == 0 && numCols == 0))
-        return merged;
+        return defaults;
 
     if (numRows != 1)
         throw std::runtime_error("the file reader/writer options must be either an empty frame (zero rows and zero "
                                  "columns) or a frame with exactly one row, but found " +
                                  std::to_string(numRows) + " rows");
 
-    const std::string *labels = optsFrame->getLabels();
+    IOOptions merged = defaults;
 
+    const std::string *labels = optsFrame->getLabels();
     for (size_t c = 0; c < numCols; ++c) {
         const std::string &key = labels[c];
 
-        // Ignore non-plugin selection knobs if user sent them in the frame.
-        if (key == "engine" || key == "priority")
+        // Ignore the key "engine" because it is only used for optionally selecting a particular extension, but cannot
+        // be used as the name of an extension-specific option.
+        if (key == "engine")
             continue;
 
         std::string value;

@@ -77,10 +77,13 @@ inline void FileIOCatalogParser::parseFileIOCatalog(const std::string &filePath,
 
             IOOptions opts;
             if (auto it = entry.find("options"); it != entry.end())
-                for (auto jt = it->begin(); jt != it->end(); ++jt)
-                    // Each key/value in JSON becomes a string→string pair
-                    // e.g. "delimiter":"", "hasHeader":"", etc.
+                for (auto jt = it->begin(); jt != it->end(); ++jt) {
+                    // The name "engine" is not allowed for extension-specific options because this key is used to
+                    // optionally select a particular extension.
+                    if (jt.key() == "engine")
+                        throw std::runtime_error("an option of a file IO extension must not be called 'engine'");
                     opts[jt.key()] = jt.value().get<std::string>();
+                }
 
             catalog.registerLazy(ext, dt, engine, priority, opts, libPath, rdrName, wtrName);
         }
