@@ -66,35 +66,36 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
         try {
             FileMetaData fmd = MetaDataParser::readMetaData(filename);
             std::string ext(std::filesystem::path(filename).extension());
-            PhyDataType dt = PhyDataType::DENSEMATRIX;
-            auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
+            // TODO Support HDFS through a file IO extension and remove this special case.
+#if USE_HDFS
+            if (ext == ".hdfs") {
+                if constexpr (std::is_same<VT, std::string>::value)
+                    throw std::runtime_error("reading string-valued HDFS files is not supported (yet)");
+                else {
+                    if (res == nullptr)
+                        res = DataObjectFactory::create<DenseMatrix<VT>>(fmd.numRows, fmd.numCols, false);
+                    readHDFS(res, filename, ctx);
+                }
+            } else
+#endif
+            {
+                PhyDataType dt = PhyDataType::DENSEMATRIX;
+                auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
 
-            // Get the engine (may be "")
-            std::string engine = extractEngineFromFrame(optsFrame);
+                // Get the engine (may be "")
+                std::string engine = extractEngineFromFrame(optsFrame);
 
-            // Select reader with engine hint
-            auto reader = catalog.getReader(ext, dt, engine);
+                // Select reader with engine hint
+                auto reader = catalog.getReader(ext, dt, engine);
 
-            // Merge user overrides using defaults for that engine
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
+                // Merge user overrides using defaults for that engine
+                IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
-            reader(&res, fmd, filename, mergedOpts, ctx);
+                reader(&res, fmd, filename, mergedOpts, ctx);
+            }
         } catch (const std::exception &e) {
             throw std::runtime_error("error while reading file `" + std::string(filename) + "`: " + e.what());
         }
-#if USE_HDFS
-        if (ext == ".hdfs") {
-            if constexpr (std::is_same<VT, std::string>::value)
-                throw std::runtime_error("reading string-valued HDFS files is not supported (yet)");
-            else {
-                if (res == nullptr)
-                    res = DataObjectFactory::create<DenseMatrix<VT>>(fmd.numRows, fmd.numCols, false);
-                readHDFS(res, filename, ctx);
-                return;
-            }
-        }
-#endif
-        throw std::runtime_error("no suitable writer found in the catalog");
     }
 };
 

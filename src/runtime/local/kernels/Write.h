@@ -63,37 +63,39 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
     static void apply(const DenseMatrix<VT> *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
         try {
             std::string ext(std::filesystem::path(filename).extension());
-            auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
-            PhyDataType dt = PhyDataType::DENSEMATRIX;
-            std::string engine = extractEngineFromFrame(optsFrame);
-            auto writer = catalog.getWriter(ext, dt, engine);
-            FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
+            // TODO Support HDFS through a file IO extension and remove this special case.
+#if USE_HDFS
+            if (ext == ".hdfs") {
+                HDFSMetaData hdfs = {true, filename};
+                FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>, -1,
+                                      hdfs);
+                // Get file extension before .hdfs (e.g. file.csv.hdfs)
+                std::string nestedExt(
+                    std::filesystem::path(std::string(filename).substr(0, std::string(filename).size() - ext.size()))
+                        .extension());
+                MetaDataParser::writeMetaData(filename, metaData);
 
-            MetaDataParser::writeMetaData(filename, fmd);
+                // call WriteHDFS
+                writeHDFS(arg, filename, ctx);
+            } else
+#endif
+            {
+                auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
+                PhyDataType dt = PhyDataType::DENSEMATRIX;
+                std::string engine = extractEngineFromFrame(optsFrame);
+                auto writer = catalog.getWriter(ext, dt, engine);
+                FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
 
-            // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
+                MetaDataParser::writeMetaData(filename, fmd);
 
-            writer(arg, fmd, filename, mergedOpts, ctx);
+                // Merge user overrides from optsFrame
+                IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
+
+                writer(arg, fmd, filename, mergedOpts, ctx);
+            }
         } catch (const std::exception &e) {
             throw std::runtime_error("error while writing file `" + std::string(filename) + "`: " + e.what());
         }
-#if USE_HDFS
-        if (ext == ".hdfs") {
-            HDFSMetaData hdfs = {true, filename};
-            FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>, -1, hdfs);
-            // Get file extension before .hdfs (e.g. file.csv.hdfs)
-            std::string nestedExt(
-                std::filesystem::path(std::string(filename).substr(0, std::string(filename).size() - ext.size()))
-                    .extension());
-            MetaDataParser::writeMetaData(filename, metaData);
-
-            // call WriteHDFS
-            writeHDFS(arg, filename, ctx);
-            return;
-        }
-#endif
-        throw std::runtime_error("no suitable writer found in the catalog");
     }
 };
 
