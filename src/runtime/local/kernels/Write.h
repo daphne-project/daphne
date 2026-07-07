@@ -60,7 +60,7 @@ template <class DTArg> void write(const DTArg *arg, const char *filename, const 
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct Write<DenseMatrix<VT>> {
-    static void apply(const DenseMatrix<VT> *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
+    static void apply(const DenseMatrix<VT> *arg, const char *filename, const Frame *opts, DCTX(ctx)) {
         try {
             std::string ext(std::filesystem::path(filename).extension());
             // TODO Support HDFS through a file IO extension and remove this special case.
@@ -82,14 +82,14 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
             {
                 auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
                 PhyDataType dt = PhyDataType::DENSEMATRIX;
-                std::string engine = extractEngineFromFrame(optsFrame);
+                std::string engine = extractEngine(opts);
                 auto writer = catalog.getWriter(ext, dt, engine);
                 FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
 
                 MetaDataParser::writeMetaData(filename, fmd);
 
-                // Merge user overrides from optsFrame
-                IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
+                // Merge user overrides from opts
+                IOOptions mergedOpts = mergeOptions(ext, dt, engine, opts, catalog);
 
                 writer(arg, fmd, filename, mergedOpts, ctx);
             }
@@ -104,12 +104,12 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
 // ----------------------------------------------------------------------------
 
 template <> struct Write<Frame> {
-    static void apply(const Frame *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
+    static void apply(const Frame *arg, const char *filename, const Frame *opts, DCTX(ctx)) {
         try {
             std::string ext(std::filesystem::path(filename).extension());
             auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
             PhyDataType dt = PhyDataType::FRAME;
-            std::string engine = extractEngineFromFrame(optsFrame);
+            std::string engine = extractEngine(opts);
             auto writer = catalog.getWriter(ext, dt, engine);
             std::vector<ValueTypeCode> vtcs;
             std::vector<std::string> labels;
@@ -120,8 +120,8 @@ template <> struct Write<Frame> {
             FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), false, vtcs, labels);
             MetaDataParser::writeMetaData(filename, fmd);
 
-            // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
+            // Merge user overrides from opts
+            IOOptions mergedOpts = mergeOptions(ext, dt, engine, opts, catalog);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
         } catch (const std::exception &e) {
@@ -135,7 +135,7 @@ template <> struct Write<Frame> {
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct Write<Matrix<VT>> {
-    static void apply(const Matrix<VT> *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
+    static void apply(const Matrix<VT> *arg, const char *filename, const Frame *opts, DCTX(ctx)) {
         try {
             std::string ext(std::filesystem::path(filename).extension());
             auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
@@ -146,14 +146,14 @@ template <typename VT> struct Write<Matrix<VT>> {
                 dt = PhyDataType::CSRMATRIX;
             else
                 throw std::runtime_error("unexpected physical data type");
-            std::string engine = extractEngineFromFrame(optsFrame);
+            std::string engine = extractEngine(opts);
             auto writer = catalog.getWriter(ext, dt, engine);
             FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
 
             MetaDataParser::writeMetaData(filename, fmd);
 
-            // Merge user overrides from optsFrame
-            IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
+            // Merge user overrides from opts
+            IOOptions mergedOpts = mergeOptions(ext, dt, engine, opts, catalog);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
         } catch (const std::exception &e) {

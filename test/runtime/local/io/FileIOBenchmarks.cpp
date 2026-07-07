@@ -18,8 +18,8 @@
 #include "runtime/local/datastructures/DataObjectFactory.h"
 #include "runtime/local/datastructures/DenseMatrix.h"
 #include "runtime/local/datastructures/Frame.h"
-#include "runtime/local/io/FileIOCatalogParser.h"
 #include "runtime/local/io/FileIOCatalog.h"
+#include "runtime/local/io/FileIOCatalogParser.h"
 #include <runtime/local/kernels/CreateFrame.h>
 #include <runtime/local/kernels/Read.h>
 
@@ -68,11 +68,11 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO Benchmark double parquet into a densematrix",
     val1[0] = "Daphne";
     columns[0] = keyCol;
     const char *labels[1] = {"engine"};
-    Frame *optsFrame = nullptr;
-    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
+    Frame *opts = nullptr;
+    createFrame(opts, columns.data(), 1, labels, 1, ctx);
 
     BENCHMARK("read double parquet into a DenseMatrix with 1 thread") {
-        read(m1, "scripts/examples/extensions/parquetReader/random_doubles2.parquet", optsFrame, ctx);
+        read(m1, "scripts/examples/extensions/parquetReader/random_doubles2.parquet", opts, ctx);
         REQUIRE(m1->getNumRows() == 3000000);
         REQUIRE(m1->getNumCols() == 16);
         return 0;
@@ -130,11 +130,11 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO Benchmark double parquet into a Frame", TAG_I
     val1[0] = "Daphne";
     columns[0] = keyCol;
     const char *labels[1] = {"engine"};
-    Frame *optsFrame = nullptr;
-    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
+    Frame *opts = nullptr;
+    createFrame(opts, columns.data(), 1, labels, 1, ctx);
 
     BENCHMARK("read double parquet into a Frame with 1 thread") {
-        read(m1, "scripts/examples/extensions/parquetReader/random_doubles.parquet", optsFrame, ctx);
+        read(m1, "scripts/examples/extensions/parquetReader/random_doubles.parquet", opts, ctx);
         REQUIRE(m1->getNumRows() == 3000000);
         REQUIRE(m1->getNumCols() == 16);
         return 0;

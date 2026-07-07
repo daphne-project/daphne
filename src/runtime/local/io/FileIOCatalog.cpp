@@ -24,16 +24,16 @@
 #include <dlfcn.h>
 
 // Helper: Merge a Frame* of column-label → single-row-value into IOOptions
-IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const std::string &engine,
-                                const Frame *optsFrame, FileIOCatalog &cat) {
+IOOptions mergeOptions(const std::string &ext, PhyDataType dt, const std::string &engine, const Frame *opts,
+                       FileIOCatalog &cat) {
     // Ask the catalog for defaults for this (ext, dt, engine).
     // If engine == "", catalog should pick highest-priority impl.
     const IOOptions &defaults = cat.getOptions(ext, dt, engine);
 
-    const size_t numRows = optsFrame->getNumRows();
-    const size_t numCols = optsFrame->getNumCols();
+    const size_t numRows = opts->getNumRows();
+    const size_t numCols = opts->getNumCols();
 
-    if (optsFrame == nullptr || (numRows == 0 && numCols == 0))
+    if (opts == nullptr || (numRows == 0 && numCols == 0))
         return defaults;
 
     if (numRows != 1)
@@ -43,7 +43,7 @@ IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const st
 
     IOOptions merged = defaults;
 
-    const std::string *labels = optsFrame->getLabels();
+    const std::string *labels = opts->getLabels();
     for (size_t c = 0; c < numCols; ++c) {
         const std::string &key = labels[c];
 
@@ -53,18 +53,18 @@ IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const st
             continue;
 
         std::string value;
-        switch (optsFrame->getColumnType(c)) {
+        switch (opts->getColumnType(c)) {
         case ValueTypeCode::STR:
-            value = optsFrame->getColumn<std::string>(c)->get(0, 0);
+            value = opts->getColumn<std::string>(c)->get(0, 0);
             break;
         case ValueTypeCode::BOOL:
-            value = optsFrame->getColumn<bool>(c)->get(0, 0) ? "true" : "false";
+            value = opts->getColumn<bool>(c)->get(0, 0) ? "true" : "false";
             break;
         case ValueTypeCode::SI64:
-            value = std::to_string(optsFrame->getColumn<int64_t>(c)->get(0, 0));
+            value = std::to_string(opts->getColumn<int64_t>(c)->get(0, 0));
             break;
         case ValueTypeCode::F64:
-            value = std::to_string(optsFrame->getColumn<double>(c)->get(0, 0));
+            value = std::to_string(opts->getColumn<double>(c)->get(0, 0));
             break;
         default:
             throw std::runtime_error("unsupported column type for option `" + key +
@@ -87,11 +87,11 @@ IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const st
 
 // Extract "engine" (and ignore "priority") from the options Frame if present.
 // Returns "" if not provided (so catalog picks highest-priority default).
-std::string extractEngineFromFrame(const Frame *optsFrame) {
-    const size_t numRows = optsFrame->getNumRows();
-    const size_t numCols = optsFrame->getNumCols();
+std::string extractEngine(const Frame *opts) {
+    const size_t numRows = opts->getNumRows();
+    const size_t numCols = opts->getNumCols();
 
-    if (optsFrame == nullptr || (numRows == 0 && numCols == 0))
+    if (opts == nullptr || (numRows == 0 && numCols == 0))
         return "";
 
     if (numRows != 1)
@@ -99,12 +99,12 @@ std::string extractEngineFromFrame(const Frame *optsFrame) {
                                  "columns) or a frame with exactly one row, but found " +
                                  std::to_string(numRows) + " rows");
 
-    const std::string *labels = optsFrame->getLabels();
+    const std::string *labels = opts->getLabels();
     for (size_t c = 0; c < numCols; ++c)
         if (labels[c] == "engine") {
-            ValueTypeCode vtc = optsFrame->getColumnType(c);
+            ValueTypeCode vtc = opts->getColumnType(c);
             if (vtc == ValueTypeCode::STR)
-                return optsFrame->getColumn<std::string>(c)->get(0, 0);
+                return opts->getColumn<std::string>(c)->get(0, 0);
             else
                 throw std::runtime_error(
                     "the attribute `engine` of the reader/writer options must be of type string, but found `" +

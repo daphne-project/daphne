@@ -240,11 +240,11 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header u
 
     const char *labels[2] = {"hasHeader", "delimiter"};
 
-    Frame *optsFrame = nullptr;
-    createFrame(optsFrame, columns.data(), 2, labels, 2, ctx);
+    Frame *opts = nullptr;
+    createFrame(opts, columns.data(), 2, labels, 2, ctx);
 
     // Read CSV using the options Frame
-    REQUIRE_NOTHROW(read(m, specialCSV.c_str(), optsFrame, ctx));
+    REQUIRE_NOTHROW(read(m, specialCSV.c_str(), opts, ctx));
 
     // Verify content
     REQUIRE(m->getNumRows() == 3);
@@ -263,7 +263,7 @@ TEMPLATE_PRODUCT_TEST_CASE("FileIO CSV Reader with delimiter '!' and no header u
 
     // Step 6: Cleanup
     DataObjectFactory::destroy(m);
-    DataObjectFactory::destroy(optsFrame);
+    DataObjectFactory::destroy(opts);
     FileIOCatalog::instance().resetToBaseline();
 }
 
@@ -329,11 +329,11 @@ TEST_CASE("FileIO parquet_write_frame writes Frame to Parquet", "[parquet][write
     val1[0] = "Daphne";
     columns[0] = keyCol;
     const char *labels[1] = {"engine"};
-    Frame *optsFrame = nullptr;
-    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
+    Frame *opts = nullptr;
+    createFrame(opts, columns.data(), 1, labels, 1, ctx);
 
     // ---------- Act ----------
-    REQUIRE_NOTHROW(write(fr, outPath.c_str(), optsFrame, ctx));
+    REQUIRE_NOTHROW(write(fr, outPath.c_str(), opts, ctx));
     REQUIRE(std::filesystem::exists(outPath));
 
     // ---------- Assert: read back with Arrow ----------
@@ -411,11 +411,11 @@ TEST_CASE("FileIO parquet_write writes DenseMatrix<double> to Parquet", "[parque
     val1[0] = "Daphne";
     columns[0] = keyCol;
     const char *labels[1] = {"engine"};
-    Frame *optsFrame = nullptr;
-    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
+    Frame *opts = nullptr;
+    createFrame(opts, columns.data(), 1, labels, 1, ctx);
 
     // --- Act: write via generic write() that dispatches through the catalog ---
-    REQUIRE_NOTHROW(write(mat, outPath.c_str(), optsFrame, ctx));
+    REQUIRE_NOTHROW(write(mat, outPath.c_str(), opts, ctx));
     REQUIRE(std::filesystem::exists(outPath));
 
     // --- Assert: read back with Arrow and validate ---
@@ -470,10 +470,10 @@ TEST_CASE("FileIO Direct call proves selected engine runs") {
     MYREADER_CALLS = 0;
     YOURREADER_CALLS = 0;
 
-    IOOptions opts;
+    IOOptions defaultOpts;
     // Register both engines for the same (.csv, FRAME)
-    reg.registerReader(".csv", PhyDataType::FRAME, "myReader", 5, opts, myReader);
-    reg.registerReader(".csv", PhyDataType::FRAME, "yourReader", 10, opts, yourReader);
+    reg.registerReader(".csv", PhyDataType::FRAME, "myReader", 5, defaultOpts, myReader);
+    reg.registerReader(".csv", PhyDataType::FRAME, "yourReader", 10, defaultOpts, yourReader);
 
     std::vector<Structure *> columns(1);
     auto *keyCol = DataObjectFactory::create<DenseMatrix<std::string>>(1, 1, false);
@@ -481,8 +481,8 @@ TEST_CASE("FileIO Direct call proves selected engine runs") {
     val1[0] = "myReader";
     columns[0] = keyCol;
     const char *labels[1] = {"engine"};
-    Frame *optsFrame = nullptr;
-    createFrame(optsFrame, columns.data(), 1, labels, 1, ctx);
+    Frame *opts = nullptr;
+    createFrame(opts, columns.data(), 1, labels, 1, ctx);
 
     // ----- A) No engine hint -> highest priority -> yourReader -----
     {
@@ -496,7 +496,7 @@ TEST_CASE("FileIO Direct call proves selected engine runs") {
     // ----- B) Explicit engine -> myReader even if lower priority -----
     {
         Frame *out = nullptr;
-        read(out, CSV_FILE.c_str(), optsFrame, ctx);
+        read(out, CSV_FILE.c_str(), opts, ctx);
         REQUIRE(YOURREADER_CALLS.load() == 1);
         REQUIRE(MYREADER_CALLS.load() == 1);
         DataObjectFactory::destroy(out);

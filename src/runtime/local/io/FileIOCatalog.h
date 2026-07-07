@@ -408,9 +408,9 @@ class FileIOCatalog {
 };
 
 // Helper: Merge a Frame* of column-label → single-row-value into IOOptions
-IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const std::string &engine,
-                                const Frame *optsFrame, FileIOCatalog &cat);
+IOOptions mergeOptions(const std::string &ext, PhyDataType dt, const std::string &engine, const Frame *opts,
+                       FileIOCatalog &cat);
 
 // Extract "engine" (and ignore "priority") from the options Frame if present.
 // Returns "" if not provided (so catalog picks highest-priority default).
-std::string extractEngineFromFrame(const Frame *optsFrame);
+std::string extractEngine(const Frame *opts);
