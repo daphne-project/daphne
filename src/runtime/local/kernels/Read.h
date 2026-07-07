@@ -63,10 +63,10 @@ template <class DTRes> void read(DTRes *&res, const char *filename, const Frame 
 
 template <typename VT> struct Read<DenseMatrix<VT>> {
     static void apply(DenseMatrix<VT> *&res, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
-        FileMetaData fmd = MetaDataParser::readMetaData(filename);
-        std::string ext(std::filesystem::path(filename).extension());
-        PhyDataType dt = PhyDataType::DENSEMATRIX;
         try {
+            FileMetaData fmd = MetaDataParser::readMetaData(filename);
+            std::string ext(std::filesystem::path(filename).extension());
+            PhyDataType dt = PhyDataType::DENSEMATRIX;
             auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
 
             // Get the engine (may be "")
@@ -79,9 +79,8 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
             IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
             reader(&res, fmd, filename, mergedOpts, ctx);
-            return;
-        } catch (const std::out_of_range &e) {
-            std::cerr << "no suitable reader found in the catalog";
+        } catch (const std::exception &e) {
+            throw std::runtime_error("error while reading file `" + std::string(filename) + "`: " + e.what());
         }
 #if USE_HDFS
         if (ext == ".hdfs") {
@@ -105,10 +104,10 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
 
 template <typename VT> struct Read<CSRMatrix<VT>> {
     static void apply(CSRMatrix<VT> *&res, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
-        FileMetaData fmd = MetaDataParser::readMetaData(filename);
-        std::string ext(std::filesystem::path(filename).extension());
-        PhyDataType dt = PhyDataType::CSRMATRIX;
         try {
+            FileMetaData fmd = MetaDataParser::readMetaData(filename);
+            std::string ext(std::filesystem::path(filename).extension());
+            PhyDataType dt = PhyDataType::CSRMATRIX;
             auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
 
             // Get the engine (may be "")
@@ -121,9 +120,8 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
             IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
             reader(&res, fmd, filename, mergedOpts, ctx);
-            return;
-        } catch (const std::out_of_range &) {
-            throw std::runtime_error("no suitable reader found in the catalog");
+        } catch (const std::exception &e) {
+            throw std::runtime_error("error while reading file `" + std::string(filename) + "`: " + e.what());
         }
     }
 };
@@ -134,10 +132,10 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
 
 template <> struct Read<Frame> {
     static void apply(Frame *&res, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
-        FileMetaData fmd = MetaDataParser::readMetaData(filename);
-        std::string ext(std::filesystem::path(filename).extension());
-        PhyDataType dt = PhyDataType::FRAME;
         try {
+            FileMetaData fmd = MetaDataParser::readMetaData(filename);
+            std::string ext(std::filesystem::path(filename).extension());
+            PhyDataType dt = PhyDataType::FRAME;
             auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
 
             // Get the engine (may be "")
@@ -150,9 +148,8 @@ template <> struct Read<Frame> {
             IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
             reader(&res, fmd, filename, mergedOpts, ctx);
-            return;
-        } catch (const std::out_of_range &) {
-            throw std::runtime_error("no suitable reader found in the catalog");
+        } catch (const std::exception &e) {
+            throw std::runtime_error("error while reading file `" + std::string(filename) + "`: " + e.what());
         }
     }
 };

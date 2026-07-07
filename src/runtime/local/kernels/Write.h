@@ -61,8 +61,8 @@ template <class DTArg> void write(const DTArg *arg, const char *filename, const 
 
 template <typename VT> struct Write<DenseMatrix<VT>> {
     static void apply(const DenseMatrix<VT> *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
-        std::string ext(std::filesystem::path(filename).extension());
         try {
+            std::string ext(std::filesystem::path(filename).extension());
             auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
             PhyDataType dt = PhyDataType::DENSEMATRIX;
             std::string engine = extractEngineFromFrame(optsFrame);
@@ -75,9 +75,8 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
             IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
-            return;
-        } catch (const std::out_of_range &e) {
-            std::cerr << "no suitable writer found in the catalog";
+        } catch (const std::exception &e) {
+            throw std::runtime_error("error while writing file `" + std::string(filename) + "`: " + e.what());
         }
 #if USE_HDFS
         if (ext == ".hdfs") {
@@ -104,8 +103,8 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
 
 template <> struct Write<Frame> {
     static void apply(const Frame *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
-        std::string ext(std::filesystem::path(filename).extension());
         try {
+            std::string ext(std::filesystem::path(filename).extension());
             auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
             PhyDataType dt = PhyDataType::FRAME;
             std::string engine = extractEngineFromFrame(optsFrame);
@@ -123,9 +122,8 @@ template <> struct Write<Frame> {
             IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
-            return;
-        } catch (const std::out_of_range &e) {
-            throw std::runtime_error("no suitable writer found in the catalog");
+        } catch (const std::exception &e) {
+            throw std::runtime_error("error while writing file `" + std::string(filename) + "`: " + e.what());
         }
     }
 };
@@ -136,8 +134,8 @@ template <> struct Write<Frame> {
 
 template <typename VT> struct Write<Matrix<VT>> {
     static void apply(const Matrix<VT> *arg, const char *filename, const Frame *optsFrame, DCTX(ctx)) {
-        std::string ext(std::filesystem::path(filename).extension());
         try {
+            std::string ext(std::filesystem::path(filename).extension());
             auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
             // TODO this kernel is not specialized for CSRMatrix
             PhyDataType dt = PhyDataType::CSRMATRIX;
@@ -151,9 +149,8 @@ template <typename VT> struct Write<Matrix<VT>> {
             IOOptions mergedOpts = mergeOptionsFromFrame(ext, dt, engine, optsFrame, catalog);
 
             writer(arg, fmd, filename, mergedOpts, ctx);
-            return;
-        } catch (const std::out_of_range &e) {
-            throw std::runtime_error("no suitable writer found in the catalog");
+        } catch (const std::exception &e) {
+            throw std::runtime_error("error while writing file `" + std::string(filename) + "`: " + e.what());
         }
     }
 };
