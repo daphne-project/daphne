@@ -139,8 +139,13 @@ template <typename VT> struct Write<Matrix<VT>> {
         try {
             std::string ext(std::filesystem::path(filename).extension());
             auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
-            // TODO this kernel is not specialized for CSRMatrix
-            PhyDataType dt = PhyDataType::CSRMATRIX;
+            PhyDataType dt;
+            if (dynamic_cast<DenseMatrix<VT> *>(arg))
+                dt = PhyDataType::DENSEMATRIX;
+            else if (dynamic_cast<CSRMatrix<VT> *>(arg))
+                dt = PhyDataType::CSRMATRIX;
+            else
+                throw std::runtime_error("unexpected physical data type");
             std::string engine = extractEngineFromFrame(optsFrame);
             auto writer = catalog.getWriter(ext, dt, engine);
             FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
