@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <runtime/local/datastructures/ValueTypeCode.h>
 #include <runtime/local/io/FileIOCatalog.h>
 
 #include <stdexcept>
@@ -52,17 +53,23 @@ IOOptions mergeOptionsFromFrame(const std::string &ext, PhyDataType dt, const st
             continue;
 
         std::string value;
-        if (auto *strCol = dynamic_cast<const DenseMatrix<std::string> *>(optsFrame->getColumn<std::string>(c))) {
-            value = strCol->get(0, 0);
-        } else if (auto *boolCol = dynamic_cast<const DenseMatrix<bool> *>(optsFrame->getColumn<bool>(c))) {
-            value = boolCol->get(0, 0) ? "true" : "false";
-        } else if (auto *intCol = dynamic_cast<const DenseMatrix<int64_t> *>(optsFrame->getColumn<int64_t>(c))) {
-            value = std::to_string(intCol->get(0, 0));
-        } else if (auto *floatCol = dynamic_cast<const DenseMatrix<double> *>(optsFrame->getColumn<double>(c))) {
-            value = std::to_string(floatCol->get(0, 0));
-        } else
+        switch (optsFrame->getColumnType(c)) {
+        case ValueTypeCode::STR:
+            value = optsFrame->getColumn<std::string>(c)->get(0, 0);
+            break;
+        case ValueTypeCode::BOOL:
+            value = optsFrame->getColumn<bool>(c)->get(0, 0) ? "true" : "false";
+            break;
+        case ValueTypeCode::SI64:
+            value = std::to_string(optsFrame->getColumn<int64_t>(c)->get(0, 0));
+            break;
+        case ValueTypeCode::F64:
+            value = std::to_string(optsFrame->getColumn<double>(c)->get(0, 0));
+            break;
+        default:
             throw std::runtime_error("unsupported column type for option `" + key +
                                      "`, expected either string, bool, int64_t, or double");
+        }
 
         // Only override known plugin options
         auto itKnown = merged.find(key);
