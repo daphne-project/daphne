@@ -132,14 +132,6 @@ class FileIOCatalog {
         return ensureWriterLoaded(*best);
     }
 
-    // Back-compat overloads (default engine selection)
-    GenericReader getReader(const std::string &ext, PhyDataType dt) {
-        return getReader(ext, dt, "" /* default selection */);
-    }
-    GenericWriter getWriter(const std::string &ext, PhyDataType dt) {
-        return getWriter(ext, dt, "" /* default selection */);
-    }
-
     // ---------- Options helpers ----------
     // Returns the IOOptions bound to the selected impl (best by engine/priority)
     const IOOptions &getOptions(const std::string &ext, PhyDataType dt, const std::string &engine /* may be "" */) {

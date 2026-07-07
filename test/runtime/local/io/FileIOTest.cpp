@@ -53,8 +53,8 @@ TEST_CASE("FileIOCatalogParser registers CSV plugin via catalog", "[io][catalog]
 
     // Now catalog should have reader and writer for .csv and Frame type
 
-    REQUIRE_NOTHROW(catalog.getReader(".csv", PhyDataType::DENSEMATRIX));
-    REQUIRE_NOTHROW(catalog.getWriter(".csv", PhyDataType::DENSEMATRIX));
+    REQUIRE_NOTHROW(catalog.getReader(".csv", PhyDataType::DENSEMATRIX, ""));
+    REQUIRE_NOTHROW(catalog.getWriter(".csv", PhyDataType::DENSEMATRIX, ""));
     catalog.resetToBaseline();
 }
 
@@ -69,10 +69,10 @@ TEST_CASE("FileIOCatalog registerReader and getReader", "[io][catalog]") {
             // no-op
         });
 
-    SECTION("Lookup existing reader succeeds") { REQUIRE_NOTHROW(catalog.getReader(".test", PhyDataType::FRAME)); }
+    SECTION("Lookup existing reader succeeds") { REQUIRE_NOTHROW(catalog.getReader(".test", PhyDataType::FRAME, "")); }
 
     SECTION("Lookup non-registered reader throws") {
-        REQUIRE_THROWS_AS(catalog.getReader(".unknown", PhyDataType::FRAME), std::runtime_error);
+        REQUIRE_THROWS_AS(catalog.getReader(".unknown", PhyDataType::FRAME, ""), std::runtime_error);
     }
     catalog.resetToBaseline();
 }
@@ -83,8 +83,8 @@ TEST_CASE("FileIO Plugin dynamic load and registration validity", "[io][plugin]"
     REQUIRE_NOTHROW(parser.parseFileIOCatalog(JSON_PATH, catalog, 0));
 
     // Verify catalog lookups work
-    auto reader = catalog.getReader(".csv", PhyDataType::DENSEMATRIX);
-    auto writer = catalog.getWriter(".csv", PhyDataType::DENSEMATRIX);
+    auto reader = catalog.getReader(".csv", PhyDataType::DENSEMATRIX, "");
+    auto writer = catalog.getWriter(".csv", PhyDataType::DENSEMATRIX, "");
 
     REQUIRE(reader != nullptr);
     REQUIRE(writer != nullptr);
