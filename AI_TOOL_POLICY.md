@@ -31,10 +31,10 @@ review it. The contributor is always the author and is fully accountable for
 their contribution, including for its correctness, design quality, and long-term
 maintainability.
 **AI expands your capabilities; it does not outsource your judgment.**
-Contributors should be sufficiently confident that their contribution is high
-enough quality that requesting a review is a good use of scarce maintainer time,
-and contributors should be **able to answer questions about their work** during
-review.
+Contributors have to be sufficiently confident that their contribution is high
+enough quality that requesting a review is a good use of scarce maintainer
+time, and contributors should be **able to answer questions about their work**
+during review.
 
 We expect that newer contributors will be less confident in their
 contributions. Our guidance to them is to **start with small contributions**
@@ -47,13 +47,12 @@ or contributors.
 ### Write PR Descriptions Yourself
 
 To ensure sufficient self-review and understanding of the work, contributors
-should write PR descriptions themselves (using AI tools for translation or
+have to write PR descriptions themselves (using AI tools for translation or
 copy-editing is fine).
 
-The description should explain the motivation,
-implementation approach, expected impact, and any open questions or
-uncertainties to the same extent as a contribution written without AI
-assistance.
+The description should explain the motivation, implementation approach,
+expected impact, and any open questions or uncertainties to the same extent as
+a contribution written without AI assistance.
 
 #### Structuring PR Descriptions
 
@@ -86,7 +85,7 @@ from them in the form of design and code review.
 ## Handling Violations
 
 If a maintainer judges that a contribution doesn't comply with this policy,
-they should paste the following response to request changes:
+they should paste the following response to request changes or close the PR:
 
 ```text
 This PR doesn't appear to comply with our policy on AI-generated content,
