@@ -32,19 +32,7 @@ def Daphne_Dialect : Dialect {
     let cppNamespace = "::mlir::daphne";
 
     let hasConstantMaterializer = 1;
-
-    // TODO It should not be necessary to add the declarations of parseType()
-    // and printType() manually. However, I cannot find a way to have only the
-    // declarations (but not the definitions) generated with this version of
-    // MLIR. Using useDefaultTypePrinterParser messes things up.
-    let extraClassDeclaration = [{
-        /// Parse a type registered to this dialect.
-        ::mlir::Type parseType(::mlir::DialectAsmParser &parser) const override;
-
-        /// Print a type registered to this dialect.
-        void printType(::mlir::Type type,
-                      ::mlir::DialectAsmPrinter &os) const override;
-    }];
+    let useDefaultTypePrinterParser = 1;
 }
 
 #endif //SRC_IR_DAPHNEIR_DAPHNEDIALECT_TD

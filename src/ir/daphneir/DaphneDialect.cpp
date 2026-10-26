@@ -19,26 +19,13 @@
 #include <ir/daphneir/DaphneTypeStorage.h>
 #include <util/ErrorHandler.h>
 
-#include <ir/daphneir/DaphneOpsEnums.cpp.inc>
-
-#include "mlir/Support/LogicalResult.h"
-#define GET_OP_CLASSES
-#include <ir/daphneir/DaphneOps.cpp.inc>
-#define GET_TYPEDEF_CLASSES
-#include <llvm/ADT/APInt.h>
-#include <llvm/ADT/APSInt.h>
-#include <llvm/ADT/BitVector.h>
-#include <llvm/ADT/TypeSwitch.h>
-
-#include <ir/daphneir/DaphneOpsDialect.cpp.inc>
-#include <ir/daphneir/DaphneOpsTypes.cpp.inc>
-
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/Support/LogicalResult.h"
 // #include "mlir/IR/FunctionImplementation.h" // Removed in newer LLVM
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
@@ -54,6 +41,12 @@
 #include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
+#include <ir/daphneir/DaphneOpsEnums.cpp.inc>
+#include <llvm/ADT/APInt.h>
+#include <llvm/ADT/APSInt.h>
+#include <llvm/ADT/BitVector.h>
+#include <llvm/ADT/TypeSwitch.h>
 
 #include <llvm/ADT/APInt.h>
 #include <llvm/ADT/APSInt.h>
@@ -62,6 +55,12 @@
 
 #include <stdexcept>
 #include <string>
+
+#define GET_OP_CLASSES
+#include <ir/daphneir/DaphneOps.cpp.inc>
+#define GET_TYPEDEF_CLASSES
+#include <ir/daphneir/DaphneOpsDialect.cpp.inc>
+#include <ir/daphneir/DaphneOpsTypes.cpp.inc>
 
 struct DaphneInlinerInterface : public mlir::DialectInlinerInterface {
     using DialectInlinerInterface::DialectInlinerInterface;
@@ -115,200 +114,179 @@ mlir::Operation *mlir::daphne::DaphneDialect::materializeConstant(OpBuilder &bui
     return builder.create<mlir::daphne::ConstantOp>(loc, type, value);
 }
 
-mlir::Type mlir::daphne::DaphneDialect::parseType(mlir::DialectAsmParser &parser) const {
-    llvm::StringRef keyword;
-    mlir::ParseResult pr = parser.parseKeyword(&keyword);
-    if (mlir::failed(pr))
-        throw std::runtime_error("parsing a DaphneIR type failed");
-    // `Matrix` `<` (`?` | \d+) `x` (`?` | \d+) `x` \type
-    //      (`:` (
-    //          `sp` `[` \float `]` |
-    //          `rep` `[` (`dense` | `sparse`) `]`
-    //      ))*
-    if (keyword == "Matrix") {
-        ssize_t numRows = -1;
-        ssize_t numCols = -1;
-        double sparsity = -1.0;
-        MatrixRepresentation representation = MatrixRepresentation::Default; // default is dense
-        BoolOrUnknown symmetric = BoolOrUnknown::Unknown;
-        mlir::Type elementType;
-        if (parser.parseLess()) {
-            return nullptr;
-        }
-        if (parser.parseOptionalQuestion()) {
-            // Parse #rows if there was no '?'.
-            if (parser.parseInteger<ssize_t>(numRows)) {
-                return nullptr;
-            }
-        }
-        if (parser.parseXInDimensionList()) {
-            return nullptr;
-        }
-        if (parser.parseOptionalQuestion()) {
-            // Parse #cols if there was no '?'.
-            if (parser.parseInteger<ssize_t>(numCols)) {
-                return nullptr;
-            }
-        }
-        if (parser.parseXInDimensionList() || parser.parseType(elementType)) {
-            return nullptr;
-        }
-        // additional properties (only print/read them when present, as this
-        // will probably get more and more)
-        while (succeeded(parser.parseOptionalColon())) {
-            if (succeeded(parser.parseOptionalKeyword("sp"))) {
-                if (sparsity != -1.0) {
-                    // read sparsity twice
-                    return nullptr;
-                }
-                if (parser.parseLSquare() || parser.parseFloat(sparsity) || parser.parseRSquare()) {
-                    return nullptr;
-                }
-            } else if (succeeded(parser.parseOptionalKeyword("rep"))) {
-                llvm::StringRef repName;
-                if (parser.parseLSquare() || parser.parseKeyword(&repName) || parser.parseRSquare()) {
-                    return nullptr;
-                }
-                representation = stringToMatrixRepresentation(repName.str());
-            } else if (succeeded(parser.parseOptionalKeyword("symmetric"))) {
-                llvm::StringRef symmetricStr;
-                if (parser.parseLSquare() || parser.parseKeyword(&symmetricStr) || parser.parseRSquare()) {
-                    return nullptr;
-                }
-                symmetric = stringToBoolOrUnknown(symmetricStr.str());
-            } else {
-                return nullptr;
-            }
-        }
-        if (parser.parseGreater()) {
-            return nullptr;
-        }
-
-        return MatrixType::get(parser.getBuilder().getContext(), elementType, numRows, numCols, sparsity,
-                               representation, symmetric);
-    } else if (keyword == "Frame") {
-        ssize_t numRows = -1;
-        ssize_t numCols = -1;
-        if (parser.parseLess() || parser.parseOptionalQuestion() ||
-            // TODO Parse #rows if there was no '?'.
-            // parser.parseInteger<ssize_t>(numRows) ||
-            parser.parseKeyword("x") || parser.parseLSquare() || parser.parseOptionalQuestion() ||
-            // TODO Parse #cols if there was no '?'.
-            // parser.parseInteger<ssize_t>(numCols) ||
-            // TODO Parse sparsity
-            parser.parseColon()) {
-            return nullptr;
-        }
-        std::vector<mlir::Type> cts;
-        mlir::Type type;
-        do {
-            if (parser.parseType(type))
-                return nullptr;
-            cts.push_back(type);
-        } while (succeeded(parser.parseOptionalComma()));
-        if (parser.parseRSquare() || parser.parseGreater()) {
-            return nullptr;
-        }
-        return FrameType::get(parser.getBuilder().getContext(), cts, numRows, numCols, nullptr);
-    } else if (keyword == "Handle") {
-        mlir::Type dataType;
-        if (parser.parseLess() || parser.parseType(dataType) || parser.parseGreater()) {
-            return nullptr;
-        }
-        return mlir::daphne::HandleType::get(parser.getBuilder().getContext(), dataType);
-    } else if (keyword == "String") {
-        return StringType::get(parser.getBuilder().getContext());
-    } else if (keyword == "Column") {
-        if (parser.parseLess())
-            return nullptr;
-        ssize_t numRows = -1;
-        if (parser.parseOptionalQuestion())
-            // Parse #rows if there was no '?'.
-            if (parser.parseInteger<ssize_t>(numRows))
-                return nullptr;
-        if (parser.parseXInDimensionList())
-            return nullptr;
-        mlir::Type vt;
-        if (parser.parseType(vt))
-            return nullptr;
-        if (parser.parseGreater())
-            return nullptr;
-        return ColumnType::get(parser.getBuilder().getContext(), vt, numRows);
-    } else if (keyword == "DaphneContext") {
-        return mlir::daphne::DaphneContextType::get(parser.getBuilder().getContext());
-    } else {
-        parser.emitError(parser.getCurrentLocation()) << "Parsing failed, keyword `" << keyword << "` not recognized!";
-        return nullptr;
-    }
+namespace {
+mlir::LogicalResult parseOptionalDim(mlir::AsmParser &parser, ssize_t &value) {
+    if (succeeded(parser.parseOptionalQuestion()))
+        return mlir::success();
+    return parser.parseInteger<ssize_t>(value);
 }
+} // namespace
 
 std::string unknownStrIf(ssize_t val) { return (val == -1) ? "?" : std::to_string(val); }
 
 std::string unknownStrIf(double val) { return (val == -1.0) ? "?" : std::to_string(val); }
 
-void mlir::daphne::DaphneDialect::printType(mlir::Type type, mlir::DialectAsmPrinter &os) const {
-    if (llvm::isa<mlir::daphne::StructureType>(type))
-        os << "Structure";
-    else if (auto t = llvm::dyn_cast<mlir::daphne::MatrixType>(type)) {
-        os << "Matrix<" << unknownStrIf(t.getNumRows()) << 'x' << unknownStrIf(t.getNumCols()) << 'x'
-           << t.getElementType();
-        auto sparsity = t.getSparsity();
-        auto representation = t.getRepresentation();
-        auto symmetric = t.getSymmetric();
+mlir::Type mlir::daphne::MatrixType::parse(mlir::AsmParser &parser) {
+    ssize_t numRows = -1;
+    ssize_t numCols = -1;
+    double sparsity = -1.0;
+    MatrixRepresentation representation = MatrixRepresentation::Default;
+    BoolOrUnknown symmetric = BoolOrUnknown::Unknown;
+    mlir::Type elementType;
 
-        if (sparsity != -1.0) {
-            os << ":sp[" << sparsity << ']';
+    if (parser.parseLess() || failed(parseOptionalDim(parser, numRows)) || parser.parseXInDimensionList() ||
+        failed(parseOptionalDim(parser, numCols)) || parser.parseXInDimensionList() || parser.parseType(elementType))
+        return mlir::Type();
+
+    while (succeeded(parser.parseOptionalColon())) {
+        if (succeeded(parser.parseOptionalKeyword("sp"))) {
+            if (parser.parseLSquare() || parser.parseFloat(sparsity) || parser.parseRSquare())
+                return mlir::Type();
+        } else if (succeeded(parser.parseOptionalKeyword("rep"))) {
+            llvm::StringRef repName;
+            if (parser.parseLSquare() || parser.parseKeyword(&repName) || parser.parseRSquare())
+                return mlir::Type();
+            representation = stringToMatrixRepresentation(repName.str());
+        } else if (succeeded(parser.parseOptionalKeyword("symmetric"))) {
+            llvm::StringRef symmetricStr;
+            if (parser.parseLSquare() || parser.parseKeyword(&symmetricStr) || parser.parseRSquare())
+                return mlir::Type();
+            symmetric = stringToBoolOrUnknown(symmetricStr.str());
+        } else {
+            return mlir::Type();
         }
-        if (representation != MatrixRepresentation::Default) {
-            os << ":rep[" << matrixRepresentationToString(representation) << ']';
-        }
-        if (symmetric != BoolOrUnknown::Unknown) {
-            os << ":symmetric[" << boolOrUnknownToString(symmetric) << ']';
-        }
-        os << '>';
-    } else if (auto t = llvm::dyn_cast<mlir::daphne::FrameType>(type)) {
-        os << "Frame<" << unknownStrIf(t.getNumRows()) << "x[" << unknownStrIf(t.getNumCols()) << ": ";
-        // Column types.
-        std::vector<mlir::Type> cts = t.getColumnTypes();
-        for (size_t i = 0; i < cts.size(); i++) {
-            os << cts[i];
-            if (i < cts.size() - 1)
+    }
+
+    if (parser.parseGreater())
+        return mlir::Type();
+
+    return MatrixType::get(parser.getBuilder().getContext(), elementType, numRows, numCols, sparsity, representation,
+                           symmetric);
+}
+
+void mlir::daphne::MatrixType::print(mlir::AsmPrinter &os) const {
+    os << "Matrix<" << unknownStrIf(getNumRows()) << 'x' << unknownStrIf(getNumCols()) << 'x' << getElementType();
+    if (auto sparsity = getSparsity(); sparsity != -1.0)
+        os << ":sp[" << sparsity << ']';
+    if (auto representation = getRepresentation(); representation != MatrixRepresentation::Default)
+        os << ":rep[" << matrixRepresentationToString(representation) << ']';
+    if (auto symmetric = getSymmetric(); symmetric != BoolOrUnknown::Unknown)
+        os << ":symmetric[" << boolOrUnknownToString(symmetric) << ']';
+    os << '>';
+}
+
+mlir::Type mlir::daphne::FrameType::parse(mlir::AsmParser &parser) {
+    ssize_t numRows = -1;
+    ssize_t numCols = -1;
+    llvm::SmallVector<mlir::Type> columnTypes;
+
+    if (parser.parseLess() || failed(parseOptionalDim(parser, numRows)) || parser.parseKeyword("x") ||
+        parser.parseLSquare() || failed(parseOptionalDim(parser, numCols)) || parser.parseColon())
+        return mlir::Type();
+
+    if (failed(parser.parseOptionalRSquare())) {
+        mlir::Type type;
+        do {
+            if (parser.parseType(type))
+                return mlir::Type();
+            columnTypes.push_back(type);
+        } while (succeeded(parser.parseOptionalComma()));
+        if (parser.parseRSquare())
+            return mlir::Type();
+    }
+
+    if (parser.parseComma())
+        return mlir::Type();
+
+    std::vector<std::string> *labels = nullptr;
+    if (failed(parser.parseOptionalQuestion())) {
+        std::string label;
+        std::vector<std::string> parsedLabels;
+        if (parser.parseLSquare())
+            return mlir::Type();
+        do {
+            if (parser.parseString(&label))
+                return mlir::Type();
+            parsedLabels.push_back(label);
+        } while (succeeded(parser.parseOptionalComma()));
+        if (parser.parseRSquare())
+            return mlir::Type();
+        // Allocate labels to keep them alive for the lifetime of the context.
+        labels = new std::vector<std::string>(parsedLabels);
+    }
+
+    if (parser.parseGreater())
+        return mlir::Type();
+
+    return FrameType::get(parser.getBuilder().getContext(),
+                          std::vector<mlir::Type>(columnTypes.begin(), columnTypes.end()), numRows, numCols, labels);
+}
+
+void mlir::daphne::FrameType::print(mlir::AsmPrinter &os) const {
+    os << "Frame<" << unknownStrIf(getNumRows()) << "x[" << unknownStrIf(getNumCols()) << ": ";
+    std::vector<mlir::Type> cts = getColumnTypes();
+    for (size_t i = 0; i < cts.size(); i++) {
+        os << cts[i];
+        if (i < cts.size() - 1)
+            os << ", ";
+    }
+    os << "], ";
+    std::vector<std::string> *labels = getLabels();
+    if (labels) {
+        os << '[';
+        for (size_t i = 0; i < labels->size(); i++) {
+            os << '"' << (*labels)[i] << '"';
+            if (i < labels->size() - 1)
                 os << ", ";
         }
-        os << "], ";
-        // Column labels.
-        std::vector<std::string> *labels = t.getLabels();
-        if (labels) {
-            os << '[';
-            for (size_t i = 0; i < labels->size(); i++) {
-                os << '"' << (*labels)[i] << '"';
-                if (i < labels->size() - 1)
-                    os << ", ";
-            }
-            os << ']';
-        } else
-            os << '?';
-        os << '>';
-    } else if (auto t = llvm::dyn_cast<mlir::daphne::ColumnType>(type)) {
-        os << "Column<" << unknownStrIf(t.getNumRows()) << "x" << t.getValueType() << '>';
-    } else if (auto t = llvm::dyn_cast<mlir::daphne::ListType>(type)) {
-        os << "List<" << t.getElementType() << '>';
-    } else if (auto handle = llvm::dyn_cast<mlir::daphne::HandleType>(type)) {
-        os << "Handle<" << handle.getDataType() << ">";
-    } else if (llvm::isa<mlir::daphne::StringType>(type))
-        os << "String";
-    else if (auto t = llvm::dyn_cast<mlir::daphne::VariadicPackType>(type))
-        os << "VariadicPack<" << t.getContainedType() << '>';
-    else if (llvm::isa<mlir::daphne::DaphneContextType>(type))
-        os << "DaphneContext";
-    else if (llvm::isa<mlir::daphne::FileType>(type))
-        os << "File";
-    else if (llvm::isa<mlir::daphne::DescriptorType>(type))
-        os << "Descriptor";
-    else if (llvm::isa<mlir::daphne::TargetType>(type))
-        os << "Target";
-    else if (llvm::isa<mlir::daphne::UnknownType>(type))
-        os << "Unknown";
+        os << ']';
+    } else
+        os << '?';
+    os << '>';
+}
+
+mlir::Type mlir::daphne::ColumnType::parse(mlir::AsmParser &parser) {
+    ssize_t numRows = -1;
+    mlir::Type valueType;
+
+    if (parser.parseLess() || failed(parseOptionalDim(parser, numRows)) || parser.parseXInDimensionList() ||
+        parser.parseType(valueType) || parser.parseGreater())
+        return mlir::Type();
+
+    return ColumnType::get(parser.getBuilder().getContext(), valueType, numRows);
+}
+
+void mlir::daphne::ColumnType::print(mlir::AsmPrinter &os) const {
+    os << "Column<" << unknownStrIf(getNumRows()) << "x" << getValueType() << '>';
+}
+
+mlir::Type mlir::daphne::ListType::parse(mlir::AsmParser &parser) {
+    mlir::Type elementType;
+    if (parser.parseLess() || parser.parseType(elementType) || parser.parseGreater())
+        return mlir::Type();
+    return ListType::get(parser.getBuilder().getContext(), elementType);
+}
+
+void mlir::daphne::ListType::print(mlir::AsmPrinter &os) const { os << "List<" << getElementType() << '>'; }
+
+mlir::Type mlir::daphne::HandleType::parse(mlir::AsmParser &parser) {
+    mlir::Type dataType;
+    if (parser.parseLess() || parser.parseType(dataType) || parser.parseGreater())
+        return mlir::Type();
+    return HandleType::get(parser.getBuilder().getContext(), dataType);
+}
+
+void mlir::daphne::HandleType::print(mlir::AsmPrinter &os) const { os << "Handle<" << getDataType() << ">"; }
+
+mlir::Type mlir::daphne::VariadicPackType::parse(mlir::AsmParser &parser) {
+    mlir::Type containedType;
+    if (parser.parseLess() || parser.parseType(containedType) || parser.parseGreater())
+        return mlir::Type();
+    return VariadicPackType::get(parser.getBuilder().getContext(), containedType);
+}
+
+void mlir::daphne::VariadicPackType::print(mlir::AsmPrinter &os) const {
+    os << "VariadicPack<" << getContainedType() << '>';
 }
 
 std::string mlir::daphne::matrixRepresentationToString(MatrixRepresentation rep) {
