@@ -1,0 +1,13 @@
+// Column-scaling idiom X @ diag(v), which the compiler rewrites to X * t(v).
+// X is non-square and v has distinct values, so a wrong broadcast axis, a
+// dropped transpose, or a row/column mix-up would change the printed result
+// rather than be masked.
+
+X = [ 1.0, 2.0, 3.0,
+      4.0, 5.0, 6.0];
+X = reshape(X, 2, 3);
+
+v = [10.0, 100.0, 1000.0];
+v = reshape(v, 3, 1);
+
+print(X @ diagMatrix(v));

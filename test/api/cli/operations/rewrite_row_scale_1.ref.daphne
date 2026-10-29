@@ -1,0 +1,15 @@
+// Reference for rewrite_row_scale_1.daphne: the same diag(v) @ X built from a
+// plain matrix literal, so the row-scaling rewrite does not fire and the naive
+// matmul path is exercised instead.
+
+D = [ 2.0, 0.0, 0.0,
+      0.0, 3.0, 0.0,
+      0.0, 0.0, 5.0];
+D = reshape(D, 3, 3);
+
+X = [ 1.0,  2.0,  3.0,  4.0,
+      5.0,  6.0,  7.0,  8.0,
+      9.0, 10.0, 11.0, 12.0];
+X = reshape(X, 3, 4);
+
+print(D @ X);

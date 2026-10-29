@@ -119,6 +119,32 @@ find_package(fmt)
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
 
 option(USE_CUDA "Whether to activate compilation of CUDA features" OFF)
+
+# Optional cap on parallel jobs for the memory-heavy kernel targets, via a Ninja job pool.
+# The generated kernels_*.cpp files instantiate a lot of templates, and each cc1 can
+# hold several GB resident, so building them all at once can hit the OOM killer on hosts
+# with little RAM per core (WSL default, small VMs, containers with a --memory limit).
+# Set to a positive integer to cap KernelObjLib (and CUDAKernels when USE_CUDA=ON);
+# leave empty for uncapped (the default). Ninja only, ignored with a warning otherwise.
+set(DAPHNE_KERNEL_COMPILE_JOBS "" CACHE STRING
+    "Max concurrent compile jobs for the pre-compiled kernel targets (Ninja only; empty = uncapped).")
+
+if(NOT "${DAPHNE_KERNEL_COMPILE_JOBS}" STREQUAL "")
+    if(NOT DAPHNE_KERNEL_COMPILE_JOBS MATCHES "^[1-9][0-9]*$")
+        message(FATAL_ERROR "DAPHNE_KERNEL_COMPILE_JOBS must be a positive integer, got '${DAPHNE_KERNEL_COMPILE_JOBS}'.")
+    endif()
+    if(NOT CMAKE_GENERATOR MATCHES "Ninja")
+        message(WARNING "DAPHNE_KERNEL_COMPILE_JOBS is set but generator is '${CMAKE_GENERATOR}'. JOB_POOLS is Ninja-only; ignoring.")
+    else()
+        set_property(GLOBAL PROPERTY JOB_POOLS daphne_kernel_compile=${DAPHNE_KERNEL_COMPILE_JOBS})
+        # Single flag used by the kernel target definitions to decide whether
+        # to attach JOB_POOL_COMPILE. Referencing the pool without registering
+        # it makes Ninja fail with "unknown pool name" at build-graph load,
+        # so both sides of the flag must stay in sync.
+        set(DAPHNE_KERNEL_POOL_ACTIVE TRUE)
+    endif()
+endif()
+
 include(CheckLanguage)
 check_language(CUDA)
 if(USE_CUDA AND CMAKE_CUDA_COMPILER)

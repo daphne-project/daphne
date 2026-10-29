@@ -33,6 +33,9 @@ Following builds only take a few seconds/minutes.
 Contents:
 
 - [Usage of the build script](#usage-of-the-build-script)
+- [Building on macOS (Experimental)](#building-on-macos-experimental)
+- [Building on WSL](#building-on-wsl)
+- [Memory Requirements](#memory-requirements)
 - [Extension of the build script](#extension)
 
 ---
@@ -165,7 +168,49 @@ The build script automatically detects macOS and configures GCC-15 as the compil
 
 ## Building on WSL
 
-When using Windows Subsystems for Linux (WSL), the default memory limit for WSL is 50% of the total memory of the underlying Windows host. This can lead to build fails due to SIGKILL for DAPHNE builds. [Advanced settings configuration in WSL](https://learn.microsoft.com/en-us/windows/wsl/wsl-config) describes how the memory limit can be configured.
+When using Windows Subsystem for Linux (WSL), the default memory limit for WSL is 50% of the total memory of the underlying Windows host. This can lead to DAPHNE build failures where `cc1plus` is killed by the Linux OOM killer. [Advanced settings configuration in WSL](https://learn.microsoft.com/en-us/windows/wsl/wsl-config) describes how the memory limit can be configured. If raising the limit is not an option, see [Memory Requirements](#memory-requirements) for how to cap build parallelism instead.
+
+## Memory Requirements
+
+Compiling the pre-compiled kernels library instantiates many kernel templates. Each translation unit can consume several GB of RAM at peak. On memory-constrained hosts (WSL default, small VMs, Docker Desktop with the default VM sizing, containers started with a `--memory` limit) building all kernel translation units in parallel can trigger the OOM killer, which surfaces as `fatal error: Killed signal terminated program cc1plus`.
+
+`build.sh` detects this automatically. It reads the available memory from the cgroup v2 memory limit (when running inside a Docker container with `--memory=`) or from `/proc/meminfo` (bare metal, WSL 2, or an unconstrained container), then sets safe values for both job-count knobs before the build starts. When the detected memory is below what `nproc` would otherwise allow, it prints a message:
+
+```
+Memory-constrained host detected (8 GB available)
+Using COMPILE_JOBS=3, KERNEL_COMPILE_JOBS=3 to prevent OOM
+Override by setting DAPHNE_COMPILE_JOBS / DAPHNE_KERNEL_COMPILE_JOBS env vars
+```
+
+No manual configuration is needed for a first-time build. Just run `./build.sh`.
+
+To use different values, set one or both env vars before invoking the script; the auto-detected defaults are skipped for any knob that is already set:
+
+```bash
+DAPHNE_COMPILE_JOBS=4 DAPHNE_KERNEL_COMPILE_JOBS=2 ./build.sh
+```
+
+The two knobs and their scope:
+
+**`DAPHNE_COMPILE_JOBS`** caps total Ninja concurrency for all targets (passed as `cmake --build --parallel N`). Without this, Ninja defaults to `nproc` parallel jobs, which can OOM the MLIR/compiler targets before the kernel phase is even reached.
+
+**`DAPHNE_KERNEL_COMPILE_JOBS`** is a finer-grained cap applied on top, only for the extra-heavy kernel translation units (`KernelObjLib`, and `CUDAKernels` when `--cuda` is used). Implemented as a Ninja job pool; ignored with a warning under other generators.
+
+Auto-detection sets both knobs to the same value (kernel jobs count against the global cap too, so the kernel-specific pool only bites when it's tighter than the global one). You would set them to different values only if you want, say, a global cap of 4 for the MLIR phase but a tighter cap of 2 specifically for the kernel phase.
+
+Reference table for manual overrides:
+
+| Available RAM | `DAPHNE_COMPILE_JOBS` | `DAPHNE_KERNEL_COMPILE_JOBS` |
+|---|---|---|
+| 8 GB | `3` | `3` |
+| 6 GB | `2` | `2` |
+| 4 GB | `1` | `1` |
+
+Above 8 GB the recommended count keeps growing: auto-detection uses `floor((RAM_GB - 1) / 2)`, capped at your core count. For example a 16 GB host gets `7` and a 32 GB host gets `15` (or `nproc`, whichever is smaller), so setting a flat `3` on a large host would leave most cores idle.
+
+Leave both options unset to use auto-detection (recommended). The auto-detected values follow a conservative "2 GB per parallel slot" rule; raise them if you know your compile TUs peak lower on your system.
+
+One kernel translation unit (`DistributedPipeline.cpp`) intrinsically peaks at ~3.6 GiB regardless of the `JOBS` setting. On hosts with less than about 4 GB of available RAM the build cannot fit even with `DAPHNE_COMPILE_JOBS=1`; increase the host / container memory in that case. Reducing this floor further would require splitting `DistributedWrapper.h` (which `DistributedPipeline.cpp` includes) one level deeper, which is a larger refactor left as follow-up work.
 
 ## Extension
 

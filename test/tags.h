@@ -23,10 +23,12 @@
 // "[b]", then TAG_A TAG_B is "[a]" "[b]", which is equivalent to "[a][b]".
 
 #define TAG_ALGORITHMS "[algorithms]"
+#define TAG_BUILD "[build]"
 #define TAG_CAST "[cast]"
 #define TAG_CODEGEN "[codegen]"
 #define TAG_CONFIG "[config]"
 #define TAG_CONTROLFLOW "[controlflow]"
+#define TAG_CSE "[cse]"
 #define TAG_DAPHNELIB "[daphnelib]"
 #define TAG_DATASTRUCTURES "[datastructures]"
 #define TAG_DISTRIBUTED "[distributed]"

@@ -1,0 +1,10 @@
+// Reference for rewrite_repeated_add_1.daphne: the same value computed as X * 3
+// directly. There is no chain of ewAdds for the repeated-add fold to match, so
+// this exercises the plain scalar-multiply path. Its modular result must match
+// the rewritten X + X + X byte for byte, including the overflow wraparound.
+
+X = [4611686018427387904, 4611686018427387900,
+     4000000000000000000, 4611686018427387903];
+X = reshape(X, 4, 1);
+
+print(X * 3);

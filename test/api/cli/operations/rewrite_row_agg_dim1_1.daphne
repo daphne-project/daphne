@@ -1,0 +1,9 @@
+// Row-aggregate identity sum(X, 0) over an n x 1 matrix, which the compiler
+// rewrites to X itself: a row-wise sum touches one element per row, so the
+// aggregate is the identity. X has distinct values so a wrong reduction would
+// change the printed result rather than be masked.
+
+X = [1.0, 2.0, 3.0, 4.0];
+X = reshape(X, 4, 1);
+
+print(sum(X, 0));

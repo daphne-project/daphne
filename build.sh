@@ -52,6 +52,98 @@ sed_inplace() {
     fi
 }
 
+# How much RAM this process can actually use, in whole GB (rounded down).
+# Tries the cgroup limits first (so it respects docker --memory), then
+# /proc/meminfo, then macOS sysctl, and falls back to 4 if none of those work.
+# /proc/meminfo reports host RAM, so it's only accurate when there's no container limit.
+get_memory_gb() {
+    local mem_bytes=0
+
+    if [ "$IS_DARWIN" = "1" ]; then
+        local raw
+        raw=$(sysctl -n hw.memsize 2>/dev/null) || raw=0
+        if [[ "$raw" =~ ^[0-9]+$ ]] && [ "$raw" -gt 0 ]; then
+            echo $(( raw / 1024 / 1024 / 1024 ))
+        else
+            echo 4
+        fi
+        return
+    fi
+
+    # cgroup v2: walk the cgroup hierarchy, take the minimum non-"max" memory.max
+    local cg_path
+    cg_path=$(awk -F: '/^0:/{print $3; exit}' /proc/self/cgroup 2>/dev/null)
+    if [ -n "$cg_path" ]; then
+        local path="$cg_path" val min_limit=0 mem_max_file
+        while true; do
+            mem_max_file="/sys/fs/cgroup${path}/memory.max"
+            if [ -r "$mem_max_file" ]; then
+                val=$(cat "$mem_max_file" 2>/dev/null)
+                if [ "$val" != "max" ] && [[ "$val" =~ ^[0-9]+$ ]]; then
+                    if [ "$min_limit" -eq 0 ] || [ "$val" -lt "$min_limit" ]; then
+                        min_limit="$val"
+                    fi
+                fi
+            fi
+            [ "$path" = "/" ] || [ -z "$path" ] && break
+            path=$(dirname "$path")
+            [ "$path" = "." ] && break
+        done
+        [ "$min_limit" -gt 0 ] && mem_bytes="$min_limit"
+    fi
+
+    # cgroup v1 fallback (legacy or hybrid kernels)
+    if [ "$mem_bytes" -eq 0 ]; then
+        local v1="/sys/fs/cgroup/memory/memory.limit_in_bytes"
+        if [ -r "$v1" ]; then
+            local v1val
+            v1val=$(cat "$v1" 2>/dev/null)
+            # Sentinel for "unlimited" on v1 is > 1 PB; any real limit is below that
+            if [[ "$v1val" =~ ^[0-9]+$ ]] && [ "$v1val" -gt 0 ] && \
+               [ "$v1val" -lt 1125899906842624 ]; then
+                mem_bytes="$v1val"
+            fi
+        fi
+    fi
+
+    # /proc/meminfo: host RAM (final fallback; not container-aware)
+    if [ "$mem_bytes" -eq 0 ] && [ -r /proc/meminfo ]; then
+        # Multiply outside awk: mawk (default on the Ubuntu images) prints
+        # byte counts >= 2^31 as "1.37439e+11", which the digits-only guard
+        # below rejects, wrongly falling back to 4 GB on any >= 2 GB host.
+        local mem_kb
+        mem_kb=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo)
+        mem_kb="${mem_kb:-0}"
+        [[ "$mem_kb" =~ ^[0-9]+$ ]] && mem_bytes=$(( mem_kb * 1024 ))
+    fi
+
+    if ! [[ "$mem_bytes" =~ ^[0-9]+$ ]] || [ "$mem_bytes" -eq 0 ]; then
+        echo 4
+        return
+    fi
+    echo $(( mem_bytes / 1024 / 1024 / 1024 ))
+}
+
+# Picks job counts that fit in avail_gb of RAM and prints "compile_jobs kernel_jobs".
+# compile_jobs is the global Ninja cap: floor((avail-1)/2), clamped to [1, nproc].
+# kernel_jobs uses the same value, since a kernel slot also takes a global slot
+# so there's no point setting it higher.
+# We budget ~2 GB per slot to cover the worst case: DistributedPipeline.cpp peaks
+# around 3.63 GB, other MLIR targets ~1.5 GB, kernel TUs ~1 GB.
+calc_daphne_jobs() {
+    local avail_gb=$1
+    local ncpu
+    ncpu=$(get_nproc)
+    local usable=$(( avail_gb > 1 ? avail_gb - 1 : 1 ))
+    local cj=$(( usable / 2 ))
+    [ "$cj" -lt 1 ] && cj=1
+    [ "$cj" -gt "$ncpu" ] && cj=$ncpu
+    # Kernel pool never exceeds the global cap (kernel slots consume global
+    # slots too); today both knobs use the same value.
+    local kj=$cj
+    echo "$cj $kj"
+}
+
 build_ts_begin=$(date +%s%N)
 
 #******************************************************************************
@@ -1214,6 +1306,37 @@ fi
 daphne_msg "Build Daphne"
 
 DAPHNE_CMAKE_EXTRA=()
+
+# Work out how much RAM we have and pick sane parallelism defaults.
+# (get_memory_gb respects docker --memory, otherwise falls back to host RAM.)
+# Only kicks in when memory is the limiting factor; env vars you set take priority.
+# The guard is OR, not AND: if you set just one knob we still auto-fill the other below.
+if [ -z "${DAPHNE_COMPILE_JOBS:-}" ] || [ -z "${DAPHNE_KERNEL_COMPILE_JOBS:-}" ]; then
+    _avail_gb=$(get_memory_gb)
+    read -r _auto_cj _auto_kj <<< "$(calc_daphne_jobs "$_avail_gb")"
+    _nproc=$(get_nproc)
+    : "${DAPHNE_COMPILE_JOBS:=$_auto_cj}"
+    : "${DAPHNE_KERNEL_COMPILE_JOBS:=$_auto_kj}"
+    # Report the values the build will actually use, which may be a mix of a
+    # preset env var and an auto-detected default, rather than the raw auto
+    # values (those can differ from the effective ones when a knob is preset).
+    if [ "$DAPHNE_COMPILE_JOBS" -lt "$_nproc" ]; then
+        daphne_msg "Memory-constrained host detected (${_avail_gb} GB available)"
+        daphne_msg "Using COMPILE_JOBS=${DAPHNE_COMPILE_JOBS}, KERNEL_COMPILE_JOBS=${DAPHNE_KERNEL_COMPILE_JOBS} to prevent OOM"
+        daphne_msg "Override by setting DAPHNE_COMPILE_JOBS / DAPHNE_KERNEL_COMPILE_JOBS env vars"
+    fi
+fi
+
+# Pass the job counts on to cmake/ninja.
+# The kernel count goes in as a CMake cache variable (a Ninja job pool),
+# and the global count becomes cmake --build --parallel.
+if [ -n "${DAPHNE_KERNEL_COMPILE_JOBS:-}" ]; then
+    DAPHNE_CMAKE_EXTRA+=(-DDAPHNE_KERNEL_COMPILE_JOBS="$DAPHNE_KERNEL_COMPILE_JOBS")
+fi
+CMAKE_BUILD_EXTRA=()
+if [ -n "${DAPHNE_COMPILE_JOBS:-}" ]; then
+    CMAKE_BUILD_EXTRA+=(--parallel "$DAPHNE_COMPILE_JOBS")
+fi
 if [ "$IS_DARWIN" == "1" ]; then
     macosSdk="${DAPHNE_MACOS_SDK:-/Library/Developer/CommandLineTools/SDKs/MacOSX15.sdk}"
     # GCC-15 is already exported; explicitly pass to cmake as well.
@@ -1228,9 +1351,9 @@ fi
 
 cmake -S "$projectRoot" -B "$daphneBuildDir" -G Ninja -DANTLR_VERSION="$antlrVersion" \
     -DCMAKE_PREFIX_PATH="$installPrefix" \
-    $BUILD_CUDA $BUILD_FPGAOPENCL $BUILD_DEBUG $BUILD_MPI $BUILD_HDFS $BUILD_PAPI ${DAPHNE_CMAKE_EXTRA[@]}
+    $BUILD_CUDA $BUILD_FPGAOPENCL $BUILD_DEBUG $BUILD_MPI $BUILD_HDFS $BUILD_PAPI "${DAPHNE_CMAKE_EXTRA[@]}"
 
-cmake --build "$daphneBuildDir" --target "$target"
+cmake --build "$daphneBuildDir" --target "$target" "${CMAKE_BUILD_EXTRA[@]}"
 
 build_ts_end=$(date +%s%N)
 daphne_msg "Successfully built Daphne://${target} (took $(printableTimestamp $((build_ts_end - build_ts_begin))))"

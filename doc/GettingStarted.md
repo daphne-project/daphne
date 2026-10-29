@@ -263,6 +263,7 @@ launching DAPHNE via Docker (see below) should work the same way as in a native 
 #### Hardware
 
 - about 7.5 GB of free disk space to build from source (mostly due to dependencies)
+- on memory-constrained hosts (WSL, small VMs, Docker Desktop, containers with a `--memory` limit), `build.sh` automatically caps build parallelism to prevent OOM, with no manual configuration needed; see [Memory Requirements](development/BuildingDaphne.md#memory-requirements) for details and manual override options
 - Optional:
     - NVidia GPU for CUDA ops (tested on Pascal and newer architectures); 8GB for CUDA SDK
     - Intel GPU for OneAPI ops (tested on Coffeelake graphics); 23 GB for OneAPI

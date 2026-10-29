@@ -1,0 +1,14 @@
+// Broadcast-minimization idiom (M1 + s1) + (M2 + s2), which the compiler
+// regroups to (M1 + M2) + (s1 + s2). The scalars are near 2^62 so their sum
+// overflows si64; integer addition is associative in Z/2^64, so the regrouping
+// preserves the wraparound and the result matches the reference exactly.
+
+M1 = [1, 2, 3, 4, 5, 6];
+M1 = reshape(M1, 2, 3);
+M2 = [10, 20, 30, 40, 50, 60];
+M2 = reshape(M2, 2, 3);
+
+s1 = 4611686018427387904;
+s2 = 4611686018427387905;
+
+print((M1 + s1) + (M2 + s2));

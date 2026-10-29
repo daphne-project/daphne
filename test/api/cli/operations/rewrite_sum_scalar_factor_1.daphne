@@ -1,0 +1,15 @@
+// Scalar-factor idiom sum(s * X), which the compiler rewrites to s * sum(X).
+// X is non-square with distinct values and s is a non-trivial factor, so a
+// dropped factor or a wrong aggregate would change the printed result rather
+// than be masked. An integer matrix is used so the scalar does not promote the
+// element type and the regrouping stays exact, the condition under which the
+// rewrite fires.
+
+s = 3;
+
+X = [ 1,  2,  3,  4,
+      5,  6,  7,  8,
+      9, 10, 11, 12];
+X = reshape(X, 3, 4);
+
+print(sum(s * X));
