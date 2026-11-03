@@ -151,3 +151,53 @@ TEST_CASE("operator_at_symmetry", TAG_OPERATIONS) {
             }
         }
 }
+
+TEST_CASE("operator_at_symmetry_inference", TAG_OPERATIONS) {
+    // The compiler infers at compile-time that `t(X) @ X` and `X @ t(X)` are symmetric (a matrix product with the syrk
+    // shape is symmetric for any real X). We check this by dumping the IR after property inference and looking for the
+    // inferred symmetric property on the matmul results. This is the compile-time counterpart to the run-time
+    // isSymmetric() check above.
+    std::string scriptFilePath = dirPath + "operator_at_symmetry.daphne";
+
+    std::stringstream out, err;
+    int status = runDaphne(out, err, "--explain", "property_inference", scriptFilePath.c_str(), "numRows=3",
+                           "numCols=4", "checkSymmetry=false");
+
+    CHECK(status == StatusCode::SUCCESS);
+    // Both matmul results (t(X) @ X and X @ t(X)) must be inferred symmetric. Counting "symmetric[true]" hits can't
+    // tell whether both paths worked: each type is printed at its definition and again at every use, so one symetric
+    // result already gives two hits. Count the matMul definition lines that carry the property instead, one per
+    // result, so >= 2 means both got it.
+    const std::string dump = err.str();
+    size_t symMatMulDefs = 0;
+    std::stringstream dumpLines(dump);
+    for (std::string line; std::getline(dumpLines, line);)
+        if (line.find("= \"daphne.matMul\"") != std::string::npos && line.find("symmetric[true]") != std::string::npos)
+            ++symMatMulDefs;
+    CHECK(symMatMulDefs >= 2);
+}
+
+TEST_CASE("operator_at_non_syrk_not_symmetric", TAG_OPERATIONS) {
+    // Negative counterpart to operator_at_symmetry_inference: a plain product of two distinct matrices `X @ Y` has no
+    // syrk shape and is not symmetric in general, so inference must NOT annotate its result symmetric[true]. Guards
+    // against an over-eager MatMulOp::inferSymmetric that returns True for any product.
+    std::string scriptFilePath = dirPath + "operator_at_non_syrk.daphne";
+
+    std::stringstream out, err;
+    int status = runDaphne(out, err, "--explain", "property_inference", scriptFilePath.c_str());
+
+    CHECK(status == StatusCode::SUCCESS);
+    CHECK_THAT(err.str(), !Catch::Contains("symmetric[true]"));
+}
+
+TEST_CASE("operator_at_square_not_symmetric", TAG_OPERATIONS) {
+    // Same operand, but no transpose: `X @ X` is not a syrk shape and not symmetric in general, so it must NOT be
+    // annotated symmetric[true]. Guards the `transa != transb` check that the distinct-operand X @ Y case never hits.
+    std::string scriptFilePath = dirPath + "operator_at_square.daphne";
+
+    std::stringstream out, err;
+    int status = runDaphne(out, err, "--explain", "property_inference", scriptFilePath.c_str());
+
+    CHECK(status == StatusCode::SUCCESS);
+    CHECK_THAT(err.str(), !Catch::Contains("symmetric[true]"));
+}

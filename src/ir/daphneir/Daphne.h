@@ -65,6 +65,7 @@
 #include "mlir/Support/TypeID.h"
 
 #include <ir/daphneir/DaphneAdaptTypesToKernelsTraits.h>
+#include <ir/daphneir/DaphneAlgebraicTraits.h>
 #include <ir/daphneir/DaphneDistributableOpInterface.h>
 #include <ir/daphneir/DaphneOpsEnums.h.inc>
 #include <ir/daphneir/DaphneTypeStorage.h>
@@ -83,6 +84,7 @@ BoolOrUnknown stringToBoolOrUnknown(const std::string &str);
 #include <ir/daphneir/DaphneInferSparsityOpInterface.h>
 #include <ir/daphneir/DaphneInferSymmetricOpInterface.h>
 #include <ir/daphneir/DaphneInferTypesOpInterface.h>
+#include <ir/daphneir/DaphneScalarConstantFoldable.h>
 
 #include <string>
 #include <utility>

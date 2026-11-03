@@ -13,6 +13,7 @@
 # limitations under the License.
 
 add_mlir_dialect_library(MLIRDaphneTransforms
+    AlgebraicSimplifyPass.cpp
     RewriteSqlOpPass.cpp
     DistributeComputationsPass.cpp
     DistributePipelinesPass.cpp
