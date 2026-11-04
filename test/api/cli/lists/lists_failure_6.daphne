@@ -1,0 +1,5 @@
+// Replace an element from an empty list.
+
+l = createList([1]);
+l, e = remove(l, 0);
+l, e = replaceElementInList(l, 0, [5]); // replace from empty list

@@ -140,6 +140,42 @@ template <typename DataType> class List : public Structure {
         // must not be freed here, since we return it.
         return element;
     }
+
+    /**
+     * @brief Replaces the element at the given position with the provided element.
+     *
+     * @param idx The position of the element to replace.
+     * @param element The new element to insert.
+     * @return The old element that was replaced.
+     */
+    const DataType *replace(size_t idx, const DataType* element) {
+        if (idx >= elements.size())
+            throw std::runtime_error("trying to replace element at position " + std::to_string(idx) +
+                                    " in a list with " + std::to_string(elements.size()) + " elements");
+        const DataType* oldElement = elements[idx];
+        // Increase ref counter for the new element before replacing
+        element->increaseRefCounter();
+        // Replace the element
+        elements[idx] = element;
+        // Note that we do not decrease the reference counter of the element. It
+        // must not be freed here, since we return it.       
+        return oldElement;
+    }
+
+    /**
+     * @brief Returns a copy of the element at the given position.
+     *
+     * @param idx The position of the element to return.
+     * @return The element at the given position.
+     */
+    const DataType *getElementInList(size_t idx) const {
+        if (idx >= elements.size())
+            throw std::runtime_error("trying to access element at position " + std::to_string(idx) +
+                                    " from a list with " + std::to_string(elements.size()) + " elements");
+        // Increase ref counter for the element before returning it
+        elements[idx]->increaseRefCounter();
+        return elements[idx];
+    }
 };
 
 template <typename DataType> std::ostream &operator<<(std::ostream &os, const List<DataType> &obj) {

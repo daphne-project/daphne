@@ -43,5 +43,5 @@ const std::string dirPath = "test/api/cli/lists/";
         }                                                                                                              \
     }
 
-MAKE_SUCCESS_TEST_CASE("lists", 4)
-MAKE_FAILURE_TEST_CASE("lists", 3)
+MAKE_SUCCESS_TEST_CASE("lists", 6)
+MAKE_FAILURE_TEST_CASE("lists", 9)

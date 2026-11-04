@@ -1,0 +1,18 @@
+List(5, DenseMatrix, int64_t)
+DenseMatrix(1x1, int64_t)
+0
+DenseMatrix(1x1, int64_t)
+1
+DenseMatrix(1x1, int64_t)
+2
+DenseMatrix(1x1, int64_t)
+3
+DenseMatrix(1x1, int64_t)
+4
+TEST: RETRIEVED ELEMENTS
+DenseMatrix(1x1, int64_t)
+0
+DenseMatrix(1x1, int64_t)
+2
+DenseMatrix(1x1, int64_t)
+4

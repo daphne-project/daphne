@@ -1,0 +1,4 @@
+// Get an element from a list, out-of-bounds (too low) position.
+
+l = createList([1]);
+e = getElementInList(l, -1);
