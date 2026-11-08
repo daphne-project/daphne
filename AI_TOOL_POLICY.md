@@ -6,12 +6,15 @@
 
 ## Quick Summary
 
-- [**Write PR descriptions/comments yourself**](#write-pr-descriptions-yourself)
+- [**Label AI-assisted work**](#label-ai-assisted-work) using an
+  `Assisted-by:` commit trailer/PR description
+- [**Write OSS Communication Yourself **](#write-pr-descriptions-yourself)
   to ensure sufficient human involvement.
 - [**Keep humans in the loop**](#keep-humans-in-the-loop): The human
   author must review their changes before submitting AI-generated pull
   requests. Full AI-automation without human review is not currently
   permitted.
+- No AI usage for `good-first-issues`
 
 For more context on contributing, [review the contributing guide.][contributing]
 
@@ -38,21 +41,30 @@ during review.
 
 We expect that newer contributors will be less confident in their
 contributions. Our guidance to them is to **start with small contributions**
-they can fully understand, to build confidence over time. We intend to be a
-welcoming community that helps contributors grow their expertise, but learning
-involves taking small steps, getting feedback, and iterating. Passing
-maintainer feedback directly to an LLM and resubmitting doesn't help maintainers
-or contributors.
+they can fully understand, to build confidence over time. To this end, we
+usually have some so-called [good-first-issue] which should be solved without
+AI assistance to ensure that newer contributors get to know the code base
+themselves. We intend to be a welcoming community that helps contributors grow
+their expertise, but learning involves taking small steps, getting feedback,
+and iterating. Passing maintainer feedback directly to an LLM and resubmitting
+doesn't help maintainers or contributors.
 
-### Write PR Descriptions Yourself
+### Label AI-assisted Work
+
+Contributors are expected to **be transparent and label contributions that
+contain substantial amounts of AI-generated content**. Note AI tool usage in
+your pull request description, commit message, or wherever authorship is
+normally indicated. For example, use a commit message trailer:
+
+```text
+Assisted-by: AI
+```
+
+### Write OSS Communication Yourself
 
 To ensure sufficient self-review and understanding of the work, contributors
-have to write PR descriptions themselves (using AI tools for translation or
-copy-editing is fine).
-
-The description should explain the motivation, implementation approach,
-expected impact, and any open questions or uncertainties to the same extent as
-a contribution written without AI assistance.
+have to write PR descriptions, issue descriptions, and comments on PRs/issues
+themselves (using AI tools for translation or copy-editing is fine).
 
 #### Structuring PR Descriptions
 
@@ -60,6 +72,10 @@ Please structure PR descriptions for easy review. While it's important to
 highlight changes and provide strong explanations, reviewing long PR
 descriptions also takes time, just as it does for PRs with significant lines of
 code. Bullet points or use of other structure in descriptions are recommended.
+
+The description should explain the motivation, implementation approach,
+expected impact, and any open questions or uncertainties to the same extent as
+a contribution written without AI assistance.
 
 If you want to include AI generated text, e.g, an analysis of an issue/PR, that
 text can be included, **in addition to your hand-written description**, as
@@ -125,6 +141,7 @@ and experiences in other communities:
 
 <!-- Link references -->
 [contributing]: https://github.com/daphne-project/daphne/blob/main/CONTRIBUTING.md
+[good-first-issue]: https://github.com/daphne-project/daphne/issues?q=label%3A%22good+first+issue%22+sort%3Aupdated-desc+is%3Aissue+state%3Aopen
 [history]: https://github.com/daphne-project/daphne/commits/main/AI_TOOL_POLICY.md
 [llvm]: https://llvm.org/docs/AIToolPolicy.html
 [modular]: https://github.com/modular/modular/blob/main/AI_TOOL_POLICY.md
