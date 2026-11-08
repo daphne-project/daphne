@@ -22,6 +22,9 @@ Thus, **contributions are highly welcome**, both from *within the DAPHNE project
 
 In the following, you find some rough **guidelines on contributing**, which will most likely be extended and further clarified in the future.
 
+## AI Tool Policy
+Please read and adhere to our [AI tool policy](AI_TOOL_POLICY.md).
+
 ## Ways of Contributing
 
 There are **various ways of contributing** including (but not limited to):
