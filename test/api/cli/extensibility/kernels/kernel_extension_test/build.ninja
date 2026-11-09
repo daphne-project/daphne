@@ -17,5 +17,5 @@ rule buildSharedLib
 build libMyKernels.so: buildSharedLib myKernels.o
 
 rule compileSrc
-  command = g++ -c -fPIC $in -I../../../../../src -std=c++17 -o $out
+  command = g++ -c -fPIC $in -I../../../../../../src -std=c++17 -o $out
 build myKernels.o: compileSrc myKernels.cpp

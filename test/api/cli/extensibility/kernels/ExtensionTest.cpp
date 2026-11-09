@@ -23,7 +23,7 @@
 #include <sstream>
 #include <string>
 
-const std::string dirPath = "test/api/cli/extensibility/";
+const std::string dirPath = "test/api/cli/extensibility/kernels/";
 
 TEST_CASE("extension_kernel", TAG_EXTENSIBILITY) {
     int status = -1;
