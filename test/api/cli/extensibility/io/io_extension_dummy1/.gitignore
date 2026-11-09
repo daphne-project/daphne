@@ -1,0 +1,4 @@
+.ninja_deps
+.ninja_log
+libDummy1.so
+dummy1.o

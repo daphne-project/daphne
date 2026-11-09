@@ -1,0 +1,4 @@
+// Manual use of a custom Matrix reader (engine specified), with one reader-specific option.
+
+X = readMatrix($file, {"engine": [$engine], $opt1: [$val1]});
+print(X);
