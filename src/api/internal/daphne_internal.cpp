@@ -298,9 +298,9 @@ int startDAPHNE(int argc, const char **argv, DaphneLibResult *daphneLibRes, int 
     static opt<string> kernelExt("kernel-ext", cat(daphneOptions),
                                  desc("Additional kernel extension to register "
                                       "(path to a kernel catalog JSON file)."));
-    static opt<std::string> fileioExt(
+    static llvm::cl::list<string> fileioExtList(
         "fileio-ext", cat(daphneOptions),
-        desc("Additional file I/O extension to register (path to a file I/O catalog JSON file)"));
+        desc("Additional file I/O extension to register (path to a file I/O catalog JSON file)"), ZeroOrMore);
 
     enum ExplainArgs {
         columnar,
@@ -646,33 +646,35 @@ int startDAPHNE(int argc, const char **argv, DaphneLibResult *daphneLibRes, int 
 
         fc.captureBaseline();
 
-        if (!fileioExt.empty()) {
-            std::string extCatalogFile;
-            int64_t extPriority;
+        for (auto fileioExt : fileioExtList) {
+            if (!fileioExt.empty()) {
+                std::string extCatalogFile;
+                int64_t extPriority;
 
-            const std::string prioritySep = ":";
-            const size_t pos = fileioExt.rfind(prioritySep);
-            if (pos != std::string::npos) { // a priority was specified for the extension
-                extCatalogFile = fileioExt.substr(0, pos);
-                const std::string extPriorityStr(fileioExt.substr(pos + prioritySep.size()));
-                try {
-                    size_t idx;
-                    extPriority = std::stoll(extPriorityStr, &idx);
-                    if (idx != extPriorityStr.size())
-                        // stoll() did not consume all characters in extPriorityStr, there is some non-integer part at
-                        // the end of the string.
-                        throw std::runtime_error(""); // the error message is generated in the catch-block below
-                } catch (std::exception &e) {
-                    throw std::runtime_error("invalid priority for file IO extension, expected an integer after the '" +
-                                             prioritySep + "', but found '" + extPriorityStr + "': '" + fileioExt +
-                                             "'");
+                const std::string prioritySep = ":";
+                const size_t pos = fileioExt.rfind(prioritySep);
+                if (pos != std::string::npos) { // a priority was specified for the extension
+                    extCatalogFile = fileioExt.substr(0, pos);
+                    const std::string extPriorityStr(fileioExt.substr(pos + prioritySep.size()));
+                    try {
+                        size_t idx;
+                        extPriority = std::stoll(extPriorityStr, &idx);
+                        if (idx != extPriorityStr.size())
+                            // stoll() did not consume all characters in extPriorityStr, there is some non-integer part
+                            // at the end of the string.
+                            throw std::runtime_error(""); // the error message is generated in the catch-block below
+                    } catch (std::exception &e) {
+                        throw std::runtime_error(
+                            "invalid priority for file IO extension, expected an integer after the '" + prioritySep +
+                            "', but found '" + extPriorityStr + "': '" + fileioExt + "'");
+                    }
+                } else { // no priority was specified for the extension
+                    extCatalogFile = fileioExt;
+                    extPriority = 0;
                 }
-            } else { // no priority was specified for the extension
-                extCatalogFile = fileioExt;
-                extPriority = 0;
-            }
 
-            fcp.parseFileIOCatalog(extCatalogFile, fc, extPriority);
+                fcp.parseFileIOCatalog(extCatalogFile, fc, extPriority);
+            }
         }
     } catch (std::exception &e) {
         logErrorDaphneLibAware(daphneLibRes, "Parser error: " + std::string(e.what()));
