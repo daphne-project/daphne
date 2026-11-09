@@ -1,2 +1,0 @@
-#f = readFrame("scripts/examples/extensions/csv/random_data");
-#print(f);

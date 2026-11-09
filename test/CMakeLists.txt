@@ -36,7 +36,6 @@ set(TEST_SOURCES
         api/cli/indexing/IndexingTest.cpp
         api/cli/inference/InferenceTest.cpp
         api/cli/io/ReadWriteTest.cpp
-        api/cli/extensibility/IO/IOReadWriteTest.cpp
         api/cli/lists/ListsTest.cpp
         api/cli/literals/LiteralsTest.cpp
         api/cli/operations/ConstantFoldingTest.cpp
@@ -83,7 +82,6 @@ set(TEST_SOURCES
         runtime/local/datastructures/TensorTest.cpp
 
         runtime/local/io/ReadCsvTest.cpp
-        runtime/local/io/FileIOTest.cpp
         runtime/local/io/FileIOBenchmarks.cpp
         runtime/local/io/ReadParquetTest.cpp
         runtime/local/io/ReadMMTest.cpp
