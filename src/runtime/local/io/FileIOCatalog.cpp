@@ -57,7 +57,7 @@ IOOptions mergeOptions(const std::string &ext, PhyDataType dt, const std::string
         case ValueTypeCode::STR:
             value = opts->getColumn<std::string>(c)->get(0, 0);
             break;
-        case ValueTypeCode::BOOL:
+        case ValueTypeCode::I1:
             value = opts->getColumn<bool>(c)->get(0, 0) ? "true" : "false";
             break;
         case ValueTypeCode::SI64:
