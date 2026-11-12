@@ -66,6 +66,7 @@ TEST_CASE("extension_io", TAG_EXTENSIBILITY) {
     const std::string scriptReadMatrixEngine1OptPathStr = dirPath + "extension_io_readMatrix_engine_1opt.daphne";
     const std::string scriptReadMatrixEngine2OptPathStr = dirPath + "extension_io_readMatrix_engine_2opt.daphne";
     const std::string scriptReadMatrixNoEnginePathStr = dirPath + "extension_io_readMatrix_noEngine.daphne";
+    const std::string scriptReadMatrixTwicePathStr = dirPath + "extension_io_readMatrix_twice.daphne";
     const std::string scriptReadFrameNoEnginePathStr = dirPath + "extension_io_readFrame_noEngine.daphne";
     const std::string scriptWriteMatrixNoEnginePathStr = dirPath + "extension_io_writeMatrix_noEngine.daphne";
     const std::string extDummy1Path = dirPath + "io_extension_dummy1/dummy1.json";
@@ -74,6 +75,7 @@ TEST_CASE("extension_io", TAG_EXTENSIBILITY) {
     const char *scriptReadMatrixEngine1OptPath = scriptReadMatrixEngine1OptPathStr.c_str();
     const char *scriptReadMatrixEngine2OptPath = scriptReadMatrixEngine2OptPathStr.c_str();
     const char *scriptReadMatrixNoEnginePath = scriptReadMatrixNoEnginePathStr.c_str();
+    const char *scriptReadMatrixTwicePath = scriptReadMatrixTwicePathStr.c_str();
     const char *scriptReadFrameNoEnginePath = scriptReadFrameNoEnginePathStr.c_str();
     const char *scriptWriteMatrixNoEnginePath = scriptWriteMatrixNoEnginePathStr.c_str();
     const std::string nothingInDummyArg = "file=\"" + dirPath + "nothing_in.dummy\"";
@@ -170,6 +172,24 @@ TEST_CASE("extension_io", TAG_EXTENSIBILITY) {
             "hello from dummy2_read_DenseMatrix, options: bar=\"123\",foo=\"abc\"\nDenseMatrix(0x0, double)\n",
             scriptReadMatrixNoEnginePath, "--fileio-ext", (extDummy1Path + ":0").c_str(), "--fileio-ext",
             (extDummy2Path + ":1").c_str(), "--args", nothingInDummyArg.c_str());
+    }
+    // Multiple different IO extensions can be used for different reads in the same DaphneDSL script, and they do not
+    // influence each other.
+    // Run a DaphneDSL script which first reads a file using a specific engine and then reads it again using the default
+    // engine selected through priorities.
+    SECTION("twice, higher-priority engine first") { // must use (dummy1, dummy1)
+        compareDaphneToStr("hello from dummy1_read_DenseMatrix\nhello from dummy1_read_DenseMatrix\nDenseMatrix(0x0, "
+                           "double)\nDenseMatrix(0x0, double)\n",
+                           scriptReadMatrixTwicePath, "--fileio-ext", (extDummy1Path + ":1").c_str(), "--fileio-ext",
+                           (extDummy2Path + ":0").c_str(), "--args",
+                           (nothingInDummyArg + ",engine=\"dummy1\"").c_str());
+    }
+    SECTION("twice, lower-priority engine first") { // must use (dummy2, dummy1)
+        compareDaphneToStr("hello from dummy2_read_DenseMatrix, options: bar=\"123\",foo=\"abc\"\nhello from "
+                           "dummy1_read_DenseMatrix\nDenseMatrix(0x0, double)\nDenseMatrix(0x0, double)\n",
+                           scriptReadMatrixTwicePath, "--fileio-ext", (extDummy1Path + ":1").c_str(), "--fileio-ext",
+                           (extDummy2Path + ":0").c_str(), "--args",
+                           (nothingInDummyArg + ",engine=\"dummy2\"").c_str());
     }
 
     // -------------------------------------------------------------------------

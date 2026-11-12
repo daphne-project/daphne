@@ -111,11 +111,21 @@ class FileIOCatalog {
     GenericReader getReader(const std::string &ext, PhyDataType dt, const std::string &engine /* may be "" */) {
         std::lock_guard<std::mutex> lk(mtx);
 
-        const Key4 *best = findBestKey(readers, ext, (size_t)dt, engine);
-        if (!best)
-            best = findBestKey(lazySpecs, ext, (size_t)dt, engine);
-        if (!best)
+        const Key4 *bestLoaded = findBestKey(readers, ext, (size_t)dt, engine);
+        const Key4 *bestLazy = findBestKey(lazySpecs, ext, (size_t)dt, engine);
+        const Key4 *best = nullptr;
+
+        // Error, if neither a loaded nor a lazy reader exists.
+        if (!bestLoaded && !bestLazy)
             throw std::runtime_error("no suitable reader found in the catalog");
+
+        // Use the best lazy reader, if no loaded reader exist or if the priority of the best loaded reader is lower
+        // than that of the best lazy reader.
+        if (!bestLoaded || std::get<3>(*bestLoaded) < std::get<3>(*bestLazy))
+            best = bestLazy;
+        // Use the best loaded reader, otherwise.
+        else
+            best = bestLoaded;
 
         return ensureReaderLoaded(*best);
     }
@@ -123,11 +133,21 @@ class FileIOCatalog {
     GenericWriter getWriter(const std::string &ext, PhyDataType dt, const std::string &engine /* may be "" */) {
         std::lock_guard<std::mutex> lk(mtx);
 
-        const Key4 *best = findBestKey(writers, ext, (size_t)dt, engine);
-        if (!best)
-            best = findBestKey(lazySpecs, ext, (size_t)dt, engine);
-        if (!best)
+        const Key4 *bestLoaded = findBestKey(writers, ext, (size_t)dt, engine);
+        const Key4 *bestLazy = findBestKey(lazySpecs, ext, (size_t)dt, engine);
+        const Key4 *best = nullptr;
+
+        // Error, if neither a loaded nor a lazy writer exists.
+        if (!bestLoaded && !bestLazy)
             throw std::runtime_error("no suitable writer found in the catalog");
+
+        // Use the best lazy writer, if no loaded writer exist or if the priority of the best loaded writer is lower
+        // than that of the best lazy writer.
+        if (!bestLoaded || std::get<3>(*bestLoaded) < std::get<3>(*bestLazy))
+            best = bestLazy;
+        // Use the best loaded writer, otherwise.
+        else
+            best = bestLoaded;
 
         return ensureWriterLoaded(*best);
     }
