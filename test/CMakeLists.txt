@@ -176,6 +176,21 @@ set(TEST_SOURCES
         runtime/local/kernels/TransposeTest.cpp
         runtime/local/kernels/TriTest.cpp
 
+        runtime/local/kernels/analysis-fusion/EwUnaryMatAnalysisTest.cpp
+        runtime/local/kernels/analysis-fusion/EwUnaryMatAnalysisBenchmark.cpp
+        
+        runtime/local/kernels/analysis-fusion/EwUnaryMatAnalysisAccTest.cpp
+        runtime/local/kernels/analysis-fusion/EwUnaryMatAnalysisAccBenchmark.cpp
+        runtime/local/kernels/analysis-fusion/EwBinaryMatAnalysisAccTest.cpp
+        runtime/local/kernels/analysis-fusion/EwBinaryMatAnalysisAccBenchmark.cpp
+        runtime/local/kernels/analysis-fusion/AggColAnalysisAccTest.cpp
+        runtime/local/kernels/analysis-fusion/AggColAnalysisAccBenchmark.cpp
+        runtime/local/kernels/analysis-fusion/AggRowAnalysisAccTest.cpp
+        runtime/local/kernels/analysis-fusion/AggRowAnalysisAccBenchmark.cpp
+        runtime/local/kernels/analysis-fusion/CTableAnalysisAccTest.cpp
+        runtime/local/kernels/analysis-fusion/CTableAnalysisAccBenchmark.cpp
+
+
         runtime/local/vectorized/MultiThreadedKernelTest.cpp
 
         util/RecordPropertiesTest.cpp
