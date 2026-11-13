@@ -132,9 +132,19 @@ void daphne::FilterRowOp::inferFrameLabels() { inferFrameLabels_ExtractOrFilterR
 
 void daphne::GroupJoinOp::inferFrameLabels() {
     auto newLabels = new std::vector<std::string>();
+    std::vector<std::string> aggColLabels;
+    std::vector<std::string> aggFuncNames;
+
     newLabels->push_back(CompilerUtils::constantOrThrow<std::string>(getLhsOn()));
-    newLabels->push_back(std::string("SUM(") + CompilerUtils::constantOrThrow<std::string>(getRhsAgg()) +
-                         std::string(")"));
+
+    auto aggFuncs = getRhsAggFuncs();
+    auto aggCols = getRhsAggCols();
+    for (size_t i = 0; i < std::min(aggFuncs.size(), aggCols.size()); ++i) {
+        auto aggFuncValue = llvm::dyn_cast<GroupEnumAttr>(aggFuncs[i]).getValue();
+        auto colLabel = CompilerUtils::constantOrThrow<std::string>(aggCols[i]);
+        newLabels->push_back(stringifyGroupEnum(aggFuncValue).str() + "(" + colLabel + ")");
+    }
+
     Value res = getResult(0);
     res.setType(llvm::dyn_cast<daphne::FrameType>(res.getType()).withLabels(newLabels));
 }

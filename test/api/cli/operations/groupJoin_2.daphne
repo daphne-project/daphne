@@ -1,0 +1,23 @@
+# Group-join with multiple aggregation functions, COUNT over *, and
+# unmatched rows on both sides.
+
+f1 = createFrame([ 1, 2, 3 ], "id");
+f2 = createFrame(
+    [1, 1,  3,  1,  3, 9],
+    [10, 20, 30, 40, 50, 99],
+    [1.5, 2.5, 4.5, 3.5, 5.5, 9.5],
+    "id", "val", "dbl"
+);
+
+res, tids = groupJoin(
+    f1, f2,
+    "id", "id",
+    "COUNT", "*",
+    "SUM", "val",
+    "MIN", "val",
+    "MAX", "val",
+    "AVG", "dbl"
+);
+
+print(res);
+print(f1[tids, ]);

@@ -1,0 +1,6 @@
+Frame(2x2, [id:int64_t, SUM(val):int64_t])
+1 70
+3 80
+Frame(2x2, [id:int64_t, foo:int64_t])
+1 11
+3 33

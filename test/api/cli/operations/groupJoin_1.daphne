@@ -1,0 +1,9 @@
+# Group-join with a single SUM aggregate.
+
+f1 = createFrame([ 1, 2, 3], [ 11, 22, 33], "id", "foo");
+f2 = createFrame([ 1, 1, 3, 1, 3], [ 10, 20, 30, 40, 50], "id", "val");
+
+res, tids = groupJoin(f1, f2, "id", "id", "SUM", "val");
+
+print(res);
+print(f1[tids, ]);
