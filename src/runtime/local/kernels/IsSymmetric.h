@@ -33,7 +33,7 @@ template <class DTArg> struct IsSymmetric {
 // ****************************************************************************
 
 /**
- * @brief Checks the input matrix for symmetry of a `DenseMatrix`. The input matrix must be a square matrix.
+ * @brief Checks the input matrix for symmetry. Returns false for non-square matrices.
  */
 template <class DTArg> bool isSymmetric(const DTArg *arg, DCTX(ctx)) { return IsSymmetric<DTArg>::apply(arg, ctx); }
 
@@ -51,7 +51,7 @@ template <typename VT> struct IsSymmetric<DenseMatrix<VT>> {
         const size_t numCols = arg->getNumCols();
 
         if (numRows != numCols)
-            throw std::runtime_error("the provided matrix is not square");
+            return false;
 
         // TODO add cache-conscious operations
         for (size_t rowIdx = 0; rowIdx < numRows; rowIdx++)
@@ -75,7 +75,7 @@ template <typename VT> struct IsSymmetric<CSRMatrix<VT>> {
         const size_t numCols = arg->getNumCols();
 
         if (numRows != numCols)
-            throw std::runtime_error("the provided matrix is not square");
+            return false;
 
         // 0x0 and 1x1 matrices are always symmetric.
         if (numRows <= 1)
@@ -135,7 +135,7 @@ template <typename VT> struct IsSymmetric<Matrix<VT>> {
         const size_t numCols = arg->getNumCols();
 
         if (numRows != numCols)
-            throw std::runtime_error("the provided matrix is not square");
+            return false;
 
         for (size_t rowIdx = 0; rowIdx < numRows; ++rowIdx)
             for (size_t colIdx = rowIdx + 1; colIdx < numCols; ++colIdx)
