@@ -183,6 +183,17 @@ endif()
 find_package(Arrow REQUIRED)
 find_package(Parquet REQUIRED)
 
+# Apache ORC C++ library, built locally in .deps/orc/ because the dev
+# container's Arrow lacks ORC support. The include directory is added
+# globally because Read.h is transitively included by many targets.
+set(ORC_PREFIX ${CMAKE_SOURCE_DIR}/.deps/orc)
+if(EXISTS ${ORC_PREFIX}/lib/liborc.a)
+    include_directories(${ORC_PREFIX}/include)
+    message(STATUS "Apache ORC: found local build at ${ORC_PREFIX}")
+else()
+    message(FATAL_ERROR "Apache ORC not found at ${ORC_PREFIX}/lib/liborc.a — see notes/orc-design branch for the build helper.")
+endif()
+
 # support for Eigen library
 find_package (Eigen3 REQUIRED)
 
