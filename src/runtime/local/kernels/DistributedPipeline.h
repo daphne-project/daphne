@@ -16,48 +16,34 @@
 
 #pragma once
 
+// Only the forward declarations live here. The definition of distributedPipeline
+// is in DistributedPipeline.cpp so that translation units using this kernel don't
+// have to pull in all of DistributedWrapper.h (gRPC, protobuf, MPI, MLIR init-all-
+// dialects). That brings the compile-time peak RSS of the generated kernels_*.cpp
+// that reference this kernel down from ~3.6 GiB to ~1 GiB.
+
 #include <runtime/local/context/DaphneContext.h>
-// #include <runtime/local/datastructures/DataObjectFactory.h>
-// #include <runtime/local/datastructures/DenseMatrix.h>
-#include <runtime/distributed/coordinator/kernels/DistributedWrapper.h>
-// #include <ir/daphneir/Daphne.h>
+#include <runtime/local/datastructures/DenseMatrix.h>
 
-#include <iostream>
+#include <cstddef>
+#include <cstdint>
 
-using mlir::daphne::VectorCombine;
-using mlir::daphne::VectorSplit;
+class Structure;
 
-// ****************************************************************************
-// Struct for partial template specialization
-// ****************************************************************************
-
-// template<class DTRes, class DTArg>
-// struct DistributedPipeline {
-//     static void apply(
-//             DTRes *& res,
-//             const char * irCode,
-//             const DTArg ** inputs, size_t numInputs,
-//             size_t * outRows, size_t numOutRows,
-//             size_t *outCols, size_t numOutCols,
-//             DCTX(ctx)
-//     );
-// };
-
-// ****************************************************************************
-// Convenience function
-// ****************************************************************************
-
-// One output.
+// One output. The template is instantiated only for DTRes = DenseMatrix<double>
+// via kernels.json; that instantiation is provided out-of-line in
+// DistributedPipeline.cpp.
 template <class DTRes>
 void distributedPipeline(DTRes **outputs, size_t numOutputs, const Structure **inputs, size_t numInputs,
                          int64_t *outRows, int64_t *outCols, int64_t *splits, int64_t *combines, const char *irCode,
-                         DCTX(ctx)) {
+                         DCTX(ctx));
 
-    auto wrapper = std::make_unique<DistributedWrapper<DTRes>>(ctx);
-    // TODO *** -> **
-    DTRes ***res = new DTRes **[numOutputs];
-    for (size_t i = 0; i < numOutputs; i++)
-        res[i] = outputs + i;
-    wrapper->execute(irCode, res, inputs, numInputs, numOutputs, outRows, outCols,
-                     reinterpret_cast<VectorSplit *>(splits), reinterpret_cast<VectorCombine *>(combines));
-}
+// The explicit instantiations provided in DistributedPipeline.cpp. The extern
+// template keeps each including TU from instantiating the template again, so it
+// links against the one in the .cpp. checkExplicitInstantiations.py also checks
+// this list against kernels.json at configure time.
+extern template void distributedPipeline<DenseMatrix<double>>(DenseMatrix<double> **outputs, size_t numOutputs,
+                                                              const Structure **inputs, size_t numInputs,
+                                                              int64_t *outRows, int64_t *outCols, int64_t *splits,
+                                                              int64_t *combines, const char *irCode,
+                                                              DaphneContext *ctx);
