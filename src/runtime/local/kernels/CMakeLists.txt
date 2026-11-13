@@ -90,6 +90,9 @@ if(USE_CUDA AND CMAKE_CUDA_COMPILER)
             CUDA::cusparse ${CUDA_cudnn_LIBRARY} CUDA::cusolver Util MLIRDaphneInference fmt::fmt)
     set_target_properties(CUDAKernels PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
     set_property(TARGET CUDAKernels PROPERTY CUDA_ARCHITECTURES all)
+    if(DAPHNE_KERNEL_POOL_ACTIVE)
+        set_property(TARGET CUDAKernels PROPERTY JOB_POOL_COMPILE daphne_kernel_compile)
+    endif()
 endif()
 
 execute_process(
@@ -98,6 +101,23 @@ execute_process(
     ${PROJECT_BINARY_DIR}/src/runtime/local/kernels/kernels
     ${PROJECT_SOURCE_DIR}/lib/catalog.json CPP
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/runtime/local/kernels/)
+
+# Verify that hand-written explicit template instantiations (currently just
+# DistributedPipeline.cpp) match what kernels.json lists for the same kernel.
+# Drift here shows up as an undefined-reference link error much later in the
+# build; failing here surfaces the problem at configure time with a fix hint.
+execute_process(
+  COMMAND
+    ${Python3_EXECUTABLE} checkExplicitInstantiations.py kernels.json
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/runtime/local/kernels/
+  RESULT_VARIABLE _checkExplicitInstantiations_result
+  ERROR_VARIABLE _checkExplicitInstantiations_stderr)
+if(NOT _checkExplicitInstantiations_result EQUAL 0)
+    message(FATAL_ERROR
+        "checkExplicitInstantiations.py reported drift between kernels.json "
+        "and hand-written explicit instantiations:\n"
+        "${_checkExplicitInstantiations_stderr}")
+endif()
 
 file(GLOB CODEGEN_CPP_FILES CONFIGURE_DEPENDS
      "${PROJECT_BINARY_DIR}/src/runtime/local/kernels/kernels_*.cpp")
@@ -115,6 +135,7 @@ set(SOURCES_cpp_kernels
         ${PROJECT_SOURCE_DIR}/src/runtime/local/instrumentation/KernelInstrumentation.cpp
         ${CODEGEN_CPP_FILES}
         ${PROJECT_SOURCE_DIR}/src/runtime/local/kernels/CreateDaphneContext.cpp
+        ${PROJECT_SOURCE_DIR}/src/runtime/local/kernels/DistributedPipeline.cpp
         ${PROJECT_SOURCE_DIR}/src/runtime/local/kernels/Pooling.cpp
         ${PROJECT_SOURCE_DIR}/src/runtime/local/kernels/VectorizedPipeline.h
         ${PROJECT_SOURCE_DIR}/src/runtime/local/vectorized/MTWrapper_dense.cpp
@@ -125,6 +146,9 @@ set(SOURCES_cpp_kernels
 # The library of pre-compiled kernels. Will be linked into the JIT-compiled user program.
 add_library(KernelObjLib OBJECT ${SOURCES_cpp_kernels} ${HEADERS_cpp_kernels})
 set_target_properties(KernelObjLib PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+if(DAPHNE_KERNEL_POOL_ACTIVE)
+    set_property(TARGET KernelObjLib PROPERTY JOB_POOL_COMPILE daphne_kernel_compile)
+endif()
 add_library(AllKernels SHARED $<TARGET_OBJECTS:KernelObjLib>)
 set_target_properties(AllKernels PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
