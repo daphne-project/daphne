@@ -1,0 +1,4 @@
+// Automatic use of a custom Frame reader based on extension priorities (engine not specified).
+
+X = readFrame($file);
+print(X);

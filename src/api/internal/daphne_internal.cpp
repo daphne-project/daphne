@@ -29,6 +29,8 @@
 #include <parser/catalog/KernelCatalogParser.h>
 #include <parser/config/ConfigParser.h>
 #include <parser/daphnedsl/DaphneDSLParser.h>
+#include <runtime/local/io/FileIOCatalog.h>
+#include <runtime/local/io/FileIOCatalogParser.h>
 #include <runtime/local/vectorized/LoadPartitioningDefs.h>
 #include <util/DaphneLogger.h>
 #include <util/KernelDispatchMapping.h>
@@ -46,7 +48,10 @@
 
 #include <chrono>
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -61,6 +66,8 @@ static std::unique_ptr<DaphneLogger> logger;
 using namespace std;
 using namespace mlir;
 using namespace llvm::cl;
+
+namespace fs = std::filesystem;
 
 void parseScriptArgs(const llvm::cl::list<string> &scriptArgsCli, unordered_map<string, string> &scriptArgsFinal) {
     for (const std::string &pair : scriptArgsCli) {
@@ -291,6 +298,9 @@ int startDAPHNE(int argc, const char **argv, DaphneLibResult *daphneLibRes, int 
     static opt<string> kernelExt("kernel-ext", cat(daphneOptions),
                                  desc("Additional kernel extension to register "
                                       "(path to a kernel catalog JSON file)."));
+    static llvm::cl::list<string> fileioExtList(
+        "fileio-ext", cat(daphneOptions),
+        desc("Additional file I/O extension to register (path to a file I/O catalog JSON file)"), ZeroOrMore);
 
     enum ExplainArgs {
         columnar,
@@ -622,6 +632,57 @@ int startDAPHNE(int argc, const char **argv, DaphneLibResult *daphneLibRes, int 
     // Creates an MLIR context and loads the required MLIR dialects.
     DaphneIrExecutor executor(selectMatrixRepr, user_config);
     mlir::MLIRContext *mctx = executor.getContext();
+
+    // TODO Reduce the code duplication of parsing the file IO extension catalogs and kernel extension catalogs.
+    // ************************************************************************
+    // Populate FileIO extension catalog
+    // ************************************************************************
+
+    FileIOCatalog &fc = executor.getUserConfig().fileioCatalog;
+
+    try {
+        FileIOCatalogParser fcp;
+        fcp.parseFileIOCatalog("scripts/examples/extensions/builtInIO/BuiltIns.json", fc, 0);
+
+        fc.captureBaseline();
+
+        for (auto fileioExt : fileioExtList) {
+            if (!fileioExt.empty()) {
+                std::string extCatalogFile;
+                int64_t extPriority;
+
+                const std::string prioritySep = ":";
+                const size_t pos = fileioExt.rfind(prioritySep);
+                if (pos != std::string::npos) { // a priority was specified for the extension
+                    extCatalogFile = fileioExt.substr(0, pos);
+                    const std::string extPriorityStr(fileioExt.substr(pos + prioritySep.size()));
+                    try {
+                        size_t idx;
+                        extPriority = std::stoll(extPriorityStr, &idx);
+                        if (idx != extPriorityStr.size())
+                            // stoll() did not consume all characters in extPriorityStr, there is some non-integer part
+                            // at the end of the string.
+                            throw std::runtime_error(""); // the error message is generated in the catch-block below
+                    } catch (std::exception &e) {
+                        throw std::runtime_error(
+                            "invalid priority for file IO extension, expected an integer after the '" + prioritySep +
+                            "', but found '" + extPriorityStr + "': '" + fileioExt + "'");
+                    }
+                } else { // no priority was specified for the extension
+                    extCatalogFile = fileioExt;
+                    extPriority = 0;
+                }
+
+                fcp.parseFileIOCatalog(extCatalogFile, fc, extPriority);
+            }
+        }
+    } catch (std::exception &e) {
+        logErrorDaphneLibAware(daphneLibRes, "Parser error: " + std::string(e.what()));
+        return StatusCode::PARSER_ERROR;
+    } catch (...) {
+        logErrorDaphneLibAware(daphneLibRes, "Parser error: Unknown exception");
+        return StatusCode::PARSER_ERROR;
+    }
 
     // ************************************************************************
     // Populate kernel extension catalog

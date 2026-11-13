@@ -23,9 +23,11 @@
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/datastructures/Matrix.h>
 #include <runtime/local/io/File.h>
+#include <runtime/local/io/FileIOCatalog.h>
 #include <runtime/local/io/FileMetaData.h>
 #include <runtime/local/io/WriteCsv.h>
 #include <runtime/local/io/WriteDaphne.h>
+
 #if USE_HDFS
 #include <runtime/local/io/HDFS/WriteHDFS.h>
 #endif
@@ -38,15 +40,15 @@
 // ****************************************************************************
 
 template <class DTArg> struct Write {
-    static void apply(const DTArg *arg, const char *filename, DCTX(ctx)) = delete;
+    static void apply(const DTArg *arg, const char *filename, const Frame *opts, DCTX(ctx)) = delete;
 };
 
 // ****************************************************************************
 // Convenience function
 // ****************************************************************************
 
-template <class DTArg> void write(const DTArg *arg, const char *filename, DCTX(ctx)) {
-    Write<DTArg>::apply(arg, filename, ctx);
+template <class DTArg> void write(const DTArg *arg, const char *filename, const Frame *opts, DCTX(ctx)) {
+    Write<DTArg>::apply(arg, filename, opts, ctx);
 }
 
 // ****************************************************************************
@@ -58,34 +60,42 @@ template <class DTArg> void write(const DTArg *arg, const char *filename, DCTX(c
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct Write<DenseMatrix<VT>> {
-    static void apply(const DenseMatrix<VT> *arg, const char *filename, DCTX(ctx)) {
-        std::string ext(std::filesystem::path(filename).extension());
-
-        if (ext == ".csv") {
-            File *file = openFileForWrite(filename);
-            FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
-            MetaDataParser::writeMetaData(filename, metaData);
-            writeCsv(arg, file);
-            closeFile(file);
-        } else if (ext == ".dbdf") {
-            FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
-            MetaDataParser::writeMetaData(filename, metaData);
-            writeDaphne(arg, filename);
+    static void apply(const DenseMatrix<VT> *arg, const char *filename, const Frame *opts, DCTX(ctx)) {
+        try {
+            std::string ext(std::filesystem::path(filename).extension());
+            // TODO Support HDFS through a file IO extension and remove this special case.
 #if USE_HDFS
-        } else if (ext == ".hdfs") {
-            HDFSMetaData hdfs = {true, filename};
-            FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>, -1, hdfs);
-            // Get file extension before .hdfs (e.g. file.csv.hdfs)
-            std::string nestedExt(
-                std::filesystem::path(std::string(filename).substr(0, std::string(filename).size() - ext.size()))
-                    .extension());
-            MetaDataParser::writeMetaData(filename, metaData);
+            if (ext == ".hdfs") {
+                HDFSMetaData hdfs = {true, filename};
+                FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>, -1,
+                                      hdfs);
+                // Get file extension before .hdfs (e.g. file.csv.hdfs)
+                std::string nestedExt(
+                    std::filesystem::path(std::string(filename).substr(0, std::string(filename).size() - ext.size()))
+                        .extension());
+                MetaDataParser::writeMetaData(filename, metaData);
 
-            // call WriteHDFS
-            writeHDFS(arg, filename, ctx);
+                // call WriteHDFS
+                writeHDFS(arg, filename, ctx);
+            } else
 #endif
-        } else
-            throw std::runtime_error("file extension not supported: '" + ext + "'");
+            {
+                auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
+                PhyDataType dt = PhyDataType::DENSEMATRIX;
+                std::string engine = extractEngine(opts);
+                auto writer = catalog.getWriter(ext, dt, engine);
+                FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
+
+                MetaDataParser::writeMetaData(filename, fmd);
+
+                // Merge user overrides from opts
+                IOOptions mergedOpts = mergeOptions(ext, dt, engine, opts, catalog);
+
+                writer(arg, fmd, filename, mergedOpts, ctx);
+            }
+        } catch (const std::exception &e) {
+            throw std::runtime_error("error while writing file `" + std::string(filename) + "`: " + e.what());
+        }
     }
 };
 
@@ -94,23 +104,29 @@ template <typename VT> struct Write<DenseMatrix<VT>> {
 // ----------------------------------------------------------------------------
 
 template <> struct Write<Frame> {
-    static void apply(const Frame *arg, const char *filename, DCTX(ctx)) {
-        std::string ext(std::filesystem::path(filename).extension());
-
-        if (ext == ".csv") {
-            File *file = openFileForWrite(filename);
+    static void apply(const Frame *arg, const char *filename, const Frame *opts, DCTX(ctx)) {
+        try {
+            std::string ext(std::filesystem::path(filename).extension());
+            auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
+            PhyDataType dt = PhyDataType::FRAME;
+            std::string engine = extractEngine(opts);
+            auto writer = catalog.getWriter(ext, dt, engine);
             std::vector<ValueTypeCode> vtcs;
             std::vector<std::string> labels;
             for (size_t i = 0; i < arg->getNumCols(); i++) {
                 vtcs.push_back(arg->getSchema()[i]);
                 labels.push_back(arg->getLabels()[i]);
             }
-            FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), false, vtcs, labels);
-            MetaDataParser::writeMetaData(filename, metaData);
-            writeCsv(arg, file);
-            closeFile(file);
-        } else
-            throw std::runtime_error("file extension not supported: '" + ext + "'");
+            FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), false, vtcs, labels);
+            MetaDataParser::writeMetaData(filename, fmd);
+
+            // Merge user overrides from opts
+            IOOptions mergedOpts = mergeOptions(ext, dt, engine, opts, catalog);
+
+            writer(arg, fmd, filename, mergedOpts, ctx);
+        } catch (const std::exception &e) {
+            throw std::runtime_error("error while writing file `" + std::string(filename) + "`: " + e.what());
+        }
     }
 };
 
@@ -119,17 +135,30 @@ template <> struct Write<Frame> {
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct Write<Matrix<VT>> {
-    static void apply(const Matrix<VT> *arg, const char *filename, DCTX(ctx)) {
-        std::string ext(std::filesystem::path(filename).extension());
+    static void apply(const Matrix<VT> *arg, const char *filename, const Frame *opts, DCTX(ctx)) {
+        try {
+            std::string ext(std::filesystem::path(filename).extension());
+            auto &catalog = ctx ? ctx->config.fileioCatalog : FileIOCatalog::instance();
+            PhyDataType dt;
+            if (dynamic_cast<DenseMatrix<VT> *>(arg))
+                dt = PhyDataType::DENSEMATRIX;
+            else if (dynamic_cast<CSRMatrix<VT> *>(arg))
+                dt = PhyDataType::CSRMATRIX;
+            else
+                throw std::runtime_error("unexpected physical data type");
+            std::string engine = extractEngine(opts);
+            auto writer = catalog.getWriter(ext, dt, engine);
+            FileMetaData fmd(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
 
-        if (ext == ".csv") {
-            File *file = openFileForWrite(filename);
-            FileMetaData metaData(arg->getNumRows(), arg->getNumCols(), true, ValueTypeUtils::codeFor<VT>);
-            MetaDataParser::writeMetaData(filename, metaData);
-            writeCsv(arg, file);
-            closeFile(file);
-        } else
-            throw std::runtime_error("file extension not supported: '" + ext + "'");
+            MetaDataParser::writeMetaData(filename, fmd);
+
+            // Merge user overrides from opts
+            IOOptions mergedOpts = mergeOptions(ext, dt, engine, opts, catalog);
+
+            writer(arg, fmd, filename, mergedOpts, ctx);
+        } catch (const std::exception &e) {
+            throw std::runtime_error("error while writing file `" + std::string(filename) + "`: " + e.what());
+        }
     }
 };
 

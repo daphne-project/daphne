@@ -28,6 +28,7 @@ set(TEST_SOURCES
         api/cli/expressions/CondTest.cpp
         api/cli/expressions/FrameLiteralTest.cpp
         api/cli/expressions/MatrixLiteralTest.cpp
+        api/cli/extensibility/io/IOExtensionTest.cpp
         api/cli/extensibility/kernels/ExtensionTest.cpp
         api/cli/extensibility/kernels/HintTest.cpp
         api/cli/functions/FunctionsTest.cpp
@@ -82,6 +83,7 @@ set(TEST_SOURCES
         runtime/local/datastructures/TensorTest.cpp
 
         runtime/local/io/ReadCsvTest.cpp
+        runtime/local/io/FileIOBenchmarks.cpp
         runtime/local/io/ReadParquetTest.cpp
         runtime/local/io/ReadMMTest.cpp
         runtime/local/io/WriteDaphneTest.cpp

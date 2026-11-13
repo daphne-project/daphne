@@ -15,6 +15,7 @@
  */
 
 #define CATCH_CONFIG_MAIN // make catch2 generate a main-function
+#define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include <catch.hpp>
 
 #include "run_tests.h"

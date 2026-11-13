@@ -1,0 +1,26 @@
+[
+  {
+    "extension": ".dummy",
+    "readerFuncName": "dummy2_read_DenseMatrix",
+    "writerFuncName": "dummy2_write_DenseMatrix",
+    "libPath": "libDummy2.so",
+    "type": "DenseMatrix",
+    "engine": "dummy2",
+    "options": {
+      "foo": "abc",
+      "bar": "123"
+    }
+  },
+  {
+    "extension": ".dummy",
+    "readerFuncName": "dummy2_read_Frame",
+    "writerFuncName": "dummy2_write_Frame",
+    "libPath": "libDummy2.so",
+    "type": "Frame",
+    "engine": "dummy2",
+    "options": {
+      "foo": "abc",
+      "bar": "123"
+    }
+  }
+]

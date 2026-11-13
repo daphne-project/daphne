@@ -1,0 +1,4 @@
+// Automatic use of a custom Matrix writer based on extension priorities (engine not specified).
+
+X = fill(0.0, 0, 0); # 0x0 matrix
+write(X, $file);
