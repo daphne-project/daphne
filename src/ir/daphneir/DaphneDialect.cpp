@@ -132,27 +132,15 @@ mlir::Type mlir::daphne::DaphneDialect::parseType(mlir::DialectAsmParser &parser
         MatrixRepresentation representation = MatrixRepresentation::Default; // default is dense
         BoolOrUnknown symmetric = BoolOrUnknown::Unknown;
         mlir::Type elementType;
-        if (parser.parseLess()) {
+        SmallVector<int64_t, 2> dimensions;
+        if (parser.parseLess() || parser.parseDimensionList(dimensions) || parser.parseType(elementType))
+            return nullptr;
+        if (dimensions.size() != 2) {
+            parser.emitError(parser.getCurrentLocation(), "expected two matrix dimensions");
             return nullptr;
         }
-        if (parser.parseOptionalQuestion()) {
-            // Parse #rows if there was no '?'.
-            if (parser.parseInteger<ssize_t>(numRows)) {
-                return nullptr;
-            }
-        }
-        if (parser.parseXInDimensionList()) {
-            return nullptr;
-        }
-        if (parser.parseOptionalQuestion()) {
-            // Parse #cols if there was no '?'.
-            if (parser.parseInteger<ssize_t>(numCols)) {
-                return nullptr;
-            }
-        }
-        if (parser.parseXInDimensionList() || parser.parseType(elementType)) {
-            return nullptr;
-        }
+        numRows = dimensions[0] == ShapedType::kDynamic ? -1 : dimensions[0];
+        numCols = dimensions[1] == ShapedType::kDynamic ? -1 : dimensions[1];
         // additional properties (only print/read them when present, as this
         // will probably get more and more)
         while (succeeded(parser.parseOptionalColon())) {
