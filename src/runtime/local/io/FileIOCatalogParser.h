@@ -85,7 +85,7 @@ inline void FileIOCatalogParser::parseFileIOCatalog(const std::string &filePath,
                     opts[jt.key()] = jt.value().get<std::string>();
                 }
 
-            catalog.registerLazy(ext, dt, engine, priority, opts, libPath, rdrName, wtrName);
+            catalog.registerIOExtension(ext, dt, engine, priority, opts, libPath, rdrName, wtrName);
         }
     } catch (std::exception &e) {
         throw std::runtime_error("error while parsing I/O catalog file `" + filePath + "`: " + e.what());

@@ -62,34 +62,7 @@ class FileIOCatalog {
         return inst;
     }
 
-    // ---------- Registration (engine + priority explicit) ----------
-    void registerReader(const std::string &ext, PhyDataType dt, const std::string &engine, int priority,
-                        const IOOptions &opts, GenericReader fn) {
-        std::lock_guard<std::mutex> lk(mtx);
-        Key4 k{ext, engine, (size_t)dt, priority};
-        if (readers.count(k) || (lazySpecs.count(k) && !lazySpecs.at(k).readerSymbol.empty()))
-            // TODO Print the human-readable name of the data type, not the numeric code.
-            throw std::runtime_error("duplicate reader for filename extension `" + ext + "`, engine `" + engine +
-                                     "`, data type `" + std::to_string(static_cast<int>(dt)) + "` and  priority " +
-                                     std::to_string(priority));
-        readers[k] = std::move(fn);
-        optionsMap[k] = opts;
-    }
-
-    void registerWriter(const std::string &ext, PhyDataType dt, const std::string &engine, int priority,
-                        const IOOptions &opts, GenericWriter fn) {
-        std::lock_guard<std::mutex> lk(mtx);
-        Key4 k{ext, engine, (size_t)dt, priority};
-        if (writers.count(k) || (lazySpecs.count(k) && !lazySpecs.at(k).writerSymbol.empty()))
-            // TODO Print the human-readable name of the data type, not the numeric code.
-            throw std::runtime_error("duplicate writer for filename extension `" + ext + "`, engine `" + engine +
-                                     "` datatype `" + std::to_string(static_cast<int>(dt)) + "` and priority " +
-                                     std::to_string(priority));
-        writers[k] = std::move(fn);
-        optionsMap[k] = opts;
-    }
-
-    void registerLazy(const std::string &ext, PhyDataType dt, const std::string &engine, int priority,
+    void registerIOExtension(const std::string &ext, PhyDataType dt, const std::string &engine, int priority,
                       const IOOptions &opts, const std::string &libPath, const std::string &readerSymbol,
                       const std::string &writerSymbol) {
         std::lock_guard<std::mutex> lk(mtx);
