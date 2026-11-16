@@ -21,7 +21,6 @@
 #include <functional>
 #include <iostream>
 #include <map>
-#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -65,7 +64,6 @@ class FileIOCatalog {
     void registerIOExtension(const std::string &ext, PhyDataType dt, const std::string &engine, int priority,
                              const IOOptions &opts, const std::string &libPath, const std::string &readerSymbol,
                              const std::string &writerSymbol) {
-        std::lock_guard<std::mutex> lk(mtx);
         Key4 k{ext, engine, (size_t)dt, priority};
 
         // Reject if anything already exists for this full key
@@ -81,8 +79,6 @@ class FileIOCatalog {
 
     // ---------- Lookup (engine optional; highest priority wins) ----------
     GenericReader getReader(const std::string &ext, PhyDataType dt, const std::string &engine /* may be "" */) {
-        std::lock_guard<std::mutex> lk(mtx);
-
         const Key4 *bestLoaded = findBestKey(readers, ext, (size_t)dt, engine);
         const Key4 *bestNonLoaded = findBestKey(extSpecs, ext, (size_t)dt, engine);
         const Key4 *best = nullptr;
@@ -103,8 +99,6 @@ class FileIOCatalog {
     }
 
     GenericWriter getWriter(const std::string &ext, PhyDataType dt, const std::string &engine /* may be "" */) {
-        std::lock_guard<std::mutex> lk(mtx);
-
         const Key4 *bestLoaded = findBestKey(writers, ext, (size_t)dt, engine);
         const Key4 *bestNonLoaded = findBestKey(extSpecs, ext, (size_t)dt, engine);
         const Key4 *best = nullptr;
@@ -127,8 +121,6 @@ class FileIOCatalog {
     // ---------- Options helpers ----------
     // Returns the IOOptions bound to the selected impl (best by engine/priority)
     const IOOptions &getOptions(const std::string &ext, PhyDataType dt, const std::string &engine /* may be "" */) {
-        std::lock_guard<std::mutex> lk(mtx);
-
         const Key4 *best = findBestKey(optionsMap, ext, (size_t)dt, engine);
         if (!best)
             throw std::runtime_error("no suitable options found in the catalog");
@@ -136,22 +128,12 @@ class FileIOCatalog {
     }
 
     // Optional: expose all (debugging)
-    std::map<std::tuple<std::string, std::string, size_t, int>, IOOptions> getAllOptions() const {
-        std::lock_guard<std::mutex> lk(mtx);
-        return optionsMap;
-    }
-    std::map<std::tuple<std::string, std::string, size_t, int>, GenericReader> getAllReaders() const {
-        std::lock_guard<std::mutex> lk(mtx);
-        return readers;
-    }
-    std::map<std::tuple<std::string, std::string, size_t, int>, GenericWriter> getAllWriters() const {
-        std::lock_guard<std::mutex> lk(mtx);
-        return writers;
-    }
+    std::map<std::tuple<std::string, std::string, size_t, int>, IOOptions> getAllOptions() const { return optionsMap; }
+    std::map<std::tuple<std::string, std::string, size_t, int>, GenericReader> getAllReaders() const { return readers; }
+    std::map<std::tuple<std::string, std::string, size_t, int>, GenericWriter> getAllWriters() const { return writers; }
 
     // ---------- Copy/assign & clear ----------
     FileIOCatalog(const FileIOCatalog &other) {
-        std::lock_guard<std::mutex> lk(other.mtx);
         readers = other.readers;
         writers = other.writers;
         optionsMap = other.optionsMap;
@@ -161,9 +143,6 @@ class FileIOCatalog {
 
     FileIOCatalog &operator=(const FileIOCatalog &other) {
         if (this != &other) {
-            std::unique_lock<std::mutex> lk1(mtx, std::defer_lock);
-            std::unique_lock<std::mutex> lk2(other.mtx, std::defer_lock);
-            std::lock(lk1, lk2);
             readers = other.readers;
             writers = other.writers;
             optionsMap = other.optionsMap;
@@ -174,8 +153,6 @@ class FileIOCatalog {
     }
 
     void dumpReaders(std::ostream &os = std::cerr) const {
-        std::lock_guard<std::mutex> lk(mtx);
-
         auto ioTypeName = [](PhyDataType t) {
             switch (t) {
             case PhyDataType::FRAME:
@@ -223,8 +200,6 @@ class FileIOCatalog {
     }
 
     void dumpWriters(std::ostream &os = std::cerr) const {
-        std::lock_guard<std::mutex> lk(mtx);
-
         auto ioTypeName = [](PhyDataType t) {
             switch (t) {
             case PhyDataType::FRAME:
@@ -273,7 +248,6 @@ class FileIOCatalog {
 
     // Call this once right after you load BuiltIns.json
     void captureBaseline() {
-        std::lock_guard<std::mutex> lk(mtx);
         baseline_readers = readers;
         baseline_writers = writers;
         baseline_options = optionsMap;
@@ -283,7 +257,6 @@ class FileIOCatalog {
 
     // Reset catalog back to the captured baseline (keeps built-ins, drops recent)
     void resetToBaseline() {
-        std::lock_guard<std::mutex> lk(mtx);
         if (!baselineCaptured) {
             readers.clear();
             writers.clear();
@@ -380,8 +353,6 @@ class FileIOCatalog {
         writers[k] = GenericWriter(reinterpret_cast<WriterFn>(sym));
         return writers[k];
     }
-
-    mutable std::mutex mtx;
 
     // Core maps now keyed by (ext, engine, dt, priority)
     std::map<Key4, GenericReader> readers;
