@@ -37,8 +37,8 @@ enum class PhyDataType { FRAME, DENSEMATRIX, CSRMATRIX };
 // Flexible options passed to readers/writers, stored externally
 using IOOptions = std::map<std::string, std::string>;
 
-// Lazy spec describing how to load a symbol from a shared lib
-struct LazySpec {
+// Describes an IO extension in terms of its shared lib, reader/writer function names, and options.
+struct IOExtensionSpec {
     std::string libPath;
     std::string readerSymbol; // "" if none
     std::string writerSymbol; // "" if none
@@ -63,20 +63,19 @@ class FileIOCatalog {
     }
 
     void registerIOExtension(const std::string &ext, PhyDataType dt, const std::string &engine, int priority,
-                      const IOOptions &opts, const std::string &libPath, const std::string &readerSymbol,
-                      const std::string &writerSymbol) {
+                             const IOOptions &opts, const std::string &libPath, const std::string &readerSymbol,
+                             const std::string &writerSymbol) {
         std::lock_guard<std::mutex> lk(mtx);
         Key4 k{ext, engine, (size_t)dt, priority};
 
         // Reject if anything already exists for this full key
-        if (lazySpecs.find(k) != lazySpecs.end() || readers.find(k) != readers.end() ||
-            writers.find(k) != writers.end())
+        if (extSpecs.find(k) != extSpecs.end() || readers.find(k) != readers.end() || writers.find(k) != writers.end())
             // TODO Print the human-readable name of the data type, not the numeric code.
-            throw std::runtime_error("duplicate lazy registration for filename extension `" + ext + "`, engine `" +
+            throw std::runtime_error("duplicate plug-in registration for filename extension `" + ext + "`, engine `" +
                                      engine + "`, data type `" + std::to_string(static_cast<int>(dt)) +
                                      "` and priority " + std::to_string(priority));
 
-        lazySpecs[k] = LazySpec{libPath, readerSymbol, writerSymbol, opts};
+        extSpecs[k] = IOExtensionSpec{libPath, readerSymbol, writerSymbol, opts};
         optionsMap[k] = opts; // defaults visible pre-load
     }
 
@@ -85,17 +84,17 @@ class FileIOCatalog {
         std::lock_guard<std::mutex> lk(mtx);
 
         const Key4 *bestLoaded = findBestKey(readers, ext, (size_t)dt, engine);
-        const Key4 *bestLazy = findBestKey(lazySpecs, ext, (size_t)dt, engine);
+        const Key4 *bestNonLoaded = findBestKey(extSpecs, ext, (size_t)dt, engine);
         const Key4 *best = nullptr;
 
-        // Error, if neither a loaded nor a lazy reader exists.
-        if (!bestLoaded && !bestLazy)
+        // Error, if neither a loaded nor a non-loaded reader exists.
+        if (!bestLoaded && !bestNonLoaded)
             throw std::runtime_error("no suitable reader found in the catalog");
 
-        // Use the best lazy reader, if no loaded reader exist or if the priority of the best loaded reader is lower
-        // than that of the best lazy reader.
-        if (!bestLoaded || std::get<3>(*bestLoaded) < std::get<3>(*bestLazy))
-            best = bestLazy;
+        // Use the best non-loaded reader, if no loaded reader exist or if the priority of the best loaded reader is
+        // lower than that of the best non-loaded reader.
+        if (!bestLoaded || std::get<3>(*bestLoaded) < std::get<3>(*bestNonLoaded))
+            best = bestNonLoaded;
         // Use the best loaded reader, otherwise.
         else
             best = bestLoaded;
@@ -107,17 +106,17 @@ class FileIOCatalog {
         std::lock_guard<std::mutex> lk(mtx);
 
         const Key4 *bestLoaded = findBestKey(writers, ext, (size_t)dt, engine);
-        const Key4 *bestLazy = findBestKey(lazySpecs, ext, (size_t)dt, engine);
+        const Key4 *bestNonLoaded = findBestKey(extSpecs, ext, (size_t)dt, engine);
         const Key4 *best = nullptr;
 
-        // Error, if neither a loaded nor a lazy writer exists.
-        if (!bestLoaded && !bestLazy)
+        // Error, if neither a loaded nor a non-loaded writer exists.
+        if (!bestLoaded && !bestNonLoaded)
             throw std::runtime_error("no suitable writer found in the catalog");
 
-        // Use the best lazy writer, if no loaded writer exist or if the priority of the best loaded writer is lower
-        // than that of the best lazy writer.
-        if (!bestLoaded || std::get<3>(*bestLoaded) < std::get<3>(*bestLazy))
-            best = bestLazy;
+        // Use the best non-loaded writer, if no loaded writer exist or if the priority of the best loaded writer is
+        // lower than that of the best non-loaded writer.
+        if (!bestLoaded || std::get<3>(*bestLoaded) < std::get<3>(*bestNonLoaded))
+            best = bestNonLoaded;
         // Use the best loaded writer, otherwise.
         else
             best = bestLoaded;
@@ -156,7 +155,7 @@ class FileIOCatalog {
         readers = other.readers;
         writers = other.writers;
         optionsMap = other.optionsMap;
-        lazySpecs = other.lazySpecs;
+        extSpecs = other.extSpecs;
         libHandles = other.libHandles; // shallow copy of handles is fine (process-global)
     }
 
@@ -168,7 +167,7 @@ class FileIOCatalog {
             readers = other.readers;
             writers = other.writers;
             optionsMap = other.optionsMap;
-            lazySpecs = other.lazySpecs;
+            extSpecs = other.extSpecs;
             libHandles = other.libHandles;
         }
         return *this;
@@ -198,12 +197,12 @@ class FileIOCatalog {
             const std::string &engine = std::get<1>(k);
             PhyDataType dt = static_cast<PhyDataType>(std::get<2>(k));
             int prio = std::get<3>(k);
-            os << "  [loaded] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
+            os << "  [    loaded] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
                << "'  priority=" << prio << "\n";
         }
 
-        // 2) Lazy reader facets that aren't loaded yet
-        for (const auto &kv : lazySpecs) {
+        // 2) Non-loaded reader facets that aren't loaded yet
+        for (const auto &kv : extSpecs) {
             const auto &k = kv.first;
             const auto &spec = kv.second;
             if (spec.readerSymbol.empty())
@@ -215,7 +214,7 @@ class FileIOCatalog {
             const std::string &engine = std::get<1>(k);
             PhyDataType dt = static_cast<PhyDataType>(std::get<2>(k));
             int prio = std::get<3>(k);
-            os << "  [lazy  ] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
+            os << "  [non-loaded] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
                << "'  priority=" << prio << "  symbol='" << spec.readerSymbol << "'"
                << "  lib='" << spec.libPath << "'"
                << "\n";
@@ -247,12 +246,12 @@ class FileIOCatalog {
             const std::string &engine = std::get<1>(k);
             PhyDataType dt = static_cast<PhyDataType>(std::get<2>(k));
             int prio = std::get<3>(k);
-            os << "  [loaded] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
+            os << "  [    loaded] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
                << "'  priority=" << prio << "\n";
         }
 
-        // 2) Lazy writer facets that aren't loaded yet
-        for (const auto &kv : lazySpecs) {
+        // 2) Non-loaded writer facets that aren't loaded yet
+        for (const auto &kv : extSpecs) {
             const auto &k = kv.first;
             const auto &spec = kv.second;
             if (spec.writerSymbol.empty())
@@ -264,7 +263,7 @@ class FileIOCatalog {
             const std::string &engine = std::get<1>(k);
             PhyDataType dt = static_cast<PhyDataType>(std::get<2>(k));
             int prio = std::get<3>(k);
-            os << "  [lazy  ] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
+            os << "  [non-loaded] ext='" << ext << "'  dt=" << ioTypeName(dt) << "  engine='" << engine
                << "'  priority=" << prio << "  symbol='" << spec.writerSymbol << "'"
                << "  lib='" << spec.libPath << "'"
                << "\n";
@@ -278,7 +277,7 @@ class FileIOCatalog {
         baseline_readers = readers;
         baseline_writers = writers;
         baseline_options = optionsMap;
-        baseline_lazy = lazySpecs;
+        baseline_nonloaded = extSpecs;
         baselineCaptured = true;
     }
 
@@ -289,20 +288,20 @@ class FileIOCatalog {
             readers.clear();
             writers.clear();
             optionsMap.clear();
-            lazySpecs.clear();
+            extSpecs.clear();
             return;
         }
         readers = baseline_readers;
         writers = baseline_writers;
         optionsMap = baseline_options;
-        lazySpecs = baseline_lazy;
+        extSpecs = baseline_nonloaded;
     }
 
     void clear() {
         readers.clear();
         writers.clear();
         optionsMap.clear();
-        lazySpecs.clear();
+        extSpecs.clear();
     }
 
   private:
@@ -330,10 +329,9 @@ class FileIOCatalog {
         if (auto it = readers.find(k); it != readers.end())
             return it->second;
 
-        // lazy resolve via spec
-        auto itL = lazySpecs.find(k);
-        if (itL == lazySpecs.end())
-            throw std::runtime_error("no reader (and no lazy spec) for requested key");
+        auto itL = extSpecs.find(k);
+        if (itL == extSpecs.end())
+            throw std::runtime_error("no reader for requested key");
 
         const auto &spec = itL->second;
         if (spec.readerSymbol.empty())
@@ -359,9 +357,9 @@ class FileIOCatalog {
         if (auto it = writers.find(k); it != writers.end())
             return it->second;
 
-        auto itL = lazySpecs.find(k);
-        if (itL == lazySpecs.end())
-            throw std::runtime_error("no writer (and no lazy spec) for requested key");
+        auto itL = extSpecs.find(k);
+        if (itL == extSpecs.end())
+            throw std::runtime_error("no writer for requested key");
 
         const auto &spec = itL->second;
         if (spec.writerSymbol.empty())
@@ -389,12 +387,12 @@ class FileIOCatalog {
     std::map<Key4, GenericReader> readers;
     std::map<Key4, GenericWriter> writers;
     std::map<Key4, IOOptions> optionsMap;
-    std::map<Key4, LazySpec> lazySpecs;
+    std::map<Key4, IOExtensionSpec> extSpecs;
 
     std::map<Key4, GenericReader> baseline_readers;
     std::map<Key4, GenericWriter> baseline_writers;
     std::map<Key4, IOOptions> baseline_options;
-    std::map<Key4, LazySpec> baseline_lazy;
+    std::map<Key4, IOExtensionSpec> baseline_nonloaded;
     bool baselineCaptured = false;
 
     std::map<std::string, void *> libHandles;

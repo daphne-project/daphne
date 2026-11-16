@@ -30,7 +30,7 @@
 
 /**
  * @brief Parses a JSON catalog of I/O plugins, discovers its reader/writer functions by name, and registers them as
- * lazy
+ * IO extensions.
  */
 class FileIOCatalogParser {
   public:
