@@ -127,11 +127,6 @@ class FileIOCatalog {
         return optionsMap.at(*best);
     }
 
-    // Optional: expose all (debugging)
-    std::map<std::tuple<std::string, std::string, size_t, int>, IOOptions> getAllOptions() const { return optionsMap; }
-    std::map<std::tuple<std::string, std::string, size_t, int>, GenericReader> getAllReaders() const { return readers; }
-    std::map<std::tuple<std::string, std::string, size_t, int>, GenericWriter> getAllWriters() const { return writers; }
-
     // ---------- Copy/assign & clear ----------
     FileIOCatalog(const FileIOCatalog &other) {
         readers = other.readers;
