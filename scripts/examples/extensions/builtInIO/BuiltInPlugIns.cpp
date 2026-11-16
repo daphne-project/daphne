@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "runtime/local/io/FileIORegistry.h"
+#include "runtime/local/io/FileIOCatalog.h"
 #include "runtime/local/io/MMFile.h"
 #include <parser/metadata/MetaDataParser.h>
 #include <runtime/local/datastructures/CSRMatrix.h>
