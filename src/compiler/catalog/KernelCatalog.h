@@ -122,8 +122,9 @@ class KernelCatalog {
      */
     static mlir::Type normalizeTypeForKernelLookup(mlir::Type t, bool generalizeToStructure = false) {
         mlir::MLIRContext *mctx = t.getContext();
-        if (generalizeToStructure && llvm::isa<mlir::daphne::MatrixType, mlir::daphne::FrameType,
-                                               mlir::daphne::ColumnType, mlir::daphne::ListType>(t))
+        if (generalizeToStructure &&
+            llvm::isa<mlir::daphne::MatrixType, mlir::daphne::FrameType, mlir::daphne::ColumnType,
+                      mlir::daphne::ListType, mlir::daphne::HashSetType>(t))
             return mlir::daphne::StructureType::get(mctx);
         if (auto mt = llvm::dyn_cast<mlir::daphne::MatrixType>(t))
             return mt.withSameElementTypeAndRepr();
@@ -134,6 +135,9 @@ class KernelCatalog {
         if (auto lt = llvm::dyn_cast<mlir::daphne::ListType>(t))
             return mlir::daphne::ListType::get(
                 mctx, normalizeTypeForKernelLookup(lt.getElementType(), generalizeToStructure));
+        if (auto hst = llvm::dyn_cast<mlir::daphne::HashSetType>(t))
+            return mlir::daphne::HashSetType::get(
+                mctx, normalizeTypeForKernelLookup(hst.getElementType(), generalizeToStructure));
         if (auto mrt = llvm::dyn_cast<mlir::MemRefType>(t)) {
             // Drop concrete shapes; keep rank and element type.
             int64_t mrtRank = mrt.getRank();

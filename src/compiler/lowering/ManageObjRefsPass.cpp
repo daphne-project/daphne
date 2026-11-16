@@ -106,7 +106,8 @@ void processValue(OpBuilder builder, Value v) {
         builder.create<daphne::IncRefOp>(v.getLoc(), v);
     }
 
-    if (!llvm::isa<daphne::MatrixType, daphne::FrameType, daphne::ListType, daphne::StringType>(v.getType()))
+    if (!llvm::isa<daphne::MatrixType, daphne::FrameType, daphne::ListType, daphne::StringType, daphne::HashSetType>(
+            v.getType()))
         return;
 
     Operation *decRefAfterOp = nullptr;
@@ -180,7 +181,7 @@ void processValue(OpBuilder builder, Value v) {
  */
 void incRefIfObj(Value v, OpBuilder &b) {
     Type t = v.getType();
-    if (llvm::isa<daphne::MatrixType, daphne::FrameType, daphne::ListType, daphne::StringType>(t))
+    if (llvm::isa<daphne::MatrixType, daphne::FrameType, daphne::ListType, daphne::StringType, daphne::HashSetType>(t))
         b.create<daphne::IncRefOp>(v.getLoc(), v);
     else if (llvm::isa<daphne::UnknownType>(t))
         throw ErrorHandler::compilerError(v.getDefiningOp(), "ManageObjRefsPass",
