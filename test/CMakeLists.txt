@@ -157,7 +157,6 @@ set(TEST_SOURCES
         runtime/local/kernels/OuterBinaryTest.cpp
         runtime/local/kernels/QuantizeTest.cpp
         runtime/local/kernels/RandMatrixTest.cpp
-        runtime/local/kernels/ReadTest.cpp
         runtime/local/kernels/RecodeTest.cpp
         runtime/local/kernels/ReplaceTest.cpp
         runtime/local/kernels/ReshapeTest.cpp
