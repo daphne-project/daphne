@@ -644,8 +644,6 @@ int startDAPHNE(int argc, const char **argv, DaphneLibResult *daphneLibRes, int 
         FileIOCatalogParser fcp;
         fcp.parseFileIOCatalog("scripts/examples/extensions/builtInIO/BuiltIns.json", fc, 0);
 
-        fc.captureBaseline();
-
         for (auto fileioExt : fileioExtList) {
             if (!fileioExt.empty()) {
                 std::string extCatalogFile;

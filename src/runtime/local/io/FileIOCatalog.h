@@ -246,37 +246,6 @@ class FileIOCatalog {
         os << std::flush;
     }
 
-    // Call this once right after you load BuiltIns.json
-    void captureBaseline() {
-        baseline_readers = readers;
-        baseline_writers = writers;
-        baseline_options = optionsMap;
-        baseline_nonloaded = extSpecs;
-        baselineCaptured = true;
-    }
-
-    // Reset catalog back to the captured baseline (keeps built-ins, drops recent)
-    void resetToBaseline() {
-        if (!baselineCaptured) {
-            readers.clear();
-            writers.clear();
-            optionsMap.clear();
-            extSpecs.clear();
-            return;
-        }
-        readers = baseline_readers;
-        writers = baseline_writers;
-        optionsMap = baseline_options;
-        extSpecs = baseline_nonloaded;
-    }
-
-    void clear() {
-        readers.clear();
-        writers.clear();
-        optionsMap.clear();
-        extSpecs.clear();
-    }
-
   private:
     using Key4 = std::tuple<std::string /*ext*/, std::string /*engine*/, size_t /*dt*/, int /*priority*/>;
 
@@ -359,12 +328,6 @@ class FileIOCatalog {
     std::map<Key4, GenericWriter> writers;
     std::map<Key4, IOOptions> optionsMap;
     std::map<Key4, IOExtensionSpec> extSpecs;
-
-    std::map<Key4, GenericReader> baseline_readers;
-    std::map<Key4, GenericWriter> baseline_writers;
-    std::map<Key4, IOOptions> baseline_options;
-    std::map<Key4, IOExtensionSpec> baseline_nonloaded;
-    bool baselineCaptured = false;
 
     std::map<std::string, void *> libHandles;
 };
