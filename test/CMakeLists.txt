@@ -67,6 +67,8 @@ set(TEST_SOURCES
         # api/cli/codegen/SparsityExploitTest.cpp
         # api/cli/codegen/TransposeTest.cpp
 
+        ir/inference/PropertyInferenceTest.cpp
+
         ir/daphneir/InferTypesTest.cpp
         api/cli/operations/CanonicalizationConstantFoldingOpTest.cpp
 
@@ -172,6 +174,7 @@ set(TEST_SOURCES
         runtime/local/kernels/SolveTest.cpp
         runtime/local/kernels/StopTest.cpp
         runtime/local/kernels/SyrkTest.cpp
+        runtime/local/kernels/TransferPropertiesTest.cpp
         runtime/local/kernels/ThetaJoinTest.cpp
         runtime/local/kernels/TransposeTest.cpp
         runtime/local/kernels/TriTest.cpp

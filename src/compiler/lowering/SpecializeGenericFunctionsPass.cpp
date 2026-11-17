@@ -172,13 +172,13 @@ func::FuncOp inferTypesInFunction(func::FuncOp function) {
     // TODO There is a cyclic dependency between (shape) inference and
     // constant folding (included in canonicalization), at the moment we
     // run only three iterations of both passes (see #173).
-    pm.addPass(daphne::createInferencePass({true, true, true, true, true, true}));
+    pm.addPass(daphne::createInferencePass({true, true, true, true, true, true, true}));
     pm.addPass(createCanonicalizerPass());
-    pm.addPass(daphne::createInferencePass({true, true, true, true, true, true}));
+    pm.addPass(daphne::createInferencePass({true, true, true, true, true, true, true}));
     pm.addPass(createCanonicalizerPass());
-    pm.addPass(daphne::createInferencePass({true, true, true, true, true, true}));
+    pm.addPass(daphne::createInferencePass({true, true, true, true, true, true, true}));
     pm.addPass(createCanonicalizerPass());
-    pm.addPass(daphne::createInferencePass({true, true, true, true, true, true}));
+    pm.addPass(daphne::createInferencePass({true, true, true, true, true, true, true}));
     pm.addPass(createCanonicalizerPass());
     if (failed(pm.run(function))) {
         throw ErrorHandler::compilerError(function.getOperation(), "SpecializeGenericFunctionsPass",

@@ -32,9 +32,7 @@ template <typename ValueType> class Matrix : public Structure {
 
   protected:
     Matrix(size_t numRows, size_t numCols)
-        : Structure(numRows, numCols), sparsity(-1), symmetric(BoolOrUnknown::Unknown){
-                                                         // nothing to do
-                                                     };
+        : Structure(numRows, numCols), sparsity(-1), symmetric(BoolOrUnknown::Unknown), numDistinct(-1) {}
 
   public:
     /**
@@ -55,6 +53,12 @@ template <typename ValueType> class Matrix : public Structure {
      * Note that, so far, this is the compile-time estimate (not the actual run-time value) of the symmetry.
      */
     BoolOrUnknown symmetric;
+
+    /**
+     * @brief Compile-time information on the number of distinct values; -1 means unknown.
+     *
+     */
+    ssize_t numDistinct;
 
     virtual ~Matrix(){
         // nothing to do
