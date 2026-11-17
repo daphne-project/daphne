@@ -174,6 +174,7 @@ set(TEST_SOURCES
         runtime/local/kernels/SolveTest.cpp
         runtime/local/kernels/StopTest.cpp
         runtime/local/kernels/SyrkTest.cpp
+        runtime/local/kernels/TransferPropertiesTest.cpp
         runtime/local/kernels/ThetaJoinTest.cpp
         runtime/local/kernels/TransposeTest.cpp
         runtime/local/kernels/TriTest.cpp
