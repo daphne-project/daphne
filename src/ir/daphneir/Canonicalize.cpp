@@ -829,3 +829,20 @@ mlir::LogicalResult mlir::daphne::SetColLabelsOp::canonicalize(mlir::daphne::Set
     }
     return mlir::failure();
 }
+
+mlir::LogicalResult mlir::daphne::SliceRowOp::canonicalize(mlir::daphne::SliceRowOp op,
+                                                           mlir::PatternRewriter &rewriter) {
+    auto sqrtOp = op.getSource().getDefiningOp<mlir::daphne::EwSqrtOp>();
+    if (!sqrtOp)
+        return mlir::failure();
+
+    mlir::Type sliceTy = op.getRes().getType();
+    if (auto resMat = llvm::dyn_cast<mlir::daphne::MatrixType>(sliceTy))
+        if (auto argMat = llvm::dyn_cast<mlir::daphne::MatrixType>(sqrtOp.getArg().getType()))
+            sliceTy = resMat.withElementType(argMat.getElementType());
+
+    auto newSlice = rewriter.create<mlir::daphne::SliceRowOp>(
+        op.getLoc(), sliceTy, sqrtOp.getArg(), op.getLowerIncl(), op.getUpperExcl());
+    rewriter.replaceOpWithNewOp<mlir::daphne::EwSqrtOp>(op, op.getRes().getType(), newSlice.getRes());
+    return mlir::success();
+}

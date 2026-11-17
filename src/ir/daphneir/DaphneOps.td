@@ -681,6 +681,7 @@ def Daphne_SliceRowOp : Daphne_Op<"sliceRow", [
 
     let arguments = (ins MatrixOrFrame:$source, SI64:$lowerIncl, SI64:$upperExcl);
     let results = (outs MatrixOrFrame:$res);
+    let hasCanonicalizeMethod = 1;
 }
 
 def Daphne_ExtractColOp : Daphne_Op<"extractCol", [
