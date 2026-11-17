@@ -31,10 +31,11 @@
 using namespace mlir;
 
 daphne::InferenceConfig::InferenceConfig(bool partialInferenceAllowed, bool typeInference, bool shapeInference,
-                                         bool frameLabelInference, bool sparsityInference, bool symmetricInference)
+                                         bool frameLabelInference, bool sparsityInference, bool symmetricInference,
+                                         bool distinctInference)
     : partialInferenceAllowed(partialInferenceAllowed), typeInference(typeInference), shapeInference(shapeInference),
       frameLabelInference(frameLabelInference), sparsityInference(sparsityInference),
-      symmetricInference(symmetricInference) {}
+      symmetricInference(symmetricInference), distinctInference(distinctInference) {}
 
 namespace {
 void castOperandIf(OpBuilder &builder, Operation *op, size_t operandIdx, Type type) {
@@ -75,11 +76,13 @@ Type getTypeWithCommonInfo(Type t1, Type t2) {
         const daphne::MatrixRepresentation repr2 = mat2.getRepresentation();
         const BoolOrUnknown sym1 = mat1.getSymmetric();
         const BoolOrUnknown sym2 = mat2.getSymmetric();
+        const ssize_t dist1 = mat1.getNumDistinct();
+        const ssize_t dist2 = mat2.getNumDistinct();
         return daphne::MatrixType::get(ctx, (vt1 == vt2) ? vt1 : u, (nr1 == nr2) ? nr1 : -1, (nc1 == nc2) ? nc1 : -1,
                                        // TODO Maybe do approximate comparison of floating-point values.
                                        (sp1 == sp2) ? sp1 : -1,
                                        (repr1 == repr2) ? repr1 : daphne::MatrixRepresentation::Default,
-                                       (sym1 == sym2) ? sym1 : BoolOrUnknown::Unknown);
+                                       (sym1 == sym2) ? sym1 : BoolOrUnknown::Unknown, (dist1 == dist2) ? dist1 : -1);
     } else if (frm1 && frm2) { // both types are frames
         const std::vector<Type> cts1 = frm1.getColumnTypes();
         const std::vector<Type> cts2 = frm2.getColumnTypes();
@@ -149,7 +152,7 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
      * @brief Triggers the inference of all properties on the given operation.
      */
     std::function<WalkResult(Operation *)> walkOp = [&](Operation *op) {
-        const bool isScfOp = op->getDialect() == op->getContext()->getOrLoadDialect<scf::SCFDialect>();
+        const bool isScfOp = op->getName().getDialectNamespace() == scf::SCFDialect::getDialectNamespace();
 
         // ----------------------------------------------------------------
         // Handle all non-control-flow (non-SCF) operations
@@ -242,6 +245,28 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
                                                                   std::to_string(i) +
                                                                   ", since it "
                                                                   "is not a matrix");
+                    }
+                }
+            }
+            if (cfg.distinctInference && returnsUnknownDistinct(op)) {
+                // Try to infer the distinct values of all results of this operation.
+                std::vector<ssize_t> distincts = daphne::tryInferDistinct(op);
+                const size_t numRes = op->getNumResults();
+                if (distincts.size() != numRes)
+                    throw ErrorHandler::compilerError(
+                        op, "InferencePass",
+                        "distinct inference for op " + op->getName().getStringRef().str() + " returned " +
+                            std::to_string(distincts.size()) + " entries, but the op has " + std::to_string(numRes) +
+                            " results");
+                // Set the infered distincts on all results of this operation.
+                for (size_t i = 0; i < numRes; i++) {
+                    if (llvm::isa<mlir::daphne::MatrixType>(op->getResultTypes()[i])) {
+                        const ssize_t distinct = distincts[i];
+
+                        Value rv = op->getResult(i);
+                        const Type rt = rv.getType();
+                        if (auto mt = dyn_cast<daphne::MatrixType>(rt))
+                            rv.setType(mt.withNumDistinct(distinct));
                     }
                 }
             }
@@ -487,6 +512,14 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
         // Continue the walk normally.
         return WalkResult::advance();
     };
+
+    static bool returnsUnknownDistinct(Operation *op) {
+        return llvm::any_of(op->getResultTypes(), [](Type rt) {
+            if (auto mt = dyn_cast<daphne::MatrixType>(rt))
+                return mt.getNumDistinct() == -1;
+            return false;
+        });
+    }
 
   public:
     InferencePass(daphne::InferenceConfig cfg) : cfg(cfg) {}

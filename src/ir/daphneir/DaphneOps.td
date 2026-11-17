@@ -22,6 +22,7 @@
 include "ir/daphneir/DaphneDialect.td"
 include "ir/daphneir/DaphneTypes.td"
 include "ir/daphneir/DaphneDistributableOpInterface.td"
+include "ir/daphneir/DaphneInferDistinctOpInterface.td"
 include "ir/daphneir/DaphneInferFrameLabelsOpInterface.td"
 include "ir/daphneir/DaphneInferSymmetricOpInterface.td"
 include "ir/daphneir/DaphneInferShapeOpInterface.td"
@@ -132,7 +133,8 @@ def Daphne_ConvertCSRMatrixToRowOffsetsMemRef : Daphne_Op<"convertCSRMatrixToRow
 def Daphne_FillOp : Daphne_Op<"fill", [
     DataTypeMat, ValueTypeFromFirstArg,
     NumRowsFromIthScalar<1>, NumColsFromIthScalar<2>, CUDASupport,
-    DeclareOpInterfaceMethods<InferSymmetricOpInterface>
+    DeclareOpInterfaceMethods<InferSymmetricOpInterface>,
+    DeclareOpInterfaceMethods<InferDistinctOpInterface>
 ]> {
     let arguments = (ins AnyScalar:$arg, Size:$numRows, Size:$numCols);
     let results = (outs MatrixOrU:$res);
@@ -188,7 +190,8 @@ def Daphne_SeqOp : Daphne_Op<"seq", [
     DataTypeMat, ValueTypeFromArgs,
     OneCol, DeclareOpInterfaceMethods<InferNumRowsOpInterface>,
     CompletelyDense,
-    CastArgsToResType
+    CastArgsToResType,
+    DeclareOpInterfaceMethods<InferDistinctOpInterface>
 ]> {
     let arguments = (ins NumScalar:$from, NumScalar:$to, NumScalar:$inc);
     let results = (outs MatrixOf<[NumScalar]>);
@@ -2054,7 +2057,7 @@ def Daphne_RecordPropertiesOp : Daphne_Op<"recordProperties"> {
 def Daphne_TransferPropertiesOp : Daphne_Op<"transferProperties"> {
     let summary = "Transfers compile-time information on data properties to the runtime data objects";
 
-    let arguments = (ins MatrixOrU:$arg, F64:$sparsity, SI64:$symmetric);
+    let arguments = (ins MatrixOrU:$arg, F64:$sparsity, SI64:$symmetric, SI64:$numDistinct);
     let results = (outs);
 
     let hasCanonicalizeMethod = 1;

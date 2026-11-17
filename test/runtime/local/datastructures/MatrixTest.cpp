@@ -18,6 +18,7 @@
 #include <runtime/local/datastructures/DataObjectFactory.h>
 #include <runtime/local/datastructures/DenseMatrix.h>
 #include <runtime/local/kernels/CheckEq.h>
+#include <runtime/local/kernels/TransferProperties.h>
 
 #include <tags.h>
 
@@ -805,4 +806,17 @@ TEMPLATE_PRODUCT_TEST_CASE("Matrix.append() on view", TAG_DATASTRUCTURES, (CSRMa
     DataObjectFactory::destroy(view1);
     DataObjectFactory::destroy(view2);
     DataObjectFactory::destroy(view3);
+}
+
+TEMPLATE_PRODUCT_TEST_CASE("Matrix.numDistinct transfer", TAG_DATASTRUCTURES, (DenseMatrix, CSRMatrix),
+                           (double, int64_t)) {
+    using DT = TestType;
+    auto matrix = genGivenVals<DT>(2, {0, 1, 1, 2});
+    CHECK(matrix->numDistinct == -1);
+    transferProperties(matrix, 0.75, static_cast<int64_t>(BoolOrUnknown::Unknown), 3, nullptr);
+    CHECK(matrix->numDistinct == 3);
+    CHECK(matrix->sparsity == 0.75);
+    transferProperties(matrix, -1, static_cast<int64_t>(BoolOrUnknown::Unknown), -1, nullptr);
+    CHECK(matrix->numDistinct == -1);
+    DataObjectFactory::destroy(matrix);
 }

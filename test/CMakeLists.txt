@@ -67,6 +67,8 @@ set(TEST_SOURCES
         # api/cli/codegen/SparsityExploitTest.cpp
         # api/cli/codegen/TransposeTest.cpp
 
+        ir/inference/PropertyInferenceTest.cpp
+
         ir/daphneir/InferTypesTest.cpp
         api/cli/operations/CanonicalizationConstantFoldingOpTest.cpp
 

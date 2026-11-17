@@ -78,6 +78,7 @@ std::string boolOrUnknownToString(BoolOrUnknown rep);
 BoolOrUnknown stringToBoolOrUnknown(const std::string &str);
 } // namespace mlir::daphne
 
+#include <ir/daphneir/DaphneInferDistinctOpInterface.h>
 #include <ir/daphneir/DaphneInferFrameLabelsOpInterface.h>
 #include <ir/daphneir/DaphneInferShapeOpInterface.h>
 #include <ir/daphneir/DaphneInferSparsityOpInterface.h>
