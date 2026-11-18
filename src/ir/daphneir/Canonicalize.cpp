@@ -186,27 +186,6 @@ mlir::LogicalResult mlir::daphne::MatMulOp::canonicalize(mlir::daphne::MatMulOp 
 }
 
 /**
- * @brief Replaces NumRowsOp by a constant, if the #rows of the input is known
- * (e.g., due to shape inference).
- */
-mlir::LogicalResult mlir::daphne::NumRowsOp::canonicalize(mlir::daphne::NumRowsOp op, PatternRewriter &rewriter) {
-    ssize_t numRows = -1;
-
-    mlir::Type inTy = op.getArg().getType();
-    if (auto t = llvm::dyn_cast<mlir::daphne::MatrixType>(inTy))
-        numRows = t.getNumRows();
-    else if (auto t = llvm::dyn_cast<mlir::daphne::FrameType>(inTy))
-        numRows = t.getNumRows();
-
-    if (numRows != -1) {
-        rewriter.replaceOpWithNewOp<mlir::daphne::ConstantOp>(op, rewriter.getIndexType(),
-                                                              rewriter.getIndexAttr(numRows));
-        return mlir::success();
-    }
-    return mlir::failure();
-}
-
-/**
  * @brief Replaces NumColsOp by a constant, if the #cols of the input is known
  * (e.g., due to shape inference).
  */
@@ -253,73 +232,55 @@ mlir::LogicalResult mlir::daphne::NumCellsOp::canonicalize(mlir::daphne::NumCell
 }
 
 /**
- * @brief Replaces SparsityOp by a constant, if the sparsity of the input is
- * known (e.g., due to sparsity inference).
+ * @brief Rewrites an `EwAddOp` whose operands carry string data into an
+ * `EwConcatOp`, since DaphneDSL overloads `+` for both numeric addition and
+ * string concatenation and the operand types may be known only after type
+ * inference.
+ *
+ * This is one of two independent canonicalization patterns for `EwAddOp`; the
+ * other normalizes a scalar left-hand side. They match disjoint sets of
+ * operands, so their registration order does not matter. Two focused patterns
+ * keep each match condition separate instead of nesting them in one if/else.
  */
-mlir::LogicalResult mlir::daphne::SparsityOp::canonicalize(mlir::daphne::SparsityOp op, PatternRewriter &rewriter) {
-    double sparsity = -1.0;
-
-    mlir::Type inTy = op.getArg().getType();
-    if (auto t = llvm::dyn_cast<mlir::daphne::MatrixType>(inTy))
-        sparsity = t.getSparsity();
-
-    if (sparsity != -1) {
-        rewriter.replaceOpWithNewOp<mlir::daphne::ConstantOp>(op, sparsity);
-        return mlir::success();
+struct RewriteEwAddOnStringToConcat : public mlir::OpRewritePattern<mlir::daphne::EwAddOp> {
+    RewriteEwAddOnStringToConcat(mlir::MLIRContext *context) : OpRewritePattern<mlir::daphne::EwAddOp>(context, 1) {
+        //
     }
-    return mlir::failure();
-}
 
-/**
- * @brief Replaces (1) `a + b` by `a concat b`, if `a` or `b` is a string,
- * and (2) `a + X` by `X + a` (`a` scalar, `X` matrix/frame).
- *
- * (1) is important, since we use the `+`-operator for both addition and
- * string concatenation in DaphneDSL, while the types of the operands might be
- * known only after type inference.
- *
- * (2) is important, since our kernels for elementwise binary operations only
- * support scalars as the right-hand-side operand so far (see #203).
- *
- * @param op
- * @param rewriter
- * @return
- */
-mlir::LogicalResult mlir::daphne::EwAddOp::canonicalize(mlir::daphne::EwAddOp op, PatternRewriter &rewriter) {
-    mlir::Value lhs = op.getLhs();
-    mlir::Value rhs = op.getRhs();
+    mlir::LogicalResult matchAndRewrite(mlir::daphne::EwAddOp op, mlir::PatternRewriter &rewriter) const override {
+        mlir::Value lhs = op.getLhs();
+        mlir::Value rhs = op.getRhs();
 
-    const bool lhsIsStr = llvm::isa<mlir::daphne::StringType>(lhs.getType());
-    const bool rhsIsStr = llvm::isa<mlir::daphne::StringType>(rhs.getType());
-    if (lhsIsStr || rhsIsStr) {
-        mlir::Type strTy = mlir::daphne::StringType::get(rewriter.getContext());
-        if (!lhsIsStr) {
-            const bool lhsIsSca = !llvm::isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>(lhs.getType());
-            if (!lhsIsSca) {
-                const bool lhsIsMatStr = llvm::isa<mlir::daphne::StringType>(
-                    llvm::dyn_cast<daphne::MatrixType>(lhs.getType()).getElementType());
-                if (lhsIsMatStr) {
-                    rewriter.replaceOpWithNewOp<mlir::daphne::EwConcatOp>(op, op.getResult().getType(), lhs, rhs);
-                    return mlir::success();
-                }
-            } else
-                lhs = rewriter.create<mlir::daphne::CastOp>(op.getLoc(), strTy, lhs);
+        const bool lhsIsStr = llvm::isa<mlir::daphne::StringType>(lhs.getType());
+        const bool rhsIsStr = llvm::isa<mlir::daphne::StringType>(rhs.getType());
+        if (lhsIsStr || rhsIsStr) {
+            mlir::Type strTy = mlir::daphne::StringType::get(rewriter.getContext());
+            if (!lhsIsStr) {
+                const bool lhsIsSca = !llvm::isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>(lhs.getType());
+                if (!lhsIsSca) {
+                    const bool lhsIsMatStr = llvm::isa<mlir::daphne::StringType>(
+                        llvm::dyn_cast<mlir::daphne::MatrixType>(lhs.getType()).getElementType());
+                    if (lhsIsMatStr) {
+                        rewriter.replaceOpWithNewOp<mlir::daphne::EwConcatOp>(op, op.getResult().getType(), lhs, rhs);
+                        return mlir::success();
+                    }
+                } else
+                    lhs = rewriter.create<mlir::daphne::CastOp>(op.getLoc(), strTy, lhs);
+            }
+            if (!rhsIsStr)
+                rhs = rewriter.create<mlir::daphne::CastOp>(op.getLoc(), strTy, rhs);
+            rewriter.replaceOpWithNewOp<mlir::daphne::EwConcatOp>(op, op.getResult().getType(), lhs, rhs);
+            return mlir::success();
         }
-        if (!rhsIsStr)
-            rhs = rewriter.create<mlir::daphne::CastOp>(op.getLoc(), strTy, rhs);
-        rewriter.replaceOpWithNewOp<mlir::daphne::EwConcatOp>(op, op.getResult().getType(), lhs, rhs);
-        return mlir::success();
-    } else {
+
+        // Neither operand is a string scalar: only two string matrices concat.
         const bool lhsIsSca = !llvm::isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>(lhs.getType());
         const bool rhsIsSca = !llvm::isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>(rhs.getType());
-        if (lhsIsSca && !rhsIsSca) {
-            rewriter.replaceOpWithNewOp<mlir::daphne::EwAddOp>(op, op.getResult().getType(), rhs, lhs);
-            return mlir::success();
-        } else if (!lhsIsSca && !rhsIsSca) {
+        if (!lhsIsSca && !rhsIsSca) {
             const bool lhsIsMatStr =
-                llvm::isa<mlir::daphne::StringType>(llvm::dyn_cast<daphne::MatrixType>(lhs.getType()).getElementType());
+                llvm::isa<mlir::daphne::StringType>(llvm::dyn_cast<mlir::daphne::MatrixType>(lhs.getType()).getElementType());
             const bool rhsIsMatStr =
-                llvm::isa<mlir::daphne::StringType>(llvm::dyn_cast<daphne::MatrixType>(rhs.getType()).getElementType());
+                llvm::isa<mlir::daphne::StringType>(llvm::dyn_cast<mlir::daphne::MatrixType>(rhs.getType()).getElementType());
             if (lhsIsMatStr && rhsIsMatStr) {
                 rewriter.replaceOpWithNewOp<mlir::daphne::EwConcatOp>(op, op.getResult().getType(), lhs, rhs);
                 return mlir::success();
@@ -327,6 +288,41 @@ mlir::LogicalResult mlir::daphne::EwAddOp::canonicalize(mlir::daphne::EwAddOp op
         }
         return mlir::failure();
     }
+};
+
+/**
+ * @brief Normalizes `a + X` to `X + a` for a scalar `a` and a matrix/frame `X`,
+ * since our kernels for elementwise binary operations only support scalars as
+ * the right-hand-side operand so far (see #203).
+ *
+ * Only fires when no operand is a string scalar; string cases are handled by
+ * `RewriteEwAddOnStringToConcat`.
+ */
+struct NormalizeEwAddScalarLhs : public mlir::OpRewritePattern<mlir::daphne::EwAddOp> {
+    NormalizeEwAddScalarLhs(mlir::MLIRContext *context) : OpRewritePattern<mlir::daphne::EwAddOp>(context, 1) {
+        //
+    }
+
+    mlir::LogicalResult matchAndRewrite(mlir::daphne::EwAddOp op, mlir::PatternRewriter &rewriter) const override {
+        mlir::Value lhs = op.getLhs();
+        mlir::Value rhs = op.getRhs();
+
+        // String operands are the concern of RewriteEwAddOnStringToConcat.
+        if (llvm::isa<mlir::daphne::StringType>(lhs.getType()) || llvm::isa<mlir::daphne::StringType>(rhs.getType()))
+            return mlir::failure();
+
+        const bool lhsIsSca = !llvm::isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>(lhs.getType());
+        const bool rhsIsSca = !llvm::isa<mlir::daphne::MatrixType, mlir::daphne::FrameType>(rhs.getType());
+        if (lhsIsSca && !rhsIsSca) {
+            rewriter.replaceOpWithNewOp<mlir::daphne::EwAddOp>(op, op.getResult().getType(), rhs, lhs);
+            return mlir::success();
+        }
+        return mlir::failure();
+    }
+};
+
+void mlir::daphne::EwAddOp::getCanonicalizationPatterns(RewritePatternSet &results, MLIRContext *context) {
+    results.add<RewriteEwAddOnStringToConcat, NormalizeEwAddScalarLhs>(context);
 }
 
 /**
@@ -555,88 +551,6 @@ mlir::LogicalResult mlir::daphne::ConvertMemRefToDenseMatrix::canonicalize(mlir:
 }
 
 /**
- * @brief Replaces `floor(a)` with `a` if `a` is an integer
- * or a matrix of integers.
- *
- * @param op
- * @param rewriter
- * @return
- */
-mlir::LogicalResult mlir::daphne::EwFloorOp::canonicalize(mlir::daphne::EwFloorOp op, mlir::PatternRewriter &rewriter) {
-    mlir::Value operand = op.getOperand();
-    auto matrix = llvm::dyn_cast<mlir::daphne::MatrixType>(operand.getType());
-    mlir::Type elemType = matrix ? matrix.getElementType() : operand.getType();
-
-    if (llvm::isa<mlir::IntegerType>(elemType)) {
-        rewriter.replaceOp(op, operand);
-        return mlir::success();
-    }
-    return mlir::failure();
-}
-
-/**
- * @brief Replaces `ceil(a)` with `a` if `a` is an integer
- * or a matrix of integers.
- *
- * @param op
- * @param rewriter
- * @return
- */
-mlir::LogicalResult mlir::daphne::EwCeilOp::canonicalize(mlir::daphne::EwCeilOp op, mlir::PatternRewriter &rewriter) {
-    mlir::Value operand = op.getOperand();
-    auto matrix = llvm::dyn_cast<mlir::daphne::MatrixType>(operand.getType());
-    mlir::Type elemType = matrix ? matrix.getElementType() : operand.getType();
-
-    if (llvm::isa<mlir::IntegerType>(elemType)) {
-        rewriter.replaceOp(op, operand);
-        return mlir::success();
-    }
-    return mlir::failure();
-}
-
-/**
- * @brief Replaces `round(a)` with `a` if `a` is an integer
- * or a matrix of integers.
- *
- * @param op
- * @param rewriter
- * @return
- */
-mlir::LogicalResult mlir::daphne::EwRoundOp::canonicalize(mlir::daphne::EwRoundOp op, mlir::PatternRewriter &rewriter) {
-    mlir::Value operand = op.getOperand();
-    auto matrix = llvm::dyn_cast<mlir::daphne::MatrixType>(operand.getType());
-    mlir::Type elemType = matrix ? matrix.getElementType() : operand.getType();
-
-    if (llvm::isa<mlir::IntegerType>(elemType)) {
-        rewriter.replaceOp(op, operand);
-        return mlir::success();
-    }
-    return mlir::failure();
-}
-
-mlir::LogicalResult mlir::daphne::RenameOp::canonicalize(mlir::daphne::RenameOp op, mlir::PatternRewriter &rewriter) {
-    // Replace the RenameOp by its argument, since we only need
-    // this operation during DaphneDSL parsing.
-    rewriter.replaceOp(op, op.getArg());
-    return mlir::success();
-}
-
-/**
- * @brief Replaces `--a` by `a` (`a` scalar).
- *
- * @param op
- * @param rewriter
- * @return
- */
-mlir::LogicalResult mlir::daphne::EwMinusOp::canonicalize(mlir::daphne::EwMinusOp op, PatternRewriter &rewriter) {
-    if (auto innerOp = op.getOperand().getDefiningOp<mlir::daphne::EwMinusOp>()) {
-        rewriter.replaceOp(op, innerOp.getOperand());
-        return mlir::success();
-    }
-    return mlir::failure();
-}
-
-/**
  * @brief Eliminates redundant conversions of a position list to a bitmap and back to a position list.
  *
  * This pattern frequently occurs during lowering to columnar operations. This simplification rewrite avoids the
@@ -759,11 +673,10 @@ mlir::LogicalResult mlir::daphne::ExtractColOp::canonicalize(mlir::daphne::Extra
 mlir::LogicalResult mlir::daphne::CastOp::canonicalize(mlir::daphne::CastOp cOp, PatternRewriter &rewriter) {
     // TODO Maybe skip property casts, or separate them, combine multiple property casts.
 
-    // Replace cast "a -> a".
-    if (cOp.isTrivialCast()) {
-        rewriter.replaceOp(cOp, cOp.getArg());
-        return mlir::success();
-    }
+    // The trivial cast "a -> a" is handled by CastOp::fold, not here: the
+    // greedy driver attempts folding before it applies canonicalize patterns,
+    // so a trivial cast is already replaced by its argument before this method
+    // runs.
 
     // Replace cast "a -> b -> c" to cast "a -> c", if the cast "a -> b" does not lose information, because if "b"
     // contains the same information as "a", we could directly cast from "a" to "c".

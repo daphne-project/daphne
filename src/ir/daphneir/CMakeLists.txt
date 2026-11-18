@@ -29,10 +29,15 @@ add_mlir_interface(DaphneInferShapeOpInterface)
 add_mlir_interface(DaphneInferSparsityOpInterface)
 add_mlir_interface(DaphneInferTypesOpInterface)
 add_mlir_interface(DaphneVectorizableOpInterface)
+add_mlir_interface(DaphneScalarConstantFoldable)
 
 set(LLVM_TARGET_DEFINITIONS Passes.td)
 mlir_tablegen(Passes.h.inc -gen-pass-decls -name Daphne)
 add_public_tablegen_target(MLIRDaphneTransformsIncGen)
+
+set(LLVM_TARGET_DEFINITIONS DaphneCanonicalizePatterns.td)
+mlir_tablegen(DaphneCanonicalizePatterns.inc -gen-rewriters)
+add_public_tablegen_target(MLIRDaphneCanonicalizePatternsIncGen)
 
 add_mlir_doc(Passes -gen-pass-doc DaphnePasses Dialects/)
 
@@ -40,6 +45,8 @@ add_mlir_dialect_library(MLIRDaphne
     DaphneDialect.cpp
     Fold.cpp
     Canonicalize.cpp
+    DaphneAlgebraicTraitPatterns.cpp
+    DaphneCanonicalizePatterns.cpp
     DaphneDistributableOpInterface.cpp
     DaphneInferFrameLabelsOpInterface.cpp
     DaphneInferDistinctOpInterface.cpp
@@ -48,10 +55,12 @@ add_mlir_dialect_library(MLIRDaphne
     DaphneInferSparsityOpInterface.cpp
     DaphneInferTypesOpInterface.cpp
     DaphneVectorizableOpInterface.cpp
+    DaphneScalarConstantFoldable.cpp
 
     DEPENDS
     MLIRDaphneOpsIncGen
     MLIRDaphneTransformsIncGen
+    MLIRDaphneCanonicalizePatternsIncGen
     MLIRDaphneDistributableOpInterfaceIncGen
     MLIRDaphneInferFrameLabelsOpInterfaceIncGen
     MLIRDaphneInferDistinctOpInterfaceIncGen
@@ -60,6 +69,7 @@ add_mlir_dialect_library(MLIRDaphne
     MLIRDaphneInferSparsityOpInterfaceIncGen
     MLIRDaphneInferTypesOpInterfaceIncGen
     MLIRDaphneVectorizableOpInterfaceIncGen
+    MLIRDaphneScalarConstantFoldableIncGen
 
     LINK_COMPONENTS
     Core

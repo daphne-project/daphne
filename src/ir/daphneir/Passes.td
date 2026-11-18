@@ -19,6 +19,11 @@
 
 include "mlir/Pass/PassBase.td"
 
+def AlgebraicSimplify : Pass<"daphne-algebraic-simplify", "::mlir::ModuleOp"> {
+  let summary = "Simplifies DaphneIR using rewrite drivers keyed on algebraic op traits.";
+  let constructor = "mlir::daphne::createAlgebraicSimplifyPass()";
+}
+
 def ConvertDaphneToLinalg : Pass<"convert-daphne-to-linalg"> {
   let summary = "Converts certain DaphneOps to ops from the Linalg dialect.";
   let description = [{
