@@ -57,6 +57,8 @@ set(TEST_SOURCES
 
         api/python/DaphneLibTest.cpp
 
+        build/BuildHelpersTest.cpp
+
         codegen/CodegenTest.cpp
         api/cli/codegen/AggAllTest.cpp
         # api/cli/codegen/AggDimTest.cpp
