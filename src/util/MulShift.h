@@ -2,7 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <string_view>
+#include <functional>
 
 inline constexpr uint64_t kFib64 = 0x9E3779B97F4A7C15ull;
 
@@ -12,9 +12,10 @@ template <typename T> inline size_t mulShift(T k, unsigned l) {
     return l == 0 ? 0 : (size_t)(h >> (64 - l));
 }
 
-struct MulShift {
+template <typename T> struct MulShift {
   private:
     size_t l;
+    std::hash<T> hasher;
 
   public:
     MulShift(size_t cap) {
@@ -35,6 +36,5 @@ struct MulShift {
         return c;
     }
 
-    size_t operator()(int k) { return mulShift(k, l); };
-    size_t operator()(std::string_view k) { return 0; };
+    size_t operator()(T k) const { return mulShift(hasher(k), l); }
 };

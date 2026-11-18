@@ -1393,6 +1393,19 @@ def Daphne_ColJoinOp : Daphne_Op<"colJoin", [
     let results = (outs ColumnOrU:$resLhsPos, ColumnOrU:$resRhsPos);
 }
 
+
+def Daphne_ColBuildSemiOp : Daphne_Op<"colBuildSemiOp", [
+    DataTypeCol, ValueTypeSize
+]> {
+    let summary = "Performs build columnar data; input: data, data, output: hash set.";
+    let description = [{
+        Outputs the hash set of elements inside the right-hand-side input column.
+    }];
+
+    let arguments = (ins ColumnOrU:$rhsData, Size:$numRes);
+    let results = (outs HashSetOrU:$resRhsSet);
+}
+
 def Daphne_ColSemiJoinOp : Daphne_Op<"colSemiJoin", [
     DataTypeCol, ValueTypeSize
 ]> {
