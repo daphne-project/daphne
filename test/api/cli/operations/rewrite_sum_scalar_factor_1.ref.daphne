@@ -1,0 +1,13 @@
+// Reference for rewrite_sum_scalar_factor_1.daphne: the same value computed as
+// s * sum(X). The multiply is applied to the aggregated scalar rather than the
+// matrix, so there is no sum(ewMul(scalar, matrix)) chain for the scalar-factor
+// rewrite to match, and the naive per-element scaling path is exercised instead.
+
+s = 3;
+
+X = [ 1,  2,  3,  4,
+      5,  6,  7,  8,
+      9, 10, 11, 12];
+X = reshape(X, 3, 4);
+
+print(s * sum(X));

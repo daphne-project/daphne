@@ -151,3 +151,117 @@ TEST_CASE("operator_at_symmetry", TAG_OPERATIONS) {
             }
         }
 }
+
+TEST_CASE("operator_at_symmetry_inference", TAG_OPERATIONS) {
+    // The compiler infers at compile-time that `t(X) @ X` and `X @ t(X)` are symmetric (a matrix product with the syrk
+    // shape is symmetric for any real X). We check this by dumping the IR after property inference and looking for the
+    // inferred symmetric property on the matmul results. This is the compile-time counterpart to the run-time
+    // isSymmetric() check above.
+    std::string scriptFilePath = dirPath + "operator_at_symmetry.daphne";
+
+    std::stringstream out, err;
+    int status = runDaphne(out, err, "--explain", "property_inference", scriptFilePath.c_str(), "numRows=3",
+                           "numCols=4", "checkSymmetry=false");
+
+    CHECK(status == StatusCode::SUCCESS);
+    // Both matmul results (t(X) @ X and X @ t(X)) must be inferred symmetric. Counting "symmetric[true]" hits can't
+    // tell whether both paths worked: each type is printed at its definition and again at every use, so one symetric
+    // result already gives two hits. Count the matMul definition lines that carry the property instead, one per
+    // result, so >= 2 means both got it.
+    const std::string dump = err.str();
+    size_t symMatMulDefs = 0;
+    std::stringstream dumpLines(dump);
+    for (std::string line; std::getline(dumpLines, line);)
+        if (line.find("= \"daphne.matMul\"") != std::string::npos && line.find("symmetric[true]") != std::string::npos)
+            ++symMatMulDefs;
+    CHECK(symMatMulDefs >= 2);
+}
+
+TEST_CASE("operator_at_non_syrk_not_symmetric", TAG_OPERATIONS) {
+    // Negative counterpart to operator_at_symmetry_inference: a plain product of two distinct matrices `X @ Y` has no
+    // syrk shape and is not symmetric in general, so inference must NOT annotate its result symmetric[true]. Guards
+    // against an over-eager MatMulOp::inferSymmetric that returns True for any product.
+    std::string scriptFilePath = dirPath + "operator_at_non_syrk.daphne";
+
+    std::stringstream out, err;
+    int status = runDaphne(out, err, "--explain", "property_inference", scriptFilePath.c_str());
+
+    CHECK(status == StatusCode::SUCCESS);
+    CHECK_THAT(err.str(), !Catch::Contains("symmetric[true]"));
+}
+
+TEST_CASE("operator_at_square_not_symmetric", TAG_OPERATIONS) {
+    // Same operand, but no transpose: `X @ X` is not a syrk shape and not symmetric in general, so it must NOT be
+    // annotated symmetric[true]. Guards the `transa != transb` check that the distinct-operand X @ Y case never hits.
+    std::string scriptFilePath = dirPath + "operator_at_square.daphne";
+
+    std::stringstream out, err;
+    int status = runDaphne(out, err, "--explain", "property_inference", scriptFilePath.c_str());
+
+    CHECK(status == StatusCode::SUCCESS);
+    CHECK_THAT(err.str(), !Catch::Contains("symmetric[true]"));
+}
+
+// Numerically proves the trace idiom `sum(diagVector(X @ Y)) -> sum(X * t(Y))`
+// end-to-end through the full compiler. The `.daphne` script extracts the
+// diagonal of the product so the rewrite fires; the `.ref.daphne` script sums
+// the same trace by masking the product with an identity matrix, a chain the
+// rewrite cannot match. Their outputs must agree byte for byte, which guards
+// the transpose shape and operand pairing that the rewrite creates (a dropped
+// transpose or wrong shape would make the emitted element-wise product
+// dimensionally incoherent rather than throw).
+TEST_CASE("rewrite_trace", TAG_OPERATIONS) { compareDaphneToSelfRefSimple(dirPath, "rewrite_trace", 1); }
+
+// Numerically proves the row-scaling rewrite `diag(v) @ X -> X * v` end-to-end
+// through the full compiler. The `.daphne` script uses diagMatrix() so the
+// rewrite fires; the `.ref.daphne` script forms the same product via a plain
+// diagonal matrix literal, which the rewrite leaves untouched. Their outputs
+// must match byte for byte, which guards the operand-order and broadcast-axis
+// invariants that a wrong rewrite would silently violate (the element-wise
+// kernel would miscompute rather than throw).
+TEST_CASE("rewrite_row_scale", TAG_OPERATIONS) { compareDaphneToSelfRefSimple(dirPath, "rewrite_row_scale", 1); }
+
+// Numerically proves the column-scaling rewrite `X @ diag(v) -> X * t(v)`
+// end-to-end through the full compiler. The `.daphne` script uses diagMatrix()
+// so the rewrite fires; the `.ref.daphne` script forms the same product via a
+// plain diagonal matrix literal, which the rewrite leaves untouched. Their
+// outputs must match byte for byte, which guards the transpose, operand-order,
+// and broadcast-axis invariants that a wrong rewrite would silently violate
+// (a dropped transpose would scale rows instead of columns, or the element-wise
+// kernel would take the wrong broadcast branch).
+TEST_CASE("rewrite_col_scale", TAG_OPERATIONS) { compareDaphneToSelfRefSimple(dirPath, "rewrite_col_scale", 1); }
+
+// Numerically proves the scalar-factor rewrite `sum(s * X) -> s * sum(X)`
+// end-to-end through the full compiler. The `.daphne` script scales the matrix
+// before aggregating so the rewrite fires; the `.ref.daphne` script scales the
+// aggregated scalar instead, a chain the rewrite cannot match. Their outputs
+// must agree byte for byte, which guards that hoisting the factor preserves the
+// result (a dropped factor or wrong aggregate would change the printed value). An
+// integer matrix is used because the regrouping is exact only over integers, the
+// condition under which the rewrite fires.
+TEST_CASE("rewrite_sum_scalar_factor", TAG_OPERATIONS) {
+    compareDaphneToSelfRefSimple(dirPath, "rewrite_sum_scalar_factor", 1);
+}
+
+// Numerically proves the row-aggregate identity `sum(X, 0) -> X` for an n x 1
+// matrix end-to-end through the full compiler. The `.daphne` script aggregates a
+// single-column matrix so the rewrite fires; the `.ref.daphne` script prints the
+// matrix directly, giving no aggregate to match. Their outputs must agree byte
+// for byte, which guards that dropping the aggregate preserves the values.
+TEST_CASE("rewrite_row_agg_dim1", TAG_OPERATIONS) { compareDaphneToSelfRefSimple(dirPath, "rewrite_row_agg_dim1", 1); }
+
+// Numerically proves the repeated-add fold `X + X + X -> X * 3` end-to-end. The
+// values are near 2^62 so the sum overflows si64; the rewrite must preserve the
+// modular wraparound, so the `.daphne` chain of adds and the `.ref` plain
+// multiply must print the same byte pattern. This is the one property a reviewer
+// cannot check by inspection, so it is proved through the full compiler.
+TEST_CASE("rewrite_repeated_add", TAG_OPERATIONS) { compareDaphneToSelfRefSimple(dirPath, "rewrite_repeated_add", 1); }
+
+// Numerically proves the broadcast-minimization rewrite
+// `(M1 + s1) + (M2 + s2) -> (M1 + M2) + (s1 + s2)` end-to-end. The scalars sum
+// past 2^63 so the scalar add overflows si64; integer addition is associative in
+// Z/2^64, so the `.daphne` and already-regrouped `.ref` forms must print the same
+// wrapped result.
+TEST_CASE("rewrite_broadcast_min", TAG_OPERATIONS) {
+    compareDaphneToSelfRefSimple(dirPath, "rewrite_broadcast_min", 1);
+}

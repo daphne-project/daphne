@@ -121,6 +121,8 @@ bool DaphneIrExecutor::runPasses(mlir::ModuleOp module) {
     if (userConfig_.explain_parsing)
         pm.addPass(mlir::daphne::createPrintIRPass("IR after parsing:"));
 
+    // First simplification pass right after parsing: canonicalize, then CSE to
+    // drop the duplicate ops it exposes.
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(mlir::createCSEPass());
     if (userConfig_.explain_parsing_simplified)
@@ -143,6 +145,7 @@ bool DaphneIrExecutor::runPasses(mlir::ModuleOp module) {
     // run only three iterations of both passes (see #173).
     pm.addNestedPass<mlir::func::FuncOp>(mlir::daphne::createInferencePass());
     pm.addPass(mlir::createCanonicalizerPass());
+    pm.addPass(mlir::daphne::createAlgebraicSimplifyPass());
 
     if (userConfig_.enable_property_recording)
         pm.addPass(mlir::daphne::createRecordPropertiesPass());
@@ -159,11 +162,11 @@ bool DaphneIrExecutor::runPasses(mlir::ModuleOp module) {
         pm.addNestedPass<mlir::func::FuncOp>(mlir::daphne::createInferencePass());
         // Simplify the IR.
         pm.addPass(mlir::createCanonicalizerPass());
-        // Remove unused ops after simplifications.
-        // TODO The CSE pass seems to eliminate only "one row" of dead code at a time, so we need it as many times as
-        // the longest chain of ops we reduce; how to apply CSE until a fixpoint?
-        for (size_t i = 0; i < 5; i++)
-            pm.addPass(mlir::createCSEPass());
+        // Remove duplicate ops exposed by the columnar rewrite and
+        // canonicalization. One CSE pass is enough (was previously looped
+        // five times): CSE visits each op after its operands, so a whole
+        // duplicated chain collapses in a single pass.
+        pm.addPass(mlir::createCSEPass());
     }
     if (userConfig_.explain_columnar)
         pm.addPass(mlir::daphne::createPrintIRPass("IR after lowering to columnar ops:"));
@@ -318,6 +321,9 @@ void DaphneIrExecutor::buildCodegenPipeline(mlir::PassManager &pm) {
     // pm.addPass(mlir::daphne::createPrintIRPass("IR after createConvertDaphneToLinalgPass"));
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgGeneralizeNamedOpsPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgElementwiseOpFusionPass());
+    // Elementwise fusion often exposes duplicate memref/tensor/linalg ops;
+    // run CSE once to deduplicate them before the next stage.
+    pm.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
     // pm.addPass(mlir::daphne::createPrintIRPass("IR after LinalgPasses"));
 
     auto bufOpts = mlir::getBufferizationOptionsForSparsification(/*analysisOnly=*/false);
@@ -334,6 +340,9 @@ void DaphneIrExecutor::buildCodegenPipeline(mlir::PassManager &pm) {
     // pm.addPass(mlir::createSparsificationAndBufferizationPass());
     pm.addPass(mlir::createStorageSpecifierToLLVMPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
+    // Canonicalization can expose further duplicates; run CSE once more so the
+    // subsequent lowering sees the smallest possible IR.
+    pm.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
 
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertLinalgToLoopsPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::memref::createExpandReallocPass());

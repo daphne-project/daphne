@@ -1,0 +1,10 @@
+// Negative case for compile-time symmetry inference: the product of a square
+// matrix with itself X @ X is not symmetric in general (both operands are the
+// same value, but neither is transposed), so its result must not be annotated
+// symmetric.
+
+X = rand(3, 3, 0.0, 1.0, 1, 12345);
+
+Z = X @ X;
+
+print(Z);

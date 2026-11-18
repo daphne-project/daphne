@@ -1,0 +1,17 @@
+// Trace idiom sum(diagVector(X @ Y)), which the compiler rewrites to
+// sum(X * t(Y)). X and Y are non-symmetric with distinct values, so a dropped
+// transpose or a wrong operand pairing would change the summed diagonal rather
+// than be masked.
+
+X = [ 1.0, 2.0, 3.0, 4.0,
+      5.0, 6.0, 7.0, 8.0,
+      9.0, 10.0, 11.0, 12.0];
+X = reshape(X, 3, 4);
+
+Y = [ 1.0, 4.0, 7.0,
+      2.0, 5.0, 8.0,
+      3.0, 6.0, 9.0,
+      10.0, 11.0, 12.0];
+Y = reshape(Y, 4, 3);
+
+print(sum(diagVector(X @ Y)));

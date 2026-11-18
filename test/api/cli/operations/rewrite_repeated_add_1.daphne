@@ -1,0 +1,10 @@
+// Repeated-add fold X + X + X, which the compiler rewrites to X * 3. The
+// element values are chosen near 2^62 so the threefold sum overflows si64; the
+// rewrite must preserve that modular wraparound (integer add and multiply agree
+// in Z/2^64), so the printed result matches the reference exactly.
+
+X = [4611686018427387904, 4611686018427387900,
+     4000000000000000000, 4611686018427387903];
+X = reshape(X, 4, 1);
+
+print(X + X + X);

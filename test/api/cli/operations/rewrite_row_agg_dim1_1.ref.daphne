@@ -1,0 +1,9 @@
+// Reference for rewrite_row_agg_dim1_1.daphne: the same n x 1 matrix printed
+// directly, with no aggregate for the row-aggregate identity to match. The two
+// outputs must agree byte for byte, confirming the dropped aggregate preserves
+// the values.
+
+X = [1.0, 2.0, 3.0, 4.0];
+X = reshape(X, 4, 1);
+
+print(X);

@@ -1,0 +1,15 @@
+// Reference for rewrite_broadcast_min_1.daphne: the same value computed in the
+// already-regrouped form (M1 + M2) + (s1 + s2). The scalars are summed once and
+// the matrices added directly, so there is no (M1 + s1) + (M2 + s2) shape for the
+// broadcast-minimization rewrite to match. The modular result must match the
+// rewritten form byte for byte, including the scalar-sum overflow.
+
+M1 = [1, 2, 3, 4, 5, 6];
+M1 = reshape(M1, 2, 3);
+M2 = [10, 20, 30, 40, 50, 60];
+M2 = reshape(M2, 2, 3);
+
+s1 = 4611686018427387904;
+s2 = 4611686018427387905;
+
+print((M1 + M2) + (s1 + s2));
