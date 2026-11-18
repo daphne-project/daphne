@@ -43,6 +43,7 @@ struct InferenceConfig {
 
 // alphabetically sorted list of passes
 std::unique_ptr<Pass> createAdaptTypesToKernelsPass();
+std::unique_ptr<Pass> createAlgebraicSimplifyPass();
 std::unique_ptr<Pass> createConvertDaphneToLinalgPass();
 std::unique_ptr<Pass> createDaphneOptPass();
 std::unique_ptr<Pass> createDistributeComputationsPass();

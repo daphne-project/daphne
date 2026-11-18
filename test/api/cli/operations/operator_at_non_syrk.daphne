@@ -1,0 +1,10 @@
+// Negative case for compile-time symmetry inference: a plain product of two
+// distinct matrices X @ Y is not symmetric in general, so its result must not
+// be annotated symmetric.
+
+X = rand(3, 4, 0.0, 1.0, 1, 12345);
+Y = rand(4, 3, 0.0, 1.0, 1, 67890);
+
+Z = X @ Y;
+
+print(Z);
