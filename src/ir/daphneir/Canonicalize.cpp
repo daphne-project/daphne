@@ -830,6 +830,10 @@ mlir::LogicalResult mlir::daphne::SetColLabelsOp::canonicalize(mlir::daphne::Set
     return mlir::failure();
 }
 
+/**
+ * @brief Pushes down `SliceRowOp` over `EwSqrtOp` as in `sqrt(X)[a:b, ]` to `sqrt(X[a:b, ])` to reduce the amount of
+ * work `EwSqrtOp` has to do.
+ */
 mlir::LogicalResult mlir::daphne::SliceRowOp::canonicalize(mlir::daphne::SliceRowOp op,
                                                            mlir::PatternRewriter &rewriter) {
     auto sqrtOp = op.getSource().getDefiningOp<mlir::daphne::EwSqrtOp>();
