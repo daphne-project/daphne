@@ -69,6 +69,7 @@ set(TEST_SOURCES
 
         ir/inference/PropertyInferenceTest.cpp
 
+        ir/daphneir/CanonicalizeTest.cpp
         ir/daphneir/InferTypesTest.cpp
         api/cli/operations/CanonicalizationConstantFoldingOpTest.cpp
 
