@@ -841,8 +841,8 @@ mlir::LogicalResult mlir::daphne::SliceRowOp::canonicalize(mlir::daphne::SliceRo
         if (auto argMat = llvm::dyn_cast<mlir::daphne::MatrixType>(sqrtOp.getArg().getType()))
             sliceTy = resMat.withElementType(argMat.getElementType());
 
-    auto newSlice = rewriter.create<mlir::daphne::SliceRowOp>(
-        op.getLoc(), sliceTy, sqrtOp.getArg(), op.getLowerIncl(), op.getUpperExcl());
+    auto newSlice = rewriter.create<mlir::daphne::SliceRowOp>(op.getLoc(), sliceTy, sqrtOp.getArg(), op.getLowerIncl(),
+                                                              op.getUpperExcl());
     rewriter.replaceOpWithNewOp<mlir::daphne::EwSqrtOp>(op, op.getRes().getType(), newSlice.getRes());
     return mlir::success();
 }
