@@ -68,7 +68,7 @@ set(TEST_SOURCES
         # api/cli/codegen/TransposeTest.cpp
 
         ir/inference/PropertyInferenceTest.cpp
-        
+
         ir/daphneir/CanonicalizeTest.cpp
         ir/daphneir/InferTypesTest.cpp
         api/cli/operations/CanonicalizationConstantFoldingOpTest.cpp
