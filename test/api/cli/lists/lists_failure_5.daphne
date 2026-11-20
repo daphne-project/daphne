@@ -1,0 +1,4 @@
+// Replace an element from a list, out-of-bounds (too high) position.
+
+l = createList([1]);
+l, e = replaceElementInList(l, 10, [6,7]);

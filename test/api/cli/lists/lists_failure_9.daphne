@@ -1,0 +1,5 @@
+// Get an element from an empty list.
+
+l = createList([1]);
+l, e = remove(l, 0);
+e = getElementInList(l, 0); // get from empty list
