@@ -1,0 +1,15 @@
+G = readMatrix($f);
+maxi = 200;
+n = nrow(G);
+x = fill(0.0, n, 1);
+x[0,0] = [1.0];
+one = fill(1.0, n, 1);
+
+start=now();
+for(iter in 1:maxi) {
+  # y = G @ t(x);
+  # z = x + y;
+  x = min(one, x + G @ t(x));
+}
+end=now();
+print((end-start) / 1000000000.0);

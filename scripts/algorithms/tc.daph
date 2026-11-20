@@ -1,0 +1,6 @@
+G = readMatrix($f);
+start = now();
+G_square = G @ G;
+nb_triangle = sum(G_square * G);
+end = now();
+print((end-start) / 1000000000.0);

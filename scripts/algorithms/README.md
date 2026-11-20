@@ -90,3 +90,22 @@ bin/daphne scripts/algorithms/pca.daph X=\"data/wine.csv\" K=2 center=true scale
 bin/daphne test/api/cli/algorithms/kmeans.daphne r=1000 f=10 c=5 i=3
 bin/daphne test/api/cli/algorithms/lm.daphne r=1000 c=100
 -->
+
+
+### Breadth First Search (bfs) 
+
+Under development. See issue: https://github.com/daphne-eu/daphne/issues/781
+
+### K-Core (k-core)
+
+Under development. See issue: https://github.com/daphne-eu/daphne/issues/782
+
+### Simple N-Body Simulation (nbody.daph)
+The only parameter (aside from the DAPHNE specific ones) that nbody.daph requires is "--args nb_particules=" where the user should provide the number of particles for the simple simulation.
+
+### Triangle Count (TC) (tc.daph)
+
+Needs the sparse by sparse matrix multiplication which is not yet available in DAPHNE. See issue: https://github.com/daphne-eu/daphne/issues/783 related to TC development.
+
+
+
