@@ -5,29 +5,41 @@
 // f64
 X = [1.0, 2, 3, 4, 5, 6](2, 3);
 Y = [0.0, 1, 5, 11, 3, 2](2, 3);
+rowVec = [2.0, 4, 1](1,);
+colVec = [3.0, 3](,1);
 a = as.scalar(X[1:2, 0:1]); // 4
 b = as.scalar(X[0:1, 1:2]); // 2
 
-print(min(X, Y)); // mat, mat
-print(min(X, a)); // mat, scalar (broadcasting)
-print(min(a, b)); // scalar, scalar
+print(min(X, Y));       // mat, mat
+print(min(X, rowVec));  // mat, mat (broadcasting along columns)
+print(min(X, colVec));  // mat, mat (broadcasting along rows)
+print(min(X, a));       // mat, scalar (broadcasting)
+print(min(a, b));       // scalar, scalar
 
 // si64
 X = [1, 2, 3, 4, 5, 6](2, 3);
 Y = [0, 1, 5, 11, 3, 2](2, 3);
+rowVec = [2, 4, 1](1,);
+colVec = [3, 3](,1);
 a = as.scalar(X[1:2, 0:1]); // 4
 b = as.scalar(X[0:1, 1:2]); // 2
 
-print(min(X, Y)); // mat, mat
-print(min(X, a)); // mat, scalar (broadcasting)
-print(min(a, b)); // scalar, scalar
+print(min(X, Y));       // mat, mat
+print(min(X, rowVec));  // mat, mat (broadcasting along columns)
+print(min(X, colVec));  // mat, mat (broadcasting along rows)
+print(min(X, a));       // mat, scalar (broadcasting)
+print(min(a, b));       // scalar, scalar
 
 // ui64
 X = [1u, 2u, 3u, 4u, 5u, 6u](2, 3);
 Y = [0u, 1u, 5u, 11u, 3u, 2u](2, 3);
+rowVec = [2u, 4u, 1u](1,);
+colVec = [3u, 3u](,1);
 a = as.scalar(X[1:2, 0:1]); // 4
 b = as.scalar(X[0:1, 1:2]); // 2
 
-print(min(X, Y)); // mat, mat
-print(min(X, a)); // mat, scalar (broadcasting)
-print(min(a, b)); // scalar, scalar
+print(min(X, Y));       // mat, mat
+print(min(X, rowVec));  // mat, mat (broadcasting along columns)
+print(min(X, colVec));  // mat, mat (broadcasting along rows)
+print(min(X, a));       // mat, scalar (broadcasting)
+print(min(a, b));       // scalar, scalar

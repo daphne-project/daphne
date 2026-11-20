@@ -4,18 +4,26 @@
 
 // f64
 X = [1.0, 2, 3, 4, 5, 6](2, 3);
+rowVec = [5.0, 4, 3](1,);
+colVec = [4.0, 3](,1);
 a = as.scalar(X[0:1, 1:2]); // 2
 b = as.scalar(X[1:2, 0:1]); // 4
 
-print(X + X); // mat + mat
-print(X + a); // mat + scalar (broadcasting)
-print(a + b); // scalar + scalar
+print(X + X);       // mat + mat
+print(X + rowVec);  // mat + mat (broadcasting along columns)
+print(X + colVec);  // mat + mat (broadcasting along rows)
+print(X + a);       // mat + scalar (broadcasting)
+print(a + b);       // scalar + scalar
 
 // si64
 X = [1, 2, 3, 4, 5, 6](2, 3);
+rowVec = [5, 4, 3](1,);
+colVec = [4, 3](,1);
 a = as.scalar(X[0:1, 1:2]); // 2
 b = as.scalar(X[1:2, 0:1]); // 4
 
-print(X + X); // mat + mat
-print(X + a); // mat + scalar (broadcasting)
-print(a + b); // scalar + scalar
+print(X + X);       // mat + mat
+print(X + rowVec);  // mat + mat (broadcasting along columns)
+print(X + colVec);  // mat + mat (broadcasting along rows)
+print(X + a);       // mat + scalar (broadcasting)
+print(a + b);       // scalar + scalar
