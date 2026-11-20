@@ -1397,6 +1397,32 @@ def Daphne_ColJoinOp : Daphne_Op<"colJoin", [
     let results = (outs ColumnOrU:$resLhsPos, ColumnOrU:$resRhsPos);
 }
 
+
+def Daphne_ColBuildSemiOp : Daphne_Op<"colBuildSemiOp", [
+    DataTypeCol, ValueTypeSize
+]> {
+    let summary = "Performs build columnar data; input: data, data, output: hash set.";
+    let description = [{
+        Outputs the hash set of elements inside the right-hand-side input column.
+    }];
+
+    let arguments = (ins ColumnOrU:$rhsData);
+    let results = (outs HashSetOrU:$resRhsSet);
+}
+
+def Daphne_ColProbeSemiOp : Daphne_Op<"colProbeSemi", [
+    DataTypeCol, ValueTypeSize
+]> {
+    let summary = "Probe lhs column with hashset from build step on rhs data, output: sorted positions";
+    let description = [{
+        Outputs the position of each element in the left-hand-side input column for which there is a matching element
+        in the right-hand-side input column. The output positions are sorted.
+    }];
+
+    let arguments = (ins HashSetOrU:$rhsHashSet, ColumnOrU:$lhsData);
+    let results = (outs ColumnOrU:$resLhsPos);
+}
+
 def Daphne_ColSemiJoinOp : Daphne_Op<"colSemiJoin", [
     DataTypeCol, ValueTypeSize
 ]> {

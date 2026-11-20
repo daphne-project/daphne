@@ -221,6 +221,11 @@ struct CompilerUtils {
                 return "Structure";
             const std::string dtName = mlirTypeToCppTypeName(lstTy.getElementType(), angleBrackets, false);
             return angleBrackets ? ("List<" + dtName + ">") : ("List_" + dtName);
+        } else if (auto hashSetType = llvm::dyn_cast<mlir::daphne::HashSetType>(t)) {
+            if (generalizeToStructure)
+                return "Structure";
+            const std::string dtName = mlirTypeToCppTypeName(hashSetType.getElementType(), angleBrackets, false);
+            return angleBrackets ? ("HashSet<" + dtName + ">") : ("HashSet_" + dtName);
         } else if (llvm::isa<mlir::daphne::StringType>(t))
             // This becomes "const char *" (which makes perfect sense for
             // strings) when inserted into the typical "const DT *" template of
@@ -283,7 +288,7 @@ struct CompilerUtils {
      */
     [[maybe_unused]] static bool isObjType(mlir::Type t) {
         return llvm::isa<mlir::daphne::MatrixType, mlir::daphne::FrameType, mlir::daphne::ColumnType,
-                         mlir::daphne::ListType>(t);
+                         mlir::daphne::ListType, mlir::daphne::HashSetType>(t);
     }
 
     /**
