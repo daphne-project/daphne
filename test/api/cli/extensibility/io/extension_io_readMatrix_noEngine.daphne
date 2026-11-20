@@ -1,0 +1,4 @@
+// Automatic use of a custom Matrix reader based on extension priorities (engine not specified).
+
+X = readMatrix($file);
+print(X);

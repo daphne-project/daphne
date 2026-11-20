@@ -1,0 +1,6 @@
+// Reading a file twice; first with a specific engine, then with the default engine based on priorities.
+
+X = readMatrix($file, {"engine": [$engine]});
+Y = readMatrix($file);
+print(X);
+print(Y);

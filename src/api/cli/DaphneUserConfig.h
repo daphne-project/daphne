@@ -19,6 +19,7 @@
 #include <api/daphnelib/DaphneLibResult.h>
 #include <compiler/catalog/KernelCatalog.h>
 #include <runtime/local/datastructures/IAllocationDescriptor.h>
+#include <runtime/local/io/FileIOCatalog.h>
 #include <runtime/local/vectorized/LoadPartitioningDefs.h>
 #include <util/DaphneLogger.h>
 #include <util/LogConfig.h>
@@ -141,6 +142,7 @@ struct DaphneUserConfig {
     DaphneLibResult *result_struct = nullptr;
 
     KernelCatalog kernelCatalog;
+    FileIOCatalog fileioCatalog;
 
     /**
      * @brief Replaces the prefix `"{exedir}/"` in the field `libdir` by the

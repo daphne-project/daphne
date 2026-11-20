@@ -1,0 +1,27 @@
+[
+  {
+    "extension": ".parquet",
+    "readerFuncName": "parquet_read",
+    "writerFuncName": "parquet_write",
+    "libPath": "libparquetPlugIn.so",
+    "type": "DenseMatrix",
+    "engine": "Daphne",
+    "priority": 100,
+    "options": {
+      "threads": "16",
+      "large_strings": "true",
+      "compression": "snappy"
+    }
+  },
+  {
+    "extension": ".parquet",
+    "readerFuncName": "parquet_read_frame",
+    "writerFuncName": "parquet_write_frame",
+    "libPath": "libparquetPlugIn.so",
+    "type": "Frame",
+    "engine": "Daphne",
+    "options": {
+      "threads": "16"
+    }
+  }
+]

@@ -1,0 +1,45 @@
+[
+  {
+    "extension": ".parquet",
+    "readerFuncName": "ReadParquet_Dense",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "DenseMatrix",
+    "options": {
+      "delimiter": ","
+    }
+  },
+  {
+    "extension": ".parquet",
+    "readerFuncName": "ReadParquet_Frame",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "Frame",
+    "options": {
+      "delimiter": ","
+    }
+  },
+  {
+    "extension": ".csv",
+    "readerFuncName": "readCsvFromPath_Frame",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "Frame",
+    "options": {
+      "delimiter": ",",
+      "sorted": "false"
+    }
+  },
+  {
+    "extension": ".csv",
+    "readerFuncName": "readCsvFromPath_Dense",
+    "writerFuncName": "",
+    "libPath": "libBuiltInPlugIns.so",
+    "type": "DenseMatrix",
+    "options": {
+      "delimiter": ",",
+      "sorted": "false",
+      "forceString": "true"
+    }
+  }
+]

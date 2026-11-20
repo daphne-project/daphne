@@ -1,0 +1,11 @@
+[
+  {
+    "extension": ".dummy",
+    "readerFuncName": "dummy1_read_DenseMatrix",
+    "writerFuncName": "dummy1_write_DenseMatrix",
+    "libPath": "libDummy1.so",
+    "type": "DenseMatrix",
+    "engine": "dummy1",
+    "options": {}
+  }
+]
