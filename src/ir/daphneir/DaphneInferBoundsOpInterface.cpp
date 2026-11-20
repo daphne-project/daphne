@@ -32,13 +32,15 @@ using namespace mlir::OpTrait;
 // ****************************************************************************
 // Inference interface implementations
 // ****************************************************************************
+
+// TODO: Support integer constants once the bounds representation is settled.
 std::vector<std::pair<std::optional<double>, std::optional<double>>> daphne::RandMatrixOp::inferBounds() {
     // Try to get the generation bounds as floating-point constants.
     auto minC = CompilerUtils::isConstant<double>(getMin());
     auto maxC = CompilerUtils::isConstant<double>(getMax());
-    if (minC.first && maxC.first) {
-        auto density = CompilerUtils::isConstant<double>(getSparsity());
-        if (density.first && density.second == 1.0)
+    if (minC.first && maxC.first && !std::isnan(minC.second) && !std::isnan(maxC.second)) {
+        auto sparsity = CompilerUtils::isConstant<double>(getSparsity());
+        if (sparsity.first && sparsity.second == 1.0)
             return {{minC.second, maxC.second}};
         // Unless fully dense, generated matrices may also contain zeros.
         return {{std::min(minC.second, 0.0), std::max(maxC.second, 0.0)}};
@@ -56,19 +58,40 @@ std::vector<std::pair<std::optional<double>, std::optional<double>>> daphne::Fil
 
 std::vector<std::pair<std::optional<double>, std::optional<double>>> daphne::OrderOp::inferBounds() {
     auto [known, returnIndices] = CompilerUtils::isConstant<bool>(getReturnIdxs());
-    if (!known || returnIndices)
+    if (!known)
         return {{std::nullopt, std::nullopt}};
-    // Ordering values preserves the input bounds.
     auto mt = llvm::dyn_cast<daphne::MatrixType>(getArg().getType());
     if (!mt)
         return {{std::nullopt, std::nullopt}};
+    if (returnIndices) {
+        const auto rows = mt.getNumRows();
+        if (rows == 0)
+            return {{std::nullopt, std::nullopt}};
+        if (rows > 0)
+            return {{0.0, static_cast<double>(rows - 1)}};
+        return {{0.0, std::nullopt}};
+    }
+    // Ordering values preserves the input bounds
     return {{mt.getLowerBound(), mt.getUpperBound()}};
 }
 
 std::vector<std::pair<std::optional<double>, std::optional<double>>> daphne::EwLtOp::inferBounds() {
     // Comparisons produce 0/1. Known input bounds may tighten the result bounds.
-    auto lhsMatrix = llvm::dyn_cast<daphne::MatrixType>(getOperand(0).getType());
-    auto rhsC = CompilerUtils::isConstant<double>(getOperand(1));
+    auto lhsMatrix = llvm::dyn_cast<daphne::MatrixType>(getLhs().getType());
+    auto rhsMatrix = llvm::dyn_cast<daphne::MatrixType>(getRhs().getType());
+    if (lhsMatrix && rhsMatrix) {
+        auto lhsLower = lhsMatrix.getLowerBound();
+        auto lhsUpper = lhsMatrix.getUpperBound();
+        auto rhsLower = rhsMatrix.getLowerBound();
+        auto rhsUpper = rhsMatrix.getUpperBound();
+
+        if (lhsUpper && rhsLower && *lhsUpper < *rhsLower)
+            return {{1.0, 1.0}};
+        if (lhsLower && rhsUpper && *lhsLower >= *rhsUpper)
+            return {{0.0, 0.0}};
+        return {{0.0, 1.0}};
+    }
+    auto rhsC = CompilerUtils::isConstant<double>(getRhs());
     if (!lhsMatrix || !rhsC.first)
         return {{0.0, 1.0}};
 
@@ -89,8 +112,8 @@ std::vector<std::pair<std::optional<double>, std::optional<double>>> daphne::EwL
 
 std::vector<std::pair<std::optional<double>, std::optional<double>>> daphne::EwNeqOp::inferBounds() {
     // Comparisons produce 0/1. Known input bounds may tighten the result bounds.
-    auto lhsMatrix = llvm::dyn_cast<daphne::MatrixType>(getOperand(0).getType());
-    auto rhsC = CompilerUtils::isConstant<double>(getOperand(1));
+    auto lhsMatrix = llvm::dyn_cast<daphne::MatrixType>(getLhs().getType());
+    auto rhsC = CompilerUtils::isConstant<double>(getRhs());
     if (!lhsMatrix || !rhsC.first)
         return {{0.0, 1.0}};
 
