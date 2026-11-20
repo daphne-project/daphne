@@ -270,7 +270,8 @@ void mlir::daphne::DaphneDialect::printType(mlir::Type type, mlir::DialectAsmPri
         auto representation = t.getRepresentation();
         auto symmetric = t.getSymmetric();
         auto numDistinct = t.getNumDistinct();
-
+        auto lowerBound = t.getLowerBound();
+        auto upperBound = t.getUpperBound();
         if (sparsity != -1.0) {
             os << ":sp[" << sparsity << ']';
         }
@@ -283,9 +284,9 @@ void mlir::daphne::DaphneDialect::printType(mlir::Type type, mlir::DialectAsmPri
         if (numDistinct != -1) {
             os << ":numDistinct[" << numDistinct << ']';
         }
-        if (t.getLowerBound())
+        if (lowerBound)
             os << ":lowerBound[" << llvm::APFloat(*t.getLowerBound()) << ']';
-        if (t.getUpperBound())
+        if (upperBound)
             os << ":upperBound[" << llvm::APFloat(*t.getUpperBound()) << ']';
         os << '>';
     } else if (auto t = llvm::dyn_cast<mlir::daphne::FrameType>(type)) {
