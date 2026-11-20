@@ -1,0 +1,11 @@
+import "raSelection.daph";
+
+X = [1, 0, 0, 1, 0, 0, 1, 0, 0];
+print(X);
+
+col = 0;
+op = "==";
+val = 0.0;
+
+Y = raSelection.m_raSelection(as.f64(X), col, op, val);
+print(Y);

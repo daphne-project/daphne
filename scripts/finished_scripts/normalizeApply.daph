@@ -1,0 +1,47 @@
+#-------------------------------------------------------------
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+#-------------------------------------------------------------
+
+# Min-max normalization (a.k.a. min-max scaling) to range [0,1], given 
+# existing min-max ranges. For matrices of positive values, this normalization 
+# preserves the input sparsity. The validity of the provided min-max range
+# and post-processing is under control of the caller. 
+#
+# INPUT:
+# ------------------------------------------------
+# X     Input feature matrix of shape n-by-m
+# cmin  Column min of shape 1-by-m
+# cmax  Column max of shape 1-by-m
+# ------------------------------------------------
+#
+# OUTPUT:
+# ------------------------------------------------
+# Y     Modified output feature matrix of shape n-by-m
+# ------------------------------------------------
+
+def m_normalizeApply(X:matrix<f64>, cmin:matrix<f64>, cmax:matrix<f64>) -> matrix<f64> {
+  diff = (cmax - cmin);
+  # avoid division by zero and divide by 1 instead
+  diff = replace(diff, 0, 1);
+  # normalize features to given range ([0,1] if indeed min/max)
+  Y = (X - cmin) / diff;
+  return as.matrix<f64>(Y);
+}
+

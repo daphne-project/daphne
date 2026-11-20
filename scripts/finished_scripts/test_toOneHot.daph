@@ -1,0 +1,9 @@
+import "toOneHot.daph";
+
+X = [1, 2, 3, 4, 5];
+
+numclasses = 5;
+
+Y = toOneHot.m_toOneHot(as.f64(X), numclasses);
+
+print(Y);

@@ -1,0 +1,15 @@
+def m_img_sample_pairing_linearized(img_in1:matrix<f64>, img_in2:matrix<f64>, weight:f64) -> matrix<f64> {
+  
+  if (weight < 0 || 1 < weight) {
+    print("Invalid weight. Set weight to 0.5");
+    weight = as.f64(0.5);
+  }
+  
+  num_images = as.si64(nrow(img_in1));
+  img_out = fill(as.f64(0), as.si64(nrow(img_in1)), as.si64(ncol(img_in2)));
+  for(i in 1:num_images) {
+    img_out[i - 1, ] = (1 - weight) * img_in1[i - 1, ] + weight * img_in2;
+  }
+  return as.matrix<f64>(img_out);
+}
+

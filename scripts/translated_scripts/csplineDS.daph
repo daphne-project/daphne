@@ -1,0 +1,113 @@
+def interpSpline(x:f64, X:matrix<f64>, Y:matrix<f64>, K:matrix<f64>) -> f64 {
+  i = as.si64(as.si64(nrow(X)) - sum(X >= x) + 1);
+  t = (x - X[i-1 - 1, 0]) / (X[i - 1, 0] - X[i-1 - 1, 0]);
+  a = K[i-1 - 1, 0] * (X[i - 1, 0] - X[i-1 - 1, 0]) - (Y[i - 1, 0] - Y[i-1 - 1, 0]);
+  b = as.matrix<f64>((0.0 - K[i - 1, 0]) * (X[i - 1, 0] - X[i-1 - 1, 0]) + (Y[i - 1, 0] - Y[i-1 - 1, 0]));
+  qm = (1 - t) * Y[i-1 - 1, 0] + t * Y[i - 1, 0] + t * (1 - t) * (a * (1 - t) + b * t);
+  q = as.scalar(as.f64(qm));
+  return as.f64(q);
+}
+
+def resize(X:matrix<f64>, rby:si64, cby:si64, dir:str) -> matrix<f64> {
+  r = as.si64(nrow(X));
+  c = as.si64(ncol(X));
+  rn = r + rby;
+  cn = c + cby;
+  Y = fill(as.f64(0.0), rn, cn);
+  
+  if (dir == "tr") {
+    Y[1+rby - 1:rn, 0:c] = X;
+  } else {
+    
+    if (dir == "bl") {
+      Y[0:r, 1+cby - 1:cn] = X;
+    } else {
+      
+      if (dir == "tl") {
+        Y[1+rby - 1:rn, 1+cby - 1:cn] = X;
+      } else {
+        
+        if (dir == "br") {
+          Y[0:r, 0:c] = X;
+        } else {
+          print("Unknown direction dir => " + dir);
+          return [0.0];
+        }
+        
+      }
+      
+    }
+    
+  }
+  
+  return as.matrix<f64>(Y);
+}
+
+def trunc(X:matrix<f64>, by:si64, dir:str) -> matrix<f64> {
+  r = as.si64(nrow(X));
+  c = as.si64(ncol(X));
+  
+  if (by > r) {
+    print("can't pop matrix more than number of rows");
+    return [0.0];
+  }
+  
+  Y = fill(as.f64(0.0), r - by, c);
+  
+  if (r != by) {
+    
+    if (dir == "up") {
+      Y[0:r-by, ] = X[1+by - 1:r, ];
+    } else {
+      
+      if (dir == "down") {
+        Y[0:r-by, ] = as.matrix<f64>(X[0:r-by, ]);
+      } else {
+        print("trunc unsupported direction " + dir);
+        return [0.0];
+      }
+      
+    }
+    
+  }
+  
+  return as.matrix<f64>(Y);
+}
+
+def calcKnotsDerivKs(X:matrix<f64>, Y:matrix<f64>) -> matrix<f64> {
+  nx = as.si64(nrow(X));
+  ny = as.si64(nrow(Y));
+  
+  if (nx != ny) {
+    print("X and Y vectors are of different size");
+    return [0.0];
+  }
+  
+  Xu = trunc(as.matrix<f64>(X), as.si64(1), as.str("up"));
+  Xd = trunc(as.matrix<f64>(X), as.si64(1), as.str("down"));
+  Bx = 1 / (Xu - Xd);
+  Bxd = resize(as.matrix<f64>(Bx), as.si64(1), as.si64(0), as.str("tr"));
+  Bxu = resize(as.matrix<f64>(Bx), as.si64(1), as.si64(0), as.str("br"));
+  Dx = 2 * (Bxd + Bxu);
+  MDx = diagMatrix(Dx);
+  MBx = diagMatrix(Bx);
+  MUx = resize(as.matrix<f64>(MBx), as.si64(1), as.si64(1), as.str("bl"));
+  MLx = resize(as.matrix<f64>(MBx), as.si64(1), as.si64(1), as.str("tr"));
+  A = MUx + MDx + MLx;
+  Yu = trunc(as.matrix<f64>(Y), as.si64(1), as.str("up"));
+  Yd = trunc(as.matrix<f64>(Y), as.si64(1), as.str("down"));
+  By = (Yu - Yd) / (Bx * Bx);
+  By1 = resize(as.matrix<f64>(By), as.si64(1), as.si64(0), as.str("tr"));
+  By2 = resize(as.matrix<f64>(By), as.si64(1), as.si64(0), as.str("br"));
+  b = 3 * (By1 + By2);
+  K = solve(A, b);
+  return as.matrix<f64>(K);
+}
+
+def m_csplineDS(X:matrix<f64>, Y:matrix<f64>, inp_x:f64) -> matrix<f64>, matrix<f64> {
+  K = calcKnotsDerivKs(as.matrix<f64>(X), as.matrix<f64>(Y));
+  y = interpSpline(as.f64(inp_x), as.matrix<f64>(X), as.matrix<f64>(Y), as.matrix<f64>(K));
+  pred_Y = fill(as.f64(y), 1, 1);
+  return as.matrix<f64>(pred_Y), as.matrix<f64>(K);
+}
+

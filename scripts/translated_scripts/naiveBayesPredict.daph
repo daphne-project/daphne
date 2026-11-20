@@ -1,0 +1,10 @@
+def m_naiveBayesPredict(X:matrix<f64>, P:matrix<f64>, C:matrix<f64>) -> matrix<f64>, matrix<f64> {
+  numRows = as.si64(nrow(X));
+  model = cbind(C, P);
+  ones = fill(as.f64(1), numRows, 1);
+  X_w_ones = cbind(X, ones);
+  YRaw = X_w_ones @ t(log(model, 2));
+  Y = idxMax(YRaw, 0);
+  return as.matrix<f64>(YRaw), as.matrix<f64>(Y);
+}
+

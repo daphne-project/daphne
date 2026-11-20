@@ -1,0 +1,21 @@
+def m_l2svmPredict(X:matrix<f64>, W:matrix<f64>, verbose:bool /*= false*/) -> matrix<f64>, matrix<f64> {
+  n = as.si64(nrow(X));
+  m = as.si64(ncol(X));
+  wn = as.si64(nrow(W));
+  wm = as.si64(ncol(W));
+  
+  if (m != wn) {
+    
+    if (m + 1 != wn) {
+      stop("l2svm Predict: Invalid shape of W [" + wm + "," + wn + "] or X [" + m + "," + n + "]");
+    }
+    
+    YRaw = X @ W[0:m, ] + W[m+1 - 1, ];
+  } else {
+    YRaw = as.matrix<f64>(X @ W);
+  }
+  
+  Y = idxMax(YRaw, 0);
+  return as.matrix<f64>(YRaw), as.matrix<f64>(Y);
+}
+

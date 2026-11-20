@@ -1,0 +1,25 @@
+def m_components(G:matrix<f64>, maxi:si64 /*= 0*/, verbose:bool /*= true*/) -> matrix<f64> {
+  
+  if (sum(sum(G, 0) != t(sum(G, 1))) > 0) {
+    print("Connected Components: input graph needs to be " + "symmetric but rowSums and colSums don't match up.");
+    return [0.0];
+  }
+  
+  c = seq(as.f64(1), as.si64(nrow(G)), 1 <= as.si64(nrow(G)) ? 1 : -1);
+  diff = inf;
+  iter = 1;
+  while (diff > 0 && (maxi == 0 || iter <= maxi)) {
+    u = max(aggMax(G * t(c), 0), c);
+    diff = sum(c != u);
+    c = as.matrix<f64>(u);
+    
+    if (verbose) {
+      print("Connected components: iter = "); print(iter); print(", #diff = "); print(diff);
+    }
+    
+    iter = as.si64(iter + 1);
+  }
+  C = c;
+  return as.matrix<f64>(C);
+}
+

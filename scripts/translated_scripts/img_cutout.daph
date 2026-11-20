@@ -1,0 +1,21 @@
+def m_img_cutout(img_in:matrix<f64>, x:si64, y:si64, width:si64, height:si64, fill_value:f64) -> matrix<f64> {
+  rows = as.si64(nrow(img_in));
+  cols = as.si64(ncol(img_in));
+  img_out = [0.0];
+  if (width < 1 || height < 1) {
+    print("Invalid width or height. Returning input");
+    img_out = img_in;
+  } else {
+    end_x = x + width - 1;
+    end_y = y + height - 1;
+    start_x = max(1, x);
+    start_y = max(1, y);
+    end_x = min(cols, end_x);
+    end_y = min(rows, end_y);
+    img_out = reshape(img_in, rows, cols);
+    img_out[start_y - 1:end_y, start_x - 1:end_x] = fill(as.f64(fill_value), (end_y - start_y + 1), (end_x - start_x + 1));
+  }
+  
+  return as.matrix<f64>(img_out);
+}
+

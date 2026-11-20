@@ -1,0 +1,10 @@
+def m_scaleMinMax(X:matrix<f64>) -> matrix<f64> {
+  print("Deprecated scaleMinMax use normalize instead");
+  cmin = aggMin(X, 1);
+  cmax = aggMax(X, 1);
+  diff = (cmax - cmin);
+  diff = replace(diff, 0, 1);
+  Y = (X - cmin) / diff;
+  return as.matrix<f64>(Y);
+}
+

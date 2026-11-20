@@ -1,0 +1,6 @@
+import "rand.daph";
+
+X = [1.0];
+
+Y = rand.m_rand(X);
+print(Y);

@@ -1,0 +1,22 @@
+def m_alsPredict(userIDs:matrix<f64>, I:matrix<f64>, L:matrix<f64>, R:matrix<f64>) -> matrix<f64> {
+  n = as.si64(nrow(userIDs));
+  X_user_max = aggMax(userIDs);
+  
+  if (X_user_max > as.si64(nrow(L))) {
+    print("Predictions cannot be provided. Maximum user-id exceeds the number of users.");
+    return [0.0];
+  }
+  
+  
+  if (as.si64(ncol(L)) != as.si64(nrow(R))) {
+    print("Predictions cannot be provided. Number of columns of L don't match the number of columns of R.");
+    return [0.0];
+  }
+  
+  P = ctable(seq(as.f64(1), n, 1 <= n ? 1 : -1), userIDs, n, as.si64(nrow(L)));
+  Usel = P @ L;
+  Isel = P @ I;
+  Y = (Isel == 0) * (Usel @ R);
+  return as.matrix<f64>(Y);
+}
+

@@ -1,0 +1,5 @@
+def m_img_invert(img_in:matrix<f64>, max_value:f64) -> matrix<f64> {
+  img_out = max_value - img_in;
+  return as.matrix<f64>(img_out);
+}
+

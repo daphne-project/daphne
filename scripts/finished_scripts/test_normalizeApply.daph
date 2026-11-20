@@ -1,0 +1,10 @@
+import "normalizeApply.daph";
+
+X = [0.0, 1.0, 2.0, 3.0];
+
+cmin = [0];
+cmax = [3];
+
+Y = normalizeApply.m_normalizeApply(as.f64(X), as.f64(cmin), as.f64(cmax));
+
+print(Y);

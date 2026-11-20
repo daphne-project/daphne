@@ -1,0 +1,5 @@
+def m_winsorizeApply(X:matrix<f64>, qLower:matrix<f64>, qUpper:matrix<f64>) -> matrix<f64> {
+  Y = min(max(X, qLower), qUpper);
+  return as.matrix<f64>(Y);
+}
+

@@ -1,0 +1,11 @@
+def m_img_sample_pairing(img_in1:matrix<f64>, img_in2:matrix<f64>, weight:f64) -> matrix<f64> {
+  
+  if (weight < 0 || 1 < weight) {
+    print("Invalid weight. Set weight to 0.5");
+    weight = as.f64(0.5);
+  }
+  
+  img_out = (1 - weight) * img_in1 + weight * img_in2;
+  return as.matrix<f64>(img_out);
+}
+

@@ -1,0 +1,99 @@
+def m_l2svm(X:matrix<f64>, Y:matrix<f64>, intercept:bool /*= false*/, epsilon:f64 /*= 0.00100000000000000002*/, reg:f64 /*= 1*/, maxIterations:si64 /*= 100*/, maxii:si64 /*= 20*/, verbose:bool /*= false*/, columnId:si64 /*= (-1.0)*/) -> matrix<f64> {
+  
+  if (as.si64(nrow(X)) < 2) {
+    stop("L2SVM: Stopping due to invalid inputs: Not possible to learn a binary class classifier without at least 2 rows");
+  }
+  
+  
+  if (epsilon < 0) {
+    stop("L2SVM: Stopping due to invalid argument: Tolerance (tol) must be non-negative");
+  }
+  
+  
+  if (reg < 0) {
+    stop("L2SVM: Stopping due to invalid argument: Regularization constant (reg) must be non-negative");
+  }
+  
+  
+  if (maxIterations < 1) {
+    stop("L2SVM: Stopping due to invalid argument: Maximum iterations should be a positive integer");
+  }
+  
+  
+  if (as.si64(ncol(Y)) < 1) {
+    stop("L2SVM: Stopping due to invalid multiple label columns, maybe use MSVM instead?");
+  }
+  
+  check_min = aggMin(Y);
+  check_max = aggMax(Y);
+  num_min = sum(Y == check_min);
+  num_max = sum(Y == check_max);
+  
+  if (num_min + num_max != as.si64(nrow(Y))) {
+    print("L2SVM: WARNING invalid number of labels in Y: "); print(num_min); print(" "); print(num_max);
+  }
+  
+  
+  if (check_min != (-1.0) || check_max != (1.0)) {
+    Y = as.matrix<f64>(2 / (check_max - check_min) * Y - (check_min + check_max) / (check_max - check_min));
+  }
+  
+  
+  if (verbose && columnId == (-1.0)) {
+    print('Running L2-SVM ');
+  }
+  
+  
+  if (intercept) {
+    ones = fill(as.f64(1), as.si64(nrow(X)), 1);
+    X = cbind(X, ones);
+  }
+  
+  w = fill(as.f64(0), as.si64(ncol(X)), 1);
+  Xw = fill(as.f64(0), as.si64(nrow(X)), 1);
+  g_old = t(X) @ Y;
+  s = g_old;
+  iter = 0;
+  continue = true;
+  while (continue && iter < maxIterations) {
+    step_sz = 0;
+    Xd = X @ s;
+    wd = reg * sum(w * s);
+    dd = reg * sum(s * s);
+    continue1 = true;
+    iiter = 0;
+    while (continue1 && iiter < maxii) {
+      tmp_Xw = Xw + step_sz * Xd;
+      out = 1 - Y * (tmp_Xw);
+      sv = (out > 0);
+      out = as.matrix<f64>(out * sv);
+      g = wd + step_sz * dd - sum(out * Y * Xd);
+      h = dd + sum(Xd * sv * Xd);
+      step_sz = as.si64(step_sz - g / h);
+      continue1 = as.bool((g * g / h >= epsilon));
+      iiter = as.si64(iiter + 1);
+    }
+    w = as.matrix<f64>(w + step_sz * s);
+    Xw = as.matrix<f64>(Xw + step_sz * Xd);
+    out = as.matrix<f64>(1 - Y * Xw);
+    sv = as.matrix<f64>((out > 0));
+    out = as.matrix<f64>(sv * out);
+    obj = 0.5 * sum(out * out) + reg / 2 * sum(w * w);
+    g_new = t(X) @ (out * Y) - reg * w;
+    
+    if (verbose) {
+      colstr = columnId != (-1.0) ? "-- MSVM class=" + columnId + ": " : "";
+      print(colstr); print("Iter: "); print(iter); print(" InnerIter: "); print(iiter); print(" --- "); print(" Obj:"); print(obj);
+    }
+    
+    tmp = sum(s * g_old);
+    continue = as.bool((step_sz * tmp >= epsilon * obj && sum(s ^ 2) != 0));
+    be = sum(g_new * g_new) / sum(g_old * g_old);
+    s = as.matrix<f64>(be * s + g_new);
+    g_old = as.matrix<f64>(g_new);
+    iter = as.si64(iter + 1);
+  }
+  model = w;
+  return as.matrix<f64>(model);
+}
+

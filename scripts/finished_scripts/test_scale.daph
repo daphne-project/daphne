@@ -1,0 +1,12 @@
+import "scale.daph";
+
+X = [1, 1, 1, 2, 2, 2, 3, 3, 3](3, 3);
+
+center = true;
+scale = true;
+
+out, centering, scaleFactor = scale.m_scale(as.f64(X), center, scale);
+
+print(out);
+print(centering);
+print(scaleFactor);

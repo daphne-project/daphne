@@ -1,0 +1,99 @@
+def m_hospitalResidencyMatch(R:matrix<f64>, H:matrix<f64>, capacity:matrix<f64>, verbose:bool /*= false*/) -> matrix<f64>, matrix<f64> {
+  print("STARTING RESIDENCY MATCH ALGORITHM");
+  print("READING R  as residents AND H as Hospitals and capacity...");
+  m = as.si64(nrow(R));
+  n = as.si64(ncol(R));
+  residencyMatch = fill(as.f64(0.0), m, n);
+  hospitalMatch = fill(as.f64(0.0), n, m);
+  resultmMatrix = fill(as.f64(0.0), as.si64(nrow(R)), as.si64(ncol(R)));
+  
+  if (as.si64(nrow(capacity)) != as.si64(nrow(H))) {
+    print("ERROR: Missing capacity info for some hospitals");
+  }
+  
+  startM = fill(as.f64(1.0), m, 1);
+  hIndex = fill(as.f64(1.0), m, 1);
+  proposer_pointers = fill(as.f64(1.0), m, 1);
+  prev_Residents_vector = fill(as.f64(1.0), n, 1);
+  prevIndex_Residents_vector = fill(as.f64(1.0), n, 1);
+  prev_Residents_vector = aggMin(hospitalMatch, 0);
+  prevIndex_Residents_vector = idxMax(hospitalMatch, 0);
+  while (sum(startM) > 0) {
+    for(i in 1:m) {
+      
+      if (as.scalar(as.f64(startM[i - 1])) == 1) {
+        secondIndex = as.scalar(as.f64(proposer_pointers[i - 1]));
+        hIndex[i - 1] = as.scalar(as.f64(R[i - 1, secondIndex - 1]));
+        prev_Residents_vector = aggMax(hospitalMatch, 0);
+        prevIndex_Residents_vector = idxMax(hospitalMatch, 0);
+        
+        if (as.scalar(as.f64(hIndex[i - 1])) != 0) {
+          hosValue = as.scalar(as.f64(H[as.scalar(hIndex[i]) - 1, i - 1]));
+          
+          if (hosValue > 0) {
+            
+            if (as.scalar(as.f64(capacity[as.scalar(hIndex[i]) - 1, 0])) >= 1) {
+              capacity[as.scalar(hIndex[i]) - 1, 0] = as.scalar(as.f64(capacity[as.scalar(hIndex[i]) - 1, 0])) - 1;
+              residencyMatch[i - 1, as.scalar(hIndex[i]) - 1] = as.scalar(as.f64(proposer_pointers[i - 1]));
+              hospitalMatch[as.scalar(hIndex[i]) - 1, i - 1] = hosValue;
+              startM[i - 1] = as.matrix(0.0);
+              proposer_pointers[i - 1] = as.scalar(as.f64(proposer_pointers[i - 1])) + 1;
+              
+              if (as.scalar(as.f64(proposer_pointers[i - 1])) > n) {
+                proposer_pointers[i - 1] = as.matrix(n.0);
+              }
+              
+            } else {
+              
+              if (as.scalar(as.f64(prev_Residents_vector[as.scalar(hIndex[i]) - 1])) >= secondIndex) {
+                resPrev = as.scalar(as.f64(prevIndex_Residents_vector[as.scalar(hIndex[i]) - 1, 0]));
+                hospitalMatch[as.scalar(hIndex[i]) - 1, resPrev - 1] = as.matrix(0.0);
+                residencyMatch[resPrev - 1, as.scalar(hIndex[i]) - 1] = as.matrix(0.0);
+                hospitalMatch[as.scalar(hIndex[i]) - 1, i - 1] = as.scalar(as.f64(proposer_pointers[i - 1]));
+                residencyMatch[i - 1, as.scalar(hIndex[i]) - 1] = as.scalar(as.f64(proposer_pointers[i - 1]));
+                startM[i - 1] = as.matrix(0.0);
+                prevResIndex = as.scalar(as.f64(prevIndex_Residents_vector[as.scalar(hIndex[i]) - 1, 0]));
+                
+                if (prevResIndex > 0) {
+                  startM[prevResIndex - 1] = as.matrix(1.0);
+                  proposer_pointers[i - 1] = as.f64(as.scalar(as.f64(proposer_pointers[i - 1])) + 1);
+                  
+                  if (as.scalar(as.f64(proposer_pointers[i - 1])) > n) {
+                    proposer_pointers[i - 1] = as.matrix(n.0);
+                  }
+                  
+                }
+                
+              }
+              
+            }
+            
+          }
+          
+          
+          if (as.scalar(as.f64(startM[i - 1])) == 1) {
+            proposer_pointers[i - 1] = as.f64(as.scalar(as.f64(proposer_pointers[i - 1])) + 1);
+            
+            if (as.scalar(as.f64(proposer_pointers[i - 1])) > n) {
+              proposer_pointers[i - 1] = as.matrix(n.0);
+            }
+            
+          }
+          
+        }
+        
+      }
+      
+    }
+  }
+  
+  if (verbose) {
+    print("residencyMatch");
+    print(residencyMatch);
+    print("hospitalMatch");
+    print(hospitalMatch);
+  }
+  
+  return as.matrix<f64>(residencyMatch), as.matrix<f64>(hospitalMatch);
+}
+

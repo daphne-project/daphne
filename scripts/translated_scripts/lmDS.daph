@@ -1,0 +1,62 @@
+def m_lmDS(X:matrix<f64>, y:matrix<f64>, icpt:si64 /*= 0*/, reg:f64 /*= 0.0000001*/, verbose:bool /*= true*/) -> matrix<f64> {
+  intercept_status = icpt;
+  regularization = reg;
+  n = as.si64(nrow(X));
+  m = as.si64(ncol(X));
+  scale_lambda = [0.0];
+  m_ext = 0;
+  if (intercept_status == 1 || intercept_status == 2) {
+    ones_n = fill(as.f64(1), n, 1);
+    X = cbind(X, ones_n);
+    m_ext = as.si64(ncol(X));
+    scale_lambda = fill(as.f64(1), m_ext, 1);
+    scale_lambda[m_ext - 1, 0] = as.matrix(0.0);
+  } else {
+    scale_lambda = fill(as.f64(1), m, 1);
+    m_ext = as.si64(m);
+  }
+  
+  scale_X = [0.0];
+  shift_X = [0.0];
+  if (intercept_status == 2) {
+    avg_X_cols = t(sum(X, 1)) / n;
+    var_X_cols = (t(sum(X ^ 2, 1)) - n * (avg_X_cols ^ 2)) / (n - 1);
+    is_unsafe = (var_X_cols <= 0);
+    scale_X = 1.0 / sqrt(var_X_cols * (1 - is_unsafe) + is_unsafe);
+    scale_X[m_ext - 1, 0] = as.matrix(1.0);
+    shift_X = (0.0 - avg_X_cols) * scale_X;
+    shift_X[m_ext - 1, 0] = as.matrix(0.0);
+  } else {
+    scale_X = fill(as.f64(1), m_ext, 1);
+    shift_X = fill(as.f64(0), m_ext, 1);
+  }
+  
+  lambda = scale_lambda * regularization;
+  A = t(X) @ X;
+  b = t(X) @ y;
+  
+  if (intercept_status == 2) {
+    A = t(diagMatrix(scale_X) @ A + shift_X @ A[m_ext - 1, ]);
+    A = as.matrix<f64>(diagMatrix(scale_X) @ A + shift_X @ A[m_ext - 1, ]);
+    b = as.matrix<f64>(diagMatrix(scale_X) @ b + shift_X @ b[m_ext - 1, ]);
+  }
+  
+  A = as.matrix<f64>(A + diagMatrix(lambda));
+  
+  if (verbose) {
+    print("Calling the Direct Solver...");
+  }
+  
+  beta_unscaled = solve(A, b);
+  beta = [0.0];
+  if (intercept_status == 2) {
+    beta = scale_X * beta_unscaled;
+    beta[m_ext - 1, ] = beta[m_ext - 1, ] + t(shift_X) @ beta_unscaled;
+  } else {
+    beta = as.matrix<f64>(beta_unscaled);
+  }
+  
+  B = beta;
+  return as.matrix<f64>(B);
+}
+

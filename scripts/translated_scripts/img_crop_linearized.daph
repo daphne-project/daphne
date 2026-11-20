@@ -1,0 +1,23 @@
+def m_img_crop_linearized(img_in:matrix<f64>, w:si64, h:si64, x_offset:si64, y_offset:si64, s_cols:si64, s_rows:si64) -> matrix<f64> {
+  orig_w = s_cols;
+  orig_h = s_rows;
+  nrows = as.si64(nrow(img_in));
+  start_h = (ceil((orig_h - h) / 2)) + y_offset;
+  end_h = (start_h + h - 1);
+  start_w = (ceil((orig_w - w) / 2)) + x_offset;
+  end_w = (start_w + w - 1);
+  img_out = [0.0];
+  if ((start_h < 0) || (end_h > orig_h) || (start_w < 0) || (end_w > orig_w)) {
+    print("Offset out of bounds! Returning input.");
+    img_out = img_in;
+  } else {
+    mask = fill(as.f64(0), orig_h, orig_w);
+    temp_mask = fill(as.f64(1), h, w);
+    mask[start_h - 1:end_h, start_w - 1:end_w] = temp_mask;
+    linear_mask = reshape(mask, 1, orig_w * orig_h);
+    img_out = reshape((reshape(img_in + 1, as.si64(nrow(img_in)), as.si64(ncol(img_in))))[[, linear_mask]] - 1, nrows, w * h);
+  }
+  
+  return as.matrix<f64>(img_out);
+}
+

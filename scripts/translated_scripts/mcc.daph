@@ -1,0 +1,48 @@
+def computeMCC(confusionM:matrix<f64>) -> f64 {
+  TN = as.scalar(as.f64(confusionM[0, 0]));
+  FP = as.scalar(as.f64(confusionM[0, 1]));
+  FN = as.scalar(as.f64(confusionM[1, 0]));
+  TP = as.scalar(as.f64(confusionM[1, 1]));
+  
+  if (aggMin(sum(confusionM, 0)) == 0 || aggMin(sum(confusionM, 1)) == 0) {
+    mattCC = as.f64(0.0);
+  } else {
+    mattCC = as.f64((TP * TN - FP * FN) / sqrt((TP + FP) * (TP + FN) * (TN + FP) * (TN + FN)));
+  }
+  
+  return as.f64(mattCC);
+}
+
+def m_mcc(predictions:matrix<f64>, labels:matrix<f64>) -> f64 {
+  
+  if ((as.si64(ncells(labels)) > 0 && sum(labels) == 0)) {
+    stop("MCC Input Error: labels contains only zeros");
+  }
+  
+  
+  if (as.si64(nrow(predictions)) != as.si64(nrow(labels))) {
+    stop("MCC Input Error: rows in predictions != rows in labels");
+  }
+  
+  
+  if (aggMin(labels) != 0 || aggMin(predictions) != 0) {
+    stop("MCC Input Error: accepts 0/1 vector only");
+  }
+  
+  
+  if (aggMin(labels) == aggMax(labels)) {
+    stop("MCC Input Error: labels contains single class");
+  }
+  
+  
+  if (aggMax(labels) > 1 || aggMax(predictions) > 1) {
+    stop("MCC Input Error: accepts 0/1 vector only");
+  }
+  
+  labels = as.matrix<f64>(labels + 1);
+  predictions = as.matrix<f64>(predictions + 1);
+  confM = ctable(labels, predictions, 2, 2);
+  mattCC = computeMCC(as.matrix<f64>(confM));
+  return as.f64(mattCC);
+}
+

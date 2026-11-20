@@ -1,0 +1,68 @@
+#-------------------------------------------------------------
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+#-------------------------------------------------------------
+
+# Computes the confusion matrix for input vectors of predictions
+# and actual labels. We return both the counts and relative frequency
+# (normalized by sum of true labels)
+#
+# .. code-block::
+#
+#                   True Labels
+#                     1    2
+#                 1   TP | FP
+#   Predictions      ----+----
+#                 2   FN | TN
+#
+# INPUT:
+# ------------------------------------------------------------------------------
+# P              vector of predictions (1-based, recoded)
+# Y              vector of actual labels (1-based, recoded)
+# ------------------------------------------------------------------------------
+#
+# OUTPUT:
+# ------------------------------------------------------------------------------
+# confusionSum   the confusion matrix as absolute counts
+# confusionAvg   the confusion matrix as relative frequencies
+# ------------------------------------------------------------------------------
+
+def m_confusionMatrix(P:matrix<f64>, Y:matrix<f64>) -> matrix<f64>, matrix<f64> {
+  dim = max(aggMax(Y), aggMax(P));
+  
+  if (ncol(P) > 1 || ncol(Y) > 1) {
+    stop("confusionMatrix: Invalid input number of cols should be 1 in both P [" + as.si64(ncol(P)) + "] and Y [" + as.si64(ncol(Y)) + "]");
+  }
+  
+  
+  if (nrow(P) != nrow(Y)) {
+    stop("confusionMatrix: The number of rows have to be equal in both P [" + as.si64(nrow(P)) + "] and Y [" + as.si64(nrow(Y)) + "]");
+  }
+  
+  
+  if (aggMin(P) < 1 || aggMin(Y) < 1) {
+    stop("confusionMatrix: All Values in P and Y should be abore or equal to 1, min(P):" + aggMin(P) + " min(Y):" + aggMin(Y));
+  }
+  
+  confusionSum = ctable(P, Y, dim, dim);
+  # max to avoid division by 0, in case a colum contain no entries.
+  confusionAvg = confusionSum / max(1, sum(confusionSum, 1));
+  return as.matrix<f64>(confusionSum), as.matrix<f64>(confusionAvg);
+}
+

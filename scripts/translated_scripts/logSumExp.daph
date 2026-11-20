@@ -1,0 +1,29 @@
+def m_logSumExp(M:matrix<f64>, margin:str /*= "none"*/) -> matrix<f64> {
+  
+  if (margin == "rows") {
+    ds = M - aggMax(M, 0);
+    rSumOfexp = sum(exp(ds), 0);
+    output = aggMax(M, 0) + log(rSumOfexp, 2);
+  } else {
+    
+    if (margin == "cols") {
+      ds = as.matrix<f64>(M - aggMax(M, 1));
+      cSumOfexp = sum(exp(ds), 1);
+      output = as.matrix<f64>(aggMax(M, 1) + log(cSumOfexp, 2));
+    } else {
+      
+      if (margin == "none") {
+        ds = as.matrix<f64>(M - aggMax(M));
+        sumOfexp = sum(exp(ds));
+        output = as.matrix(aggMax(M) + log(sumOfexp, 2));
+      } else {
+        stop("invalid margin value expecting rows, cols or none found: " + margin);
+      }
+      
+    }
+    
+  }
+  
+  return as.matrix<f64>(output);
+}
+
