@@ -1,0 +1,285 @@
+#-------------------------------------------------------------
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+#-------------------------------------------------------------
+#
+# Builtin function that implements the k-Means clustering algorithm
+#
+# INPUT:
+# ---------------------------------------------------------------------------------------
+# X                             The input Matrix to do KMeans on.
+# k                             Number of centroids
+# runs                          Number of runs (with different initial centroids)
+# max_iter                      Maximum number of iterations per run
+# eps                           Tolerance (epsilon) for WCSS change ratio
+# is_verbose                    do not print per-iteration stats
+# avg_sample_size_per_centroid  Average number of records per centroid in data samples
+# seed                          The seed used for initial sampling. If set to -1
+#                               random seeds are selected.
+# ---------------------------------------------------------------------------------------
+#
+# OUTPUT:
+# ---------------------------------------------------------------
+# Y     The mapping of records to centroids
+# C     The output matrix with the centroids
+# ---------------------------------------------------------------
+
+def get_sample_maps(num_records:si64, num_samples:si64, approx_sample_size:si64, seed:si64) -> matrix<f64>, matrix<f64>, si64 {
+  sample_col_map = [0.0];
+  if (approx_sample_size < num_records) {
+    # Input value "approx_sample_size" is the average sample size; increase it by ~10 std.dev's
+    # to get the sample block size (to allocate space):
+    sample_block_size = as.si64(approx_sample_size + round(10 * sqrt(approx_sample_size)));
+    num_rows = sample_block_size * num_samples;
+
+    # Generate all samples in parallel by converting uniform random values into random
+    # integer skip-ahead intervals and prefix-summing them:
+    sample_rec_ids = rand(sample_block_size, num_samples, 0.001, 1.0, 1.0, seed);
+    sample_rec_ids = round(log(sample_rec_ids, 2) / log(1.0 - as.f64(approx_sample_size) / as.f64(num_records), 2) + 0.5);
+    # Prob [k-1 < log(uniform)/log(1-p) < k] = p*(1-p)^(k-1) = Prob [k-1 zeros before a one]
+    sample_rec_ids = cumSum(sample_rec_ids);
+
+    # Replace all sample record ids over "num_records" (i.e. out of range) by "num_records + 1":
+    is_sample_rec_id_within_range = sample_rec_ids <= num_records;
+    sample_rec_ids = as.f64(sample_rec_ids * is_sample_rec_id_within_range + (num_records + 1) * (1 - is_sample_rec_id_within_range));
+
+    # Rearrange all samples (and their out-of-range indicators) into one column-vector:
+    sample_rec_ids = reshape(t(as.f64(sample_rec_ids)), num_rows, 1);
+    is_row_in_samples = reshape(t(as.f64(is_sample_rec_id_within_range)), num_rows, 1);
+
+    # Use contingency table to create the "sample_maps" matrix that is a vertical concatenation
+    # of 0-1-matrices, one per sample, each with 1s at (i, sample_record[i]) and 0s elsewhere:
+    sample_maps = ctable(seq(as.f64(0), num_rows - 1), sample_rec_ids, num_rows, num_records);
+
+    # Create a 0-1-matrix that maps each sample column ID into all row positions of the
+    # corresponding sample; map out-of-sample-range positions to row id = num_rows + 1:
+    sample_positions = (num_rows + 1) - as.f64(is_row_in_samples) * seq(as.f64(num_rows), 1, (-1.0));
+    # Column ID positions = 1, 1, ..., 1, 2, 2, ..., 2, . . . , n_c, n_c, ..., n_c:
+    col_positions = round(0.5 + seq(as.f64(0), num_rows - 1, 1) / sample_block_size);
+    sample_col_map = ctable(sample_positions - 1, col_positions - 1);
+    # Remove the out-of-sample-range positions by cutting off the last row:
+    sample_col_map = as.matrix<f64>(sample_col_map[0:(num_rows), ]);
+    return sample_maps, sample_col_map, sample_block_size;
+  }
+  one_per_record = fill(as.f64(1), num_records, 1);
+  sample_block_size = as.si64(num_records);
+  sample_maps = fill(as.f64(0), (num_records * num_samples), num_records);
+  sample_col_map = fill(as.f64(0), (num_records * num_samples), num_samples);
+  for(i in 1:num_samples) {
+    sample_maps[(num_records*(i-1)+1) - 1:(num_records*i), ] = diagMatrix(one_per_record);
+    sample_col_map[(num_records*(i-1)+1) - 1:(num_records*i), i - 1] = one_per_record;
+  }
+  return sample_maps, sample_col_map, sample_block_size;
+}
+
+def m_kmeans(X:matrix<f64>, k:si64 /*= 10*/, runs:si64 /*= 10*/, max_iter:si64 /*= 1000*/, eps:f64 /*= 0.000001*/, is_verbose:bool /*= false*/, avg_sample_size_per_centroid:si64 /*= 50*/, seed:si64 /*= (-1.0)*/) -> matrix<f64>, matrix<f64> {
+  if (is_verbose) {
+    print("BEGIN K-MEANS SCRIPT");
+  }
+  
+  num_records = as.si64(nrow(X));
+  num_features = as.si64(ncol(X));
+  num_centroids = k;
+  num_runs = runs;
+  
+  if (is_verbose) {
+    print("dim X="+nrow(X)+"x"+ncol(X));
+  }
+  
+  sumXsq = sum(X ^ 2);
+
+  # STEP 1: INITIALIZE CENTROIDS FOR ALL RUNS FROM DATA SAMPLES:
+  
+  if (is_verbose) {
+    print("Taking data samples for initialization...");
+  }
+  
+  sample_maps, samples_vs_runs_map, sample_block_size = get_sample_maps(num_records, num_runs, num_centroids * avg_sample_size_per_centroid, seed);
+
+  is_row_in_samples = sum(sample_maps, 0);
+  X_samples = sample_maps @ X;
+  X_samples_sq_norms = sum(X_samples ^ 2, 0);
+  
+  if (is_verbose) {
+    print("Initializing the centroids for all runs...");
+  }
+  
+  All_Centroids = fill(0.0, num_runs * num_centroids, num_features);
+
+  # We select centroids according to the k-Means++ heuristic applied to a sample of X
+  # Loop invariant: min_distances ~ sq.distances from X_sample rows to nearest centroids,
+  # with the out-of-range X_sample positions in min_distances set to 0.0
+  min_distances = is_row_in_samples;
+
+  for(i in 1:num_centroids) {
+    # Reshape min_distances and prefix-sum to compute the cumulative distribution function:
+    min_distances_matrix_form = reshape(min_distances, sample_block_size, num_runs);
+    cdf_min_distances = cumSum(min_distances_matrix_form);
+
+    # Select the i-th centroid in each sample as a random sample row id with
+    # probability ~ min_distances:
+    lseed = seed == (-1.0) ? (-1.0) : as.f64(seed + i);
+    random_row = rand(1, num_runs, 0.001, 1.0, 1.0, lseed); # this is not equal to: rand(rows=1, cols=num_runs, seed=lseed)
+    threshold_matrix = random_row * cdf_min_distances[sample_block_size - 1, ];
+    centroid_ids = t(sum(cdf_min_distances < threshold_matrix, 1)) + 1;
+
+    # Place the selected centroids together, one per run, into a matrix:
+    centroid_placer = ctable(seq(1.0, num_runs), sample_block_size * seq(0.0, num_runs - 1) + centroid_ids, num_runs, sample_block_size * num_runs);
+    centroids = centroid_placer @ X_samples;
+
+    # Place the selected centroids into their appropriate slots in All_Centroids:
+    centroid_placer = ctable(seq(as.f64(i), num_centroids * (num_runs - 1) + i, num_centroids), seq(1.0, num_runs, 1), as.si64(nrow(All_Centroids)), num_runs);
+    All_Centroids = All_Centroids + centroid_placer @ centroids;
+
+    # Update min_distances to preserve the loop invariant:
+    distances = X_samples_sq_norms + samples_vs_runs_map @ sum(centroids ^ 2, 0) - 2 * sum(X_samples * (samples_vs_runs_map @ centroids), 0);
+    if (i == 1) {
+      min_distances = is_row_in_samples * distances;
+    } else {
+      min_distances = min(min_distances, distances);
+    }
+  }
+
+  # STEP 2: PERFORM K-MEANS ITERATIONS FOR ALL RUNS:
+
+  termination_code = fill(0.0, num_runs, 1);
+  final_wcss = fill(0.0, num_runs, 1);
+  num_iterations = fill(0.0, num_runs, 1);
+
+  if (is_verbose) {
+    print("Performing k-means iterations for all runs...");
+  }
+  
+  C = [0.0];
+  
+  for(run_index in 1:num_runs) {
+    C = All_Centroids[(num_centroids*(run_index-1)+1) - 1:(num_centroids*run_index), ];
+    C_old = C;
+    iter_count = 0;
+    term_code = 0;
+    wcss = inf;
+
+    while (term_code == 0) {
+      # Compute Euclidean squared distances from records (X rows) to centroids (C rows)
+      # without the C-independent term, then take the minimum for each record
+      D = (-2.0) * (X @ t(C)) + t(sum(C ^ 2, 0));
+      minD = aggMin(D, 0);
+
+      # Compute the current centroid-based within-cluster sum of squares (WCSS)
+      wcss_old = wcss;
+      wcss = sumXsq + sum(minD);
+      
+      if (is_verbose) {
+        if (iter_count == 0) {
+          print("Run "+run_index+", At Start-Up:  Centroid WCSS = "+wcss);
+        } else {
+          print("Run "+run_index+", Iteration "+iter_count+":  Centroid WCSS = "+wcss+";  Centroid change (avg.sq.dist.) = "+(sum((C - C_old) ^ 2) / num_centroids));
+        }
+        
+      }
+      
+      # Find the closest centroid for each record
+      P = D <= minD;
+      # If some records belong to multiple centroids, share them equally
+      P = P / sum(P, 0); 
+      # Compute the column normalization factor for P
+      P_denom = sum(P, 1);
+      # Compute new centroids as weighted averages over the records
+      C = (t(P) @ X) / t(P_denom);
+
+      # Check if convergence or maximum iteration has been reached
+      iter_count = as.si64(iter_count + 1);
+      if (wcss_old - wcss < eps * wcss) {
+        #  Convergence reached
+        term_code = 1;
+      } else {
+        if (iter_count >= max_iter) {
+          # Max iteration reached
+          term_code = 2;
+        } else {
+          if (sum(P_denom <= 0) > 0) {
+            # "Runaway" centroid (0.0 denom)
+            term_code = 3;
+          } else {
+            C_old = C;
+          }
+        }
+      }
+    }
+    
+    if (is_verbose) {
+      print("Run "+run_index+", Iteration "+iter_count+":  Terminated with code = "+term_code+",  Centroid WCSS = "+wcss);
+    }
+
+
+    All_Centroids[(num_centroids*(run_index-1)+1) - 1:(num_centroids*run_index), ] = C;
+    final_wcss[run_index - 1, 0] = [wcss];
+    termination_code[run_index - 1, 0] = as.matrix<f64>(term_code);
+    num_iterations[run_index - 1, 0] = as.matrix<f64>(iter_count);
+  }
+
+  # STEP 3: SELECT THE RUN WITHBEST CENTROID-WCSS AND OUTPUT ITS CENTROIDS:
+
+  termination_bitmap = fill(0.0, num_runs, 3);
+  termination_bitmap_raw = ctable(seq(0.0, num_runs - 1, 1), termination_code - 1);
+  termination_bitmap[, 0:ncol(termination_bitmap_raw)] = termination_bitmap_raw;
+  termination_stats = sum(termination_bitmap, 1);
+  
+  if (is_verbose) {
+    print("Number of successful runs = "+as.si64(as.scalar(termination_stats[0, 0])));
+    print("Number of incomplete runs = "+as.si64(as.scalar(termination_stats[0, 1])));
+    print("Number of failed runs (with lost centroids) = "+as.si64(as.scalar(termination_stats[0, 2])));
+  }
+  
+  num_successful_runs = as.si64(as.scalar(termination_stats[0, 0]));
+
+  Y = [1.0];
+  
+  if (num_successful_runs > 0) {
+    final_wcss_successful = replace(final_wcss, inf, 0) * termination_bitmap[, 0];
+    worst_wcss = aggMax(final_wcss_successful);
+    best_wcss = aggMin(final_wcss_successful + (10 * worst_wcss + 10) * (1 - termination_bitmap[, 0]));
+    avg_wcss = sum(final_wcss_successful) / num_successful_runs;
+    best_index_vector = (final_wcss_successful == best_wcss);
+    aggr_best_index_vector = cumSum(best_index_vector);
+    best_index = as.si64(sum(aggr_best_index_vector == 0) + 1);
+    
+    if (is_verbose) {
+      print("Successful runs:  Best run is run "+best_index+" with Centroid WCSS = "+best_wcss+";  Avg WCSS = "+avg_wcss+";  Worst WCSS = "+worst_wcss);
+    }
+    
+    C = All_Centroids[(num_centroids*(best_index-1)+1) - 1:(num_centroids*best_index), ];
+    D = (-2.0) * (X @ t(C)) + t(sum(C ^ 2, 0));
+    P = D <= aggMin(D, 0);
+    aggr_P = t(cumSum(t(P)));
+    Y = sum(aggr_P == 0, 0) + 1;
+    
+    if (is_verbose) {
+      print("dim C= "+as.si64(nrow(C))+"x"+as.si64(ncol(C))+", dim Y= "+as.si64(nrow(Y))+"x"+as.si64(ncol(Y)));
+    }
+    
+  } else {
+    print("K-means: No output is produced. Try increasing the number of iterations and/or lower eps.");
+    C = fill(0.0, num_centroids, num_records);
+    Y = fill(-1.0, 1, num_records);
+  }
+  
+  return C, Y;
+}
+
