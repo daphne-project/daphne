@@ -1,0 +1,10 @@
+import "../../translated_files/dbscan.daph";
+
+X = readMatrix("data/test_matrix_daph.csv");
+eps = $eps;
+minPts = $minPts;
+
+clusterMembers, clusteringMatrix, eps = dbscan.m_dbscan(X, eps, minPts);
+
+write(clusterMembers, "output/daphne_output.csv");
+write(clusteringMatrix, "output/daphne_output2.csv");

@@ -1,0 +1,14 @@
+import "../../translated_files/lm.daph";
+
+X = readMatrix("data/test_matrix_daph.csv");
+y = readMatrix("data/test_matrix_daph2.csv");
+
+icpt = $icpt;
+reg = $reg;
+tol = $tol;
+maxi = $maxi;
+verbose = $verbose;
+
+B = lm.m_lm(X, y, icpt, as.f64(reg), as.f64(tol), maxi, verbose);
+
+write(B, "output/daphne_output.csv");

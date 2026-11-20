@@ -1,0 +1,11 @@
+import "../../translated_files/shortestPath.daph";
+
+G = readMatrix("data/test_matrix_daph.csv");
+
+maxi = $maxi;
+sourceNode = $sourceNode;
+verbose = $verbose;
+
+C = shortestPath.m_shortestPath(G, maxi, sourceNode, verbose);
+
+write(C, "output/daphne_output.csv");
