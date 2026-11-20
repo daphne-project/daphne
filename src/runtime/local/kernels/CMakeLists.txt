@@ -140,6 +140,28 @@ endif()
 list(APPEND LIBS DaphneMetaDataParser MLIRDaphne MLIRDaphneTransforms)
 list(APPEND LIBS Eigen3::Eigen Arrow::arrow_shared Parquet::parquet_shared)
 
+# Apache ORC C++ library, built locally in .deps/orc/ because the dev
+# container's Arrow was compiled without ORC support (-DARROW_ORC=OFF).
+# The local build was configured with -DPROTOBUF_HOME=/usr/local so liborc
+# links against the same protobuf gRPC already uses (avoids duplicate
+# descriptor.proto registration at process startup).
+set(ORC_PREFIX ${PROJECT_SOURCE_DIR}/.deps/orc)
+if(EXISTS ${ORC_PREFIX}/lib/liborc.a)
+    add_library(DaphneOrc INTERFACE)
+    target_include_directories(DaphneOrc INTERFACE ${ORC_PREFIX}/include)
+    target_link_libraries(DaphneOrc INTERFACE
+        ${ORC_PREFIX}/lib/liborc.a
+        ${ORC_PREFIX}/lib/libsnappy.a
+        ${ORC_PREFIX}/lib/libzstd.a
+        ${ORC_PREFIX}/lib/liblz4.a
+        ${ORC_PREFIX}/lib/libz.a
+    )
+    list(APPEND LIBS DaphneOrc)
+    message(STATUS "Apache ORC: found local build at ${ORC_PREFIX}")
+else()
+    message(FATAL_ERROR "Apache ORC not found at ${ORC_PREFIX}/lib/liborc.a — see .deps/orc/ README or rebuild via the helper script.")
+endif()
+
 if(USE_PAPI)
     find_library(PAPI_LIB NAMES papi HINTS ${PROJECT_BINARY_DIR}/installed/lib REQUIRED)
 endif()

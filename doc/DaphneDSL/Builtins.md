@@ -559,6 +559,7 @@ Currently, the following formats are supported:
 - ".csv": comma-separated values
 - ".mtx": matrix market
 - ".parquet": Apache Parquet format
+- ".orc": [Apache ORC format](/doc/OrcIO.md)
 - ".dbdf": [DAPHNE's binary data format](/doc/BinaryFormat.md)
 
 For both reading and writing, file names can be specified as absolute or relative paths.

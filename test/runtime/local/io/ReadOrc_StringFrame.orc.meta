@@ -1,0 +1,22 @@
+{
+    "numRows": 3,
+    "numCols": 4,
+    "schema": [
+        {
+            "label": "name",
+            "valueType": "str"
+        },
+        {
+            "label": "age",
+            "valueType": "si64"
+        },
+        {
+            "label": "dept",
+            "valueType": "str"
+        },
+        {
+            "label": "salary",
+            "valueType": "f64"
+        }
+    ]
+}

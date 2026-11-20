@@ -19,6 +19,7 @@ doc_build/
 thirdparty/*
 !thirdparty/llvm-project/
 !thirdparty/patches/
+.deps/
 
 # Visual Studio Code
 .vscode/
