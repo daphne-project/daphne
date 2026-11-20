@@ -57,9 +57,10 @@ def Matrix : Daphne_Type<"Matrix"> {
     let summary = "matrix";
 
     // TODO Maybe we should rename "element type" to "value type" everywhere.
-    let parameters = (ins "::mlir::Type":$elementType, "ssize_t":$numRows,
-        "ssize_t":$numCols, "double":$sparsity, "MatrixRepresentation":$representation,
-        "BoolOrUnknown":$symmetric, "ssize_t":$numDistinct);
+    let parameters = (ins
+        "::mlir::Type":$elementType,
+        "ssize_t":$numRows, "ssize_t":$numCols, "double":$sparsity, "MatrixRepresentation":$representation, "BoolOrUnknown":$symmetric, "ssize_t":$numDistinct, "std::optional<double>":$lowerBound, "std::optional<double>":$upperBound
+    );
     let genVerifyDecl = 1;
     // NOTE: float needs special treatment for equality check and hashing (epsilon)
     let genStorageClass = 0;
@@ -68,8 +69,7 @@ def Matrix : Daphne_Type<"Matrix"> {
         // Creates a MatrixType from mere element type information, with all
         // other parameters reset.
         TypeBuilder<(ins "::mlir::Type":$elementType), [{
-            return Base::get($_ctxt, elementType, -1, -1, -1.0, ::mlir::daphne::MatrixRepresentation::Default, ::mlir::daphne::BoolOrUnknown::Unknown,
-            -1);
+            return Base::get($_ctxt, elementType, -1, -1, -1.0, ::mlir::daphne::MatrixRepresentation::Default, ::mlir::daphne::BoolOrUnknown::Unknown, -1, std::nullopt, std::nullopt);
         }]>,
     ];
 
@@ -79,27 +79,31 @@ def Matrix : Daphne_Type<"Matrix"> {
         // new value.
 
         ::mlir::daphne::MatrixType withElementType(::mlir::Type elementType) {
-            return get(getContext(), elementType, getNumRows(), getNumCols(), getSparsity(), getRepresentation(), getSymmetric(), getNumDistinct());
+            return get(getContext(), elementType, getNumRows(), getNumCols(), getSparsity(), getRepresentation(), getSymmetric(), getNumDistinct(), getLowerBound(), getUpperBound());
         }
 
         ::mlir::daphne::MatrixType withShape(ssize_t numRows, ssize_t numCols) {
-            return get(getContext(), getElementType(), numRows, numCols, getSparsity(), getRepresentation(), getSymmetric(), getNumDistinct());
+            return get(getContext(), getElementType(), numRows, numCols, getSparsity(), getRepresentation(), getSymmetric(), getNumDistinct(), getLowerBound(), getUpperBound());
         }
 
         ::mlir::daphne::MatrixType withSparsity(double sparsity) {
-            return get(getContext(), getElementType(), getNumRows(), getNumCols(), sparsity, getRepresentation(), getSymmetric(), getNumDistinct());
+            return get(getContext(), getElementType(), getNumRows(), getNumCols(), sparsity, getRepresentation(), getSymmetric(), getNumDistinct(), getLowerBound(), getUpperBound());
         }
 
         ::mlir::daphne::MatrixType withRepresentation(::mlir::daphne::MatrixRepresentation rep) {
-            return get(getContext(), getElementType(), getNumRows(), getNumCols(), getSparsity(), rep, getSymmetric(), getNumDistinct());
+            return get(getContext(), getElementType(), getNumRows(), getNumCols(), getSparsity(), rep, getSymmetric(), getNumDistinct(), getLowerBound(), getUpperBound());
         }
 
         ::mlir::daphne::MatrixType withSymmetric(BoolOrUnknown symmetric) {
-            return get(getContext(), getElementType(), getNumRows(), getNumCols(), getSparsity(), getRepresentation(), symmetric, getNumDistinct());
+            return get(getContext(), getElementType(), getNumRows(), getNumCols(), getSparsity(), getRepresentation(), symmetric, getNumDistinct(), getLowerBound(), getUpperBound());
         }
 
         ::mlir::daphne::MatrixType withNumDistinct(ssize_t numDistinct) {
-            return get(getContext(), getElementType(), getNumRows(), getNumCols(), getSparsity(), getRepresentation(), getSymmetric(), numDistinct);
+            return get(getContext(), getElementType(), getNumRows(), getNumCols(), getSparsity(), getRepresentation(), getSymmetric(), numDistinct, getLowerBound(), getUpperBound());
+        }
+
+        ::mlir::daphne::MatrixType withBounds(std::optional<double> lowerBound, std::optional<double> upperBound) {
+            return get(getContext(), getElementType(), getNumRows(), getNumCols(), getSparsity(), getRepresentation(), getSymmetric(), getNumDistinct(), lowerBound, upperBound);
         }
 
         // The following methods return a MatrixType preserving the specified
@@ -110,7 +114,7 @@ def Matrix : Daphne_Type<"Matrix"> {
         }
 
         ::mlir::daphne::MatrixType withSameElementTypeAndRepr() {
-            return get(getContext(), getElementType(), -1, -1, -1.0, getRepresentation(), ::mlir::daphne::BoolOrUnknown::Unknown, -1);
+            return get(getContext(), getElementType(), -1, -1, -1.0, getRepresentation(), ::mlir::daphne::BoolOrUnknown::Unknown, -1, std::nullopt, std::nullopt);
         }
 
         /**
@@ -140,6 +144,12 @@ def Matrix : Daphne_Type<"Matrix"> {
                 return false;
 
             if (other.getNumDistinct() != -1 && getNumDistinct() != other.getNumDistinct())
+                return false;
+
+            if (other.getLowerBound() != std::nullopt && getLowerBound() != other.getLowerBound())
+                return false;
+
+            if (other.getUpperBound() != std::nullopt && getUpperBound() != other.getUpperBound())
                 return false;
 
             return true;

@@ -32,10 +32,10 @@ using namespace mlir;
 
 daphne::InferenceConfig::InferenceConfig(bool partialInferenceAllowed, bool typeInference, bool shapeInference,
                                          bool frameLabelInference, bool sparsityInference, bool symmetricInference,
-                                         bool distinctInference)
+                                         bool distinctInference, bool boundsInference)
     : partialInferenceAllowed(partialInferenceAllowed), typeInference(typeInference), shapeInference(shapeInference),
       frameLabelInference(frameLabelInference), sparsityInference(sparsityInference),
-      symmetricInference(symmetricInference), distinctInference(distinctInference) {}
+      symmetricInference(symmetricInference), distinctInference(distinctInference), boundsInference(boundsInference) {}
 
 namespace {
 void castOperandIf(OpBuilder &builder, Operation *op, size_t operandIdx, Type type) {
@@ -78,11 +78,17 @@ Type getTypeWithCommonInfo(Type t1, Type t2) {
         const BoolOrUnknown sym2 = mat2.getSymmetric();
         const ssize_t dist1 = mat1.getNumDistinct();
         const ssize_t dist2 = mat2.getNumDistinct();
+        const std::optional<double> lowerBound1 = mat1.getLowerBound();
+        const std::optional<double> lowerBound2 = mat2.getLowerBound();
+        const std::optional<double> upperBound1 = mat1.getUpperBound();
+        const std::optional<double> upperBound2 = mat2.getUpperBound();
         return daphne::MatrixType::get(ctx, (vt1 == vt2) ? vt1 : u, (nr1 == nr2) ? nr1 : -1, (nc1 == nc2) ? nc1 : -1,
                                        // TODO Maybe do approximate comparison of floating-point values.
                                        (sp1 == sp2) ? sp1 : -1,
                                        (repr1 == repr2) ? repr1 : daphne::MatrixRepresentation::Default,
-                                       (sym1 == sym2) ? sym1 : BoolOrUnknown::Unknown, (dist1 == dist2) ? dist1 : -1);
+                                       (sym1 == sym2) ? sym1 : BoolOrUnknown::Unknown, (dist1 == dist2) ? dist1 : -1,
+                                       (lowerBound1 == lowerBound2) ? lowerBound1 : std::nullopt,
+                                       (upperBound1 == upperBound2) ? upperBound1 : std::nullopt);
     } else if (frm1 && frm2) { // both types are frames
         const std::vector<Type> cts1 = frm1.getColumnTypes();
         const std::vector<Type> cts2 = frm2.getColumnTypes();
@@ -267,6 +273,30 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
                         const Type rt = rv.getType();
                         if (auto mt = dyn_cast<daphne::MatrixType>(rt))
                             rv.setType(mt.withNumDistinct(distinct));
+                    }
+                }
+            }
+            if (cfg.boundsInference && returnsUnknownBounds(op)) {
+                // Try to infer the bounds of all results of this operation.
+                std::vector<std::pair<std::optional<double>, std::optional<double>>> bounds =
+                    daphne::tryInferBounds(op);
+                const size_t numRes = op->getNumResults();
+                if (bounds.size() != numRes)
+                    throw ErrorHandler::compilerError(op, "InferencePass",
+                                                      "bounds inference for op " + op->getName().getStringRef().str() +
+                                                          " returned " + std::to_string(bounds.size()) +
+                                                          " entries, but the op has " + std::to_string(numRes) +
+                                                          " results");
+                // Set the infered values on all results of this operation.
+                for (size_t i = 0; i < numRes; i++) {
+                    if (llvm::isa<mlir::daphne::MatrixType>(op->getResultTypes()[i])) {
+                        std::optional<double> lowerBound = bounds[i].first;
+                        std::optional<double> upperBound = bounds[i].second;
+
+                        Value rv = op->getResult(i);
+                        const Type rt = rv.getType();
+                        if (auto mt = llvm::dyn_cast<daphne::MatrixType>(rt))
+                            rv.setType(mt.withBounds(lowerBound, upperBound));
                     }
                 }
             }
@@ -517,6 +547,14 @@ class InferencePass : public PassWrapper<InferencePass, OperationPass<func::Func
         return llvm::any_of(op->getResultTypes(), [](Type rt) {
             if (auto mt = dyn_cast<daphne::MatrixType>(rt))
                 return mt.getNumDistinct() == -1;
+            return false;
+        });
+    }
+
+    static bool returnsUnknownBounds(Operation *op) {
+        return llvm::any_of(op->getResultTypes(), [](Type rt) {
+            if (auto mt = llvm::dyn_cast<daphne::MatrixType>(rt))
+                return !mt.getLowerBound().has_value() || !mt.getUpperBound().has_value();
             return false;
         });
     }

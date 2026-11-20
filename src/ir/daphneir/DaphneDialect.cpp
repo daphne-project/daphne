@@ -132,6 +132,9 @@ mlir::Type mlir::daphne::DaphneDialect::parseType(mlir::DialectAsmParser &parser
         MatrixRepresentation representation = MatrixRepresentation::Default; // default is dense
         BoolOrUnknown symmetric = BoolOrUnknown::Unknown;
         ssize_t numDistinct = -1;
+        std::optional<double> lowerBound = std::nullopt;
+        std::optional<double> upperBound = std::nullopt;
+
         mlir::Type elementType;
         SmallVector<int64_t, 2> dimensions;
         if (parser.parseLess() || parser.parseDimensionList(dimensions) || parser.parseType(elementType))
@@ -177,6 +180,16 @@ mlir::Type mlir::daphne::DaphneDialect::parseType(mlir::DialectAsmParser &parser
                     parser.emitError(parser.getCurrentLocation(), "distinct count must be nonnegative");
                     return nullptr;
                 }
+            } else if (succeeded(parser.parseOptionalKeyword("lowerBound"))) {
+                double value;
+                if (lowerBound || parser.parseLSquare() || parser.parseFloat(value) || parser.parseRSquare())
+                    return nullptr;
+                lowerBound = value;
+            } else if (succeeded(parser.parseOptionalKeyword("upperBound"))) {
+                double value;
+                if (upperBound || parser.parseLSquare() || parser.parseFloat(value) || parser.parseRSquare())
+                    return nullptr;
+                upperBound = value;
             } else {
                 return nullptr;
             }
@@ -186,7 +199,7 @@ mlir::Type mlir::daphne::DaphneDialect::parseType(mlir::DialectAsmParser &parser
         }
 
         return MatrixType::get(parser.getBuilder().getContext(), elementType, numRows, numCols, sparsity,
-                               representation, symmetric, numDistinct);
+                               representation, symmetric, numDistinct, lowerBound, upperBound);
     } else if (keyword == "Frame") {
         ssize_t numRows = -1;
         ssize_t numCols = -1;
@@ -257,7 +270,8 @@ void mlir::daphne::DaphneDialect::printType(mlir::Type type, mlir::DialectAsmPri
         auto representation = t.getRepresentation();
         auto symmetric = t.getSymmetric();
         auto numDistinct = t.getNumDistinct();
-
+        auto lowerBound = t.getLowerBound();
+        auto upperBound = t.getUpperBound();
         if (sparsity != -1.0) {
             os << ":sp[" << sparsity << ']';
         }
@@ -270,6 +284,10 @@ void mlir::daphne::DaphneDialect::printType(mlir::Type type, mlir::DialectAsmPri
         if (numDistinct != -1) {
             os << ":numDistinct[" << numDistinct << ']';
         }
+        if (lowerBound)
+            os << ":lowerBound[" << llvm::APFloat(*t.getLowerBound()) << ']';
+        if (upperBound)
+            os << ":upperBound[" << llvm::APFloat(*t.getUpperBound()) << ']';
         os << '>';
     } else if (auto t = llvm::dyn_cast<mlir::daphne::FrameType>(type)) {
         os << "Frame<" << unknownStrIf(t.getNumRows()) << "x[" << unknownStrIf(t.getNumCols()) << ": ";
@@ -369,9 +387,10 @@ namespace detail {
 
 // Constructor implementation
 MatrixTypeStorage::MatrixTypeStorage(::mlir::Type elementType, ssize_t numRows, ssize_t numCols, double sparsity,
-                                     MatrixRepresentation representation, BoolOrUnknown symmetric, ssize_t numDistinct)
+                                     MatrixRepresentation representation, BoolOrUnknown symmetric, ssize_t numDistinct,
+                                     std::optional<double> lowerBound, std::optional<double> upperBound)
     : elementType(elementType), numRows(numRows), numCols(numCols), sparsity(sparsity), representation(representation),
-      symmetric(symmetric), numDistinct(numDistinct) {}
+      symmetric(symmetric), numDistinct(numDistinct), lowerBound(lowerBound), upperBound(upperBound) {}
 
 // Equality operator implementation
 bool MatrixTypeStorage::operator==(const KeyTy &tblgenKey) const {
@@ -389,6 +408,10 @@ bool MatrixTypeStorage::operator==(const KeyTy &tblgenKey) const {
         return false;
     if (numDistinct != std::get<6>(tblgenKey))
         return false;
+    if (lowerBound != std::get<7>(tblgenKey))
+        return false;
+    if (upperBound != std::get<8>(tblgenKey))
+        return false;
     return true;
 }
 
@@ -396,7 +419,9 @@ bool MatrixTypeStorage::operator==(const KeyTy &tblgenKey) const {
 ::llvm::hash_code MatrixTypeStorage::hashKey(const KeyTy &tblgenKey) {
     auto float_hashable = static_cast<ssize_t>(std::get<3>(tblgenKey) / epsilon);
     return ::llvm::hash_combine(std::get<0>(tblgenKey), std::get<1>(tblgenKey), std::get<2>(tblgenKey), float_hashable,
-                                std::get<4>(tblgenKey), std::get<5>(tblgenKey), std::get<6>(tblgenKey));
+                                std::get<4>(tblgenKey), std::get<5>(tblgenKey), std::get<6>(tblgenKey),
+                                std::hash<std::optional<double>>()(std::get<7>(tblgenKey)),
+                                std::hash<std::optional<double>>()(std::get<8>(tblgenKey)));
 }
 
 // Construct implementation
@@ -408,9 +433,11 @@ MatrixTypeStorage *MatrixTypeStorage::construct(::mlir::TypeStorageAllocator &al
     auto representation = std::get<4>(tblgenKey);
     auto symmetric = std::get<5>(tblgenKey);
     auto numDistinct = std::get<6>(tblgenKey);
+    auto lowerBound = std::get<7>(tblgenKey);
+    auto upperBound = std::get<8>(tblgenKey);
 
-    return new (allocator.allocate<MatrixTypeStorage>())
-        MatrixTypeStorage(elementType, numRows, numCols, sparsity, representation, symmetric, numDistinct);
+    return new (allocator.allocate<MatrixTypeStorage>()) MatrixTypeStorage(
+        elementType, numRows, numCols, sparsity, representation, symmetric, numDistinct, lowerBound, upperBound);
 }
 
 } // namespace detail
@@ -421,13 +448,17 @@ double MatrixType::getSparsity() const { return getImpl()->sparsity; }
 MatrixRepresentation MatrixType::getRepresentation() const { return getImpl()->representation; }
 BoolOrUnknown MatrixType::getSymmetric() const { return getImpl()->symmetric; }
 ssize_t MatrixType::getNumDistinct() const { return getImpl()->numDistinct; }
+std::optional<double> MatrixType::getLowerBound() const { return getImpl()->lowerBound; }
+std::optional<double> MatrixType::getUpperBound() const { return getImpl()->upperBound; }
 
 } // namespace mlir::daphne
 
 ::mlir::LogicalResult mlir::daphne::MatrixType::verify(::llvm::function_ref<::mlir::InFlightDiagnostic()> emitError,
                                                        Type elementType, ssize_t numRows, ssize_t numCols,
                                                        double sparsity, MatrixRepresentation rep,
-                                                       BoolOrUnknown symmetric, ssize_t numDistinct) {
+                                                       BoolOrUnknown symmetric, ssize_t numDistinct,
+                                                       std::optional<double> lowerBound,
+                                                       std::optional<double> upperBound) {
     if ((numRows == 0 || numCols == 0) && numDistinct > 0)
         return emitError() << "empty matrices cannot have positive distinct counts";
     if (numRows > 0 && numCols > 0 && numDistinct == 0)

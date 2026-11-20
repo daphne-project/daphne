@@ -19,6 +19,8 @@
 
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
+#include <llvm/ADT/Hashing.h>
+#include <optional>
 
 namespace mlir::daphne {
 
@@ -33,11 +35,14 @@ struct MatrixTypeStorage : public ::mlir::TypeStorage {
     //  the choosen epsilon directly defines how accurate our sparsity inference
     //  can be
     constexpr static const double epsilon = 1e-6;
+
     MatrixTypeStorage(::mlir::Type elementType, ssize_t numRows, ssize_t numCols, double sparsity,
-                      MatrixRepresentation representation, BoolOrUnknown symmetric, ssize_t numDistinct);
+                      MatrixRepresentation representation, BoolOrUnknown symmetric, ssize_t numDistinct,
+                      std::optional<double> lowerBound, std::optional<double> upperBound);
 
     /// The hash key is a tuple of the parameter types.
-    using KeyTy = std::tuple<::mlir::Type, ssize_t, ssize_t, double, MatrixRepresentation, BoolOrUnknown, ssize_t>;
+    using KeyTy = std::tuple<::mlir::Type, ssize_t, ssize_t, double, MatrixRepresentation, BoolOrUnknown, ssize_t,
+                             std::optional<double>, std::optional<double>>;
     bool operator==(const KeyTy &tblgenKey) const;
     static ::llvm::hash_code hashKey(const KeyTy &tblgenKey);
 
@@ -53,6 +58,8 @@ struct MatrixTypeStorage : public ::mlir::TypeStorage {
     MatrixRepresentation representation;
     BoolOrUnknown symmetric;
     ssize_t numDistinct;
+    std::optional<double> lowerBound;
+    std::optional<double> upperBound;
 };
 
 } // namespace detail
