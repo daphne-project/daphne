@@ -1695,6 +1695,7 @@ The fact that DAPHNE supports a certain data property does not mean that the dat
 <li><em>sparsity:</em> the number of non-zero elements divided by the total number of elements</li>
 <li><em>symmetry:</em> whether the <em>(n x n)</em> matrix <em>X</em> is symmetric, i.e., for any <em>0 ≤ i, j ≤ n: X[i, j] = X[j, i]</em></li>
 <li><em>numDistinct:</em> the number of distinct matrix values (-1 denotes unknown)</li>
+<li><em>value bounds:</em> known lower and upper bounds on matrix values, represented as optional doubles</li>
 <li><em>physical representation:</em> the way the matrix is stored in memory (e.g., dense or sparse)</li>
 </ul>
 </li>
@@ -1762,6 +1763,7 @@ By the end of the DAPHNE compiler (more precisely, by <code>RewriteToCallKernelO
 <li>Non-negative numeric data properties (e.g., the number of rows, the number of columns, number of distinct values, sparsity, etc.): typically <code>-1</code></li>
 </ul>
 <ul>
+<li>Value bounds: each endpoint is a <code>std::optional&lt;double&gt;</code>. <code>std::nullopt</code> denotes unknown</li>
 <li>Complex object-valued data properties (e.g., the array of column labels of a frame): typically <code>nullptr</code></li>
 </ul>
 <p><strong>The compile-time information on the data properties is also available to the runtime.</strong></p>
@@ -1790,6 +1792,7 @@ By the end of the DAPHNE compiler (more precisely, by <code>RewriteToCallKernelO
 <li>sparsity</li>
 <li>symmetry</li>
 <li>number of distinct values (<code>numDistinct</code>)</li>
+<li>value bounds</li>
 </ul>
 </li>
 </ul>
