@@ -23,8 +23,7 @@
 
 #include <catch.hpp>
 
-TEMPLATE_PRODUCT_TEST_CASE("Matrix.numDistinct transfer", TAG_DATASTRUCTURES, (DenseMatrix, CSRMatrix),
-                           (double, int64_t)) {
+TEMPLATE_PRODUCT_TEST_CASE("Matrix.numDistinct transfer", TAG_KERNELS, (DenseMatrix, CSRMatrix), (double, int64_t)) {
     using DT = TestType;
     auto matrix = genGivenVals<DT>(2, {0, 1, 1, 2});
     CHECK(matrix->numDistinct == -1);
@@ -36,7 +35,7 @@ TEMPLATE_PRODUCT_TEST_CASE("Matrix.numDistinct transfer", TAG_DATASTRUCTURES, (D
     DataObjectFactory::destroy(matrix);
 }
 
-TEMPLATE_PRODUCT_TEST_CASE("Matrix.bounds transfer", TAG_DATASTRUCTURES, (DenseMatrix, CSRMatrix), (double, int64_t)) {
+TEMPLATE_PRODUCT_TEST_CASE("Matrix.bounds transfer", TAG_KERNELS, (DenseMatrix, CSRMatrix), (double, int64_t)) {
     using DT = TestType;
     auto matrix = genGivenVals<DT>(2, {0, 1, 1, 2});
     CHECK_FALSE(matrix->lowerBound.has_value());
