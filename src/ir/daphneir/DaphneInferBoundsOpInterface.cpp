@@ -64,12 +64,13 @@ std::vector<std::pair<std::optional<double>, std::optional<double>>> daphne::Ord
     if (!mt)
         return {{std::nullopt, std::nullopt}};
     if (returnIndices) {
-        const auto rows = mt.getNumRows();
-        if (rows == 0)
+        const auto numRows = mt.getNumRows();
+        if (numRows == -1 || numRows == 0)
+            // If numRows == 0, the result contains no values and, thus, lower/upper bounds are not defined.
+            // If numRows is unknown (-1), we cannot tell (yet) if it will resolve to the ==0 or >0 case later.
             return {{std::nullopt, std::nullopt}};
-        if (rows > 0)
-            return {{0.0, static_cast<double>(rows - 1)}};
-        return {{0.0, std::nullopt}};
+        // If numRows > 0, the result contains values in [0, numRows - 1].
+        return {{0.0, static_cast<double>(numRows - 1)}};
     }
     // Ordering values preserves the input bounds
     return {{mt.getLowerBound(), mt.getUpperBound()}};
