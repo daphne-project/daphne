@@ -22,6 +22,7 @@
 
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <type_traits>
 
@@ -66,6 +67,9 @@ template <typename ValueType> class Column : public Structure {
      * @brief The common type of all values in this column.
      */
     using VT = ValueType;
+
+    std::optional<double> lowerBound;
+    std::optional<double> upperBound;
 
     static std::string getName() { return "Column"; }
 

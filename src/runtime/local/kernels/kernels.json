@@ -7817,6 +7817,22 @@
                 {
                     "type": "int64_t",
                     "name": "numDistinct"
+                },
+                {
+                    "type": "bool",
+                    "name": "hasLowerBound"
+                },
+                {
+                    "type": "double",
+                    "name": "lowerBound"
+                },
+                {
+                    "type": "bool",
+                    "name": "hasUpperBound"
+                },
+                {
+                    "type": "double",
+                    "name": "upperBound"
                 }
             ]
         },

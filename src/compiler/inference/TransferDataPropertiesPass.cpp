@@ -50,7 +50,13 @@ struct TransferDataPropertiesPass : public PassWrapper<TransferDataPropertiesPas
                     auto coSymmetric = builder.create<daphne::ConstantOp>(loc, static_cast<int64_t>(mt.getSymmetric()));
                     auto coNumDistinct =
                         builder.create<daphne::ConstantOp>(loc, static_cast<int64_t>(mt.getNumDistinct()));
-                    builder.create<daphne::TransferPropertiesOp>(loc, v, coSparsity, coSymmetric, coNumDistinct);
+                    auto coHasLowerBound = builder.create<daphne::ConstantOp>(loc, mt.getLowerBound().has_value());
+                    auto coLowerBound = builder.create<daphne::ConstantOp>(loc, mt.getLowerBound().value_or(0.0));
+                    auto coHasUpperBound = builder.create<daphne::ConstantOp>(loc, mt.getUpperBound().has_value());
+                    auto coUpperBound = builder.create<daphne::ConstantOp>(loc, mt.getUpperBound().value_or(0.0));
+                    builder.create<daphne::TransferPropertiesOp>(loc, v, coSparsity, coSymmetric, coNumDistinct,
+                                                                 coHasLowerBound, coLowerBound, coHasUpperBound,
+                                                                 coUpperBound);
                 }
             }
 
