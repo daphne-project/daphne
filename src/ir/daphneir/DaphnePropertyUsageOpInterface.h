@@ -15,9 +15,11 @@
  */
 
 #pragma once
-#include <cstdint>
+
 #include <llvm/ADT/SmallVector.h>
 #include <mlir/IR/OpDefinition.h>
+
+#include <cstdint>
 
 namespace mlir::daphne {
 enum class DataPropertyKind : uint32_t;

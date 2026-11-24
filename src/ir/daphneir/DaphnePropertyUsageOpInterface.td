@@ -16,6 +16,7 @@
 
 #ifndef DAPHNE_PROPERTY_USAGE_INTERFACE_TD
 #define DAPHNE_PROPERTY_USAGE_INTERFACE_TD
+
 include "mlir/IR/OpBase.td"
 include "mlir/IR/EnumAttr.td"
 
