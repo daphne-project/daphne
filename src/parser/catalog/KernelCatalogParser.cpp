@@ -73,6 +73,10 @@ KernelCatalogParser::KernelCatalogParser(mlir::MLIRContext *mctx) {
         mlir::Type ct = mlir::daphne::ColumnType::get(mctx, st);
         typeMap.emplace(CompilerUtils::mlirTypeToCppTypeName(ct), ct);
 
+        // Hash related type.
+        mlir::Type ht = mlir::daphne::HashSetType::get(mctx, st);
+        typeMap.emplace(CompilerUtils::mlirTypeToCppTypeName(ht), ht);
+
         // MemRef type.
         if (!llvm::isa<mlir::daphne::StringType>(st)) {
             // DAPHNE's StringType is not supported as the element type of a

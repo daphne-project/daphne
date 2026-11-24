@@ -331,6 +331,16 @@ def List : Daphne_Type<"List"> {
 
 def ListOrU : AnyTypeOf<[List, Unknown]>;
 
+def HashSet : Daphne_Type<"HashSet"> {
+    let summary = "hashset IR for join";
+
+    let parameters = (ins
+        "::mlir::Type":$elementType
+    );
+}
+
+def HashSetOrU : AnyTypeOf<[HashSet, Unknown]>;
+
 // ****************************************************************************
 // Distributed types
 // ****************************************************************************
