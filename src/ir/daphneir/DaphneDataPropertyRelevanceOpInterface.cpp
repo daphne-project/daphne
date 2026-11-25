@@ -17,7 +17,7 @@
 #include <ir/daphneir/Daphne.h>
 
 namespace mlir::daphne {
-#include <ir/daphneir/DaphnePropertyUsageOpInterface.cpp.inc>
+#include <ir/daphneir/DaphneDataPropertyRelevanceOpInterface.cpp.inc>
 }
 
 using namespace mlir;
@@ -28,56 +28,61 @@ void getComparisonProperties(OpOperand &lhs, OpOperand &rhs, unsigned operandInd
                              llvm::SmallVectorImpl<DataPropertyKind> &properties) {
     if ((operandIndex == lhs.getOperandNumber() && isa<MatrixType>(lhs.get().getType())) ||
         (operandIndex == rhs.getOperandNumber() && isa<MatrixType>(rhs.get().getType())))
-        properties.push_back(DataPropertyKind::ValueBounds);
+        properties.push_back(DataPropertyKind::Bounds);
 }
 
 void getJoinProperties(OpOperand &lhsValue, OpOperand &rhsValue, unsigned operandIndex,
                        llvm::SmallVectorImpl<DataPropertyKind> &properties) {
     if (operandIndex == rhsValue.getOperandNumber() && isa<ColumnType>(lhsValue.get().getType()) &&
         isa<ColumnType>(rhsValue.get().getType()))
-        properties.push_back(DataPropertyKind::ValueBounds);
+        properties.push_back(DataPropertyKind::Bounds);
 }
 } // namespace
 
-void MatMulOp::getUsedProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
-    if (operandIndex == getLhsMutable().getOperandNumber() && isa<MatrixType>(getLhs().getType()) &&
-        isa<MatrixType>(getRhs().getType()))
-        properties.push_back(DataPropertyKind::NonzeroCount);
+void MatMulOp::getRelevantProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
+    if (!isa<MatrixType>(getLhs().getType()) || !isa<MatrixType>(getRhs().getType()))
+        return;
+    if (operandIndex == getLhsMutable().getOperandNumber())
+        properties.push_back(DataPropertyKind::Sparsity);
+    if (operandIndex == getLhsMutable().getOperandNumber() || operandIndex == getRhsMutable().getOperandNumber()) {
+        properties.push_back(DataPropertyKind::NumRows);
+        properties.push_back(DataPropertyKind::NumCols);
+    }
 }
 
-void MapOp::getUsedProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
+void MapOp::getRelevantProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
     if (operandIndex == getArgMutable().getOperandNumber() && isa<MatrixType>(getArg().getType()))
-        properties.push_back(DataPropertyKind::DistinctCount);
+        properties.push_back(DataPropertyKind::NumDistinct);
 }
 
-void ColJoinOp::getUsedProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
+void ColJoinOp::getRelevantProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
     getJoinProperties(getLhsDataMutable(), getRhsDataMutable(), operandIndex, properties);
 }
 
-void ColSemiJoinOp::getUsedProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
+void ColSemiJoinOp::getRelevantProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
     getJoinProperties(getLhsDataMutable(), getRhsDataMutable(), operandIndex, properties);
 }
 
-void EwLtOp::getUsedProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
+void EwLtOp::getRelevantProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
     getComparisonProperties(getLhsMutable(), getRhsMutable(), operandIndex, properties);
 }
 
-void EwLeOp::getUsedProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
+void EwLeOp::getRelevantProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
     getComparisonProperties(getLhsMutable(), getRhsMutable(), operandIndex, properties);
 }
 
-void EwGtOp::getUsedProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
+void EwGtOp::getRelevantProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
     getComparisonProperties(getLhsMutable(), getRhsMutable(), operandIndex, properties);
 }
 
-void EwGeOp::getUsedProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
+void EwGeOp::getRelevantProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
     getComparisonProperties(getLhsMutable(), getRhsMutable(), operandIndex, properties);
 }
 
-void EwEqOp::getUsedProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
+void EwEqOp::getRelevantProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
     getComparisonProperties(getLhsMutable(), getRhsMutable(), operandIndex, properties);
 }
 
-void EwNeqOp::getUsedProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
+void EwNeqOp::getRelevantProperties(unsigned operandIndex, llvm::SmallVectorImpl<DataPropertyKind> &properties) {
     getComparisonProperties(getLhsMutable(), getRhsMutable(), operandIndex, properties);
 }

@@ -231,7 +231,13 @@ The data properties of an SSA value are displayed as a part of its type, whereby
 
 ## Data Property Exploitation
 
-**TODO**
+### Declaring Relevant Input Properties
+
+The `DataPropertyRelevance` operation interface declares which input data properties runtime kernels (implementation variants of operations) may exploit to choose specialized execution paths. Actual relevance depends on the concrete kernel implementation.
+
+The method `getRelevantProperties(operandIndex, properties)` appends the relevant property kinds for a given operand, allowing a future compiler pass to determine which properties to analyze at runtime.
+
+To add a declaration, attach `DeclareOpInterfaceMethods<DataPropertyRelevanceOpInterface>` in `DaphneOps.td` and implement `getRelevantProperties` in `DaphneDataPropertyRelevanceOpInterface.cpp`.
 
 ## Extending DAPHNE's Support for Data Properties
 

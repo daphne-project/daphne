@@ -24,6 +24,6 @@
 namespace mlir::daphne {
 enum class DataPropertyKind : uint32_t;
 
-#include <ir/daphneir/DaphnePropertyUsageOpInterface.h.inc>
+#include <ir/daphneir/DaphneDataPropertyRelevanceOpInterface.h.inc>
 
 } // namespace mlir::daphne

@@ -65,9 +65,9 @@
 #include "mlir/Support/TypeID.h"
 
 #include <ir/daphneir/DaphneAdaptTypesToKernelsTraits.h>
+#include <ir/daphneir/DaphneDataPropertyRelevanceOpInterface.h>
 #include <ir/daphneir/DaphneDistributableOpInterface.h>
 #include <ir/daphneir/DaphneOpsEnums.h.inc>
-#include <ir/daphneir/DaphnePropertyUsageOpInterface.h>
 #include <ir/daphneir/DaphneTypeStorage.h>
 #include <ir/daphneir/DaphneVectorizableOpInterface.h>
 

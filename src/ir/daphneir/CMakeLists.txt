@@ -21,7 +21,7 @@ mlir_tablegen(DaphneOpsEnums.cpp.inc -gen-enum-defs)
 add_public_tablegen_target(MLIRDaphneOpsEnumsIncGen)
 add_dependencies(mlir-headers MLIRDaphneOpsEnumsIncGen)
 
-add_mlir_interface(DaphnePropertyUsageOpInterface)
+add_mlir_interface(DaphneDataPropertyRelevanceOpInterface)
 add_mlir_interface(DaphneDistributableOpInterface)
 add_mlir_interface(DaphneInferFrameLabelsOpInterface)
 add_mlir_interface(DaphneInferDistinctOpInterface)
@@ -38,7 +38,7 @@ add_public_tablegen_target(MLIRDaphneTransformsIncGen)
 add_mlir_doc(Passes -gen-pass-doc DaphnePasses Dialects/)
 
 add_mlir_dialect_library(MLIRDaphne
-    DaphnePropertyUsageOpInterface.cpp
+    DaphneDataPropertyRelevanceOpInterface.cpp
     DaphneDialect.cpp
     Fold.cpp
     Canonicalize.cpp
@@ -52,7 +52,7 @@ add_mlir_dialect_library(MLIRDaphne
     DaphneVectorizableOpInterface.cpp
 
     DEPENDS
-    MLIRDaphnePropertyUsageOpInterfaceIncGen
+    MLIRDaphneDataPropertyRelevanceOpInterfaceIncGen
     MLIRDaphneOpsIncGen
     MLIRDaphneTransformsIncGen
     MLIRDaphneDistributableOpInterfaceIncGen
