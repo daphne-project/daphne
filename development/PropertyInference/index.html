@@ -1382,6 +1382,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Data Property Exploitation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#declaring-relevant-input-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      Declaring Relevant Input Properties
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1588,6 +1603,21 @@
       Data Property Exploitation
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Data Property Exploitation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#declaring-relevant-input-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      Declaring Relevant Input Properties
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1890,7 +1920,10 @@ The data properties of an SSA value are displayed as a part of its type, whereby
 <p><strong>Relation to file meta data.</strong></p>
 <p><strong>TODO</strong></p>
 <h2 id="data-property-exploitation">Data Property Exploitation</h2>
-<p><strong>TODO</strong></p>
+<h3 id="declaring-relevant-input-properties">Declaring Relevant Input Properties</h3>
+<p>The <code>DataPropertyRelevance</code> operation interface declares which input data properties runtime kernels (implementation variants of operations) may exploit to choose specialized execution paths. Actual relevance depends on the concrete kernel implementation.</p>
+<p>The method <code>getRelevantProperties(operandIndex, properties)</code> appends the relevant property kinds for a given operand, allowing a future compiler pass to determine which properties to analyze at run-time.</p>
+<p>To add a declaration, attach <code>DeclareOpInterfaceMethods&lt;DataPropertyRelevanceOpInterface&gt;</code> in <code>DaphneOps.td</code> and implement <code>getRelevantProperties</code> in <code>DaphneDataPropertyRelevanceOpInterface.cpp</code>.</p>
 <h2 id="extending-daphnes-support-for-data-properties">Extending DAPHNE's Support for Data Properties</h2>
 <p>DAPHNE's support for data properties can be extended by modifying the source code straightforwardly.
 This section provides step-by-step instructions for typical tasks, summarizing what needs to be done in which files.
