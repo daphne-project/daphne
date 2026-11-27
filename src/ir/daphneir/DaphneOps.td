@@ -22,6 +22,7 @@
 include "ir/daphneir/DaphneDialect.td"
 include "ir/daphneir/DaphneTypes.td"
 include "ir/daphneir/DaphneDistributableOpInterface.td"
+include "ir/daphneir/DaphneDataPropertyRelevanceOpInterface.td"
 include "ir/daphneir/DaphneInferDistinctOpInterface.td"
 include "ir/daphneir/DaphneInferFrameLabelsOpInterface.td"
 include "ir/daphneir/DaphneInferBoundsOpInterface.td"
@@ -240,6 +241,7 @@ def Daphne_IsSymmetricOp : Daphne_Op<"isSymmetric"> {
 // ****************************************************************************
 
 def Daphne_MatMulOp : Daphne_Op<"matMul", [
+    DeclareOpInterfaceMethods<DataPropertyRelevanceOpInterface>,
     DeclareOpInterfaceMethods<VectorizableOpInterface>,
     DataTypeMat, ValueTypeFromArgs,
     DeclareOpInterfaceMethods<InferShapeOpInterface>,
@@ -399,7 +401,7 @@ def Daphne_EwConcatOp : Daphne_EwBinaryOp<"ewConcat", StrScalar, [ValueTypeStr, 
 // ----------------------------------------------------------------------------
 
 class Daphne_EwCmpOp<string name, Type inputScalarType, list<Trait> traits = []>
-: Daphne_EwBinaryOp<name, inputScalarType, !listconcat(traits, [ValueTypeCmp, CastArgsToMostGeneralArgType])> {
+: Daphne_EwBinaryOp<name, inputScalarType, !listconcat(traits, [ValueTypeCmp, CastArgsToMostGeneralArgType, DeclareOpInterfaceMethods<DataPropertyRelevanceOpInterface>])> {
     // TODO: We do not enforce (matrix of) boolean output any more, but should
     // think about that again.
     //let results = (outs AnyTypeOf<[MatrixOf<[BoolScalar]>, BoolScalar, Unknown]>:$res);
@@ -1381,6 +1383,7 @@ def Daphne_ColMergeOp : Daphne_ColSetOp<"colMerge"> {
 }
 
 def Daphne_ColJoinOp : Daphne_Op<"colJoin", [
+    DeclareOpInterfaceMethods<DataPropertyRelevanceOpInterface>,
     DeclareOpInterfaceMethods<InferTypesOpInterface>
 ]> {
     let summary = "N:1 equi-join on columnar data; input: data, unique data; output: sorted positions, positions.";
@@ -1397,6 +1400,7 @@ def Daphne_ColJoinOp : Daphne_Op<"colJoin", [
 }
 
 def Daphne_ColSemiJoinOp : Daphne_Op<"colSemiJoin", [
+    DeclareOpInterfaceMethods<DataPropertyRelevanceOpInterface>,
     DataTypeCol, ValueTypeSize
 ]> {
     let summary = "Semi-join on columnar data; input: data, data, output: sorted positions.";
@@ -1947,7 +1951,7 @@ def Daphne_DistributedPipelineOp : Daphne_Op<"distributedPipeline", [AttrSizedOp
 // Higher-order operations
 // ****************************************************************************
 
-def Daphne_MapOp : Daphne_Op<"map", [ShapeFromArg]> {
+def Daphne_MapOp : Daphne_Op<"map", [ShapeFromArg, DeclareOpInterfaceMethods<DataPropertyRelevanceOpInterface>]> {
     let summary = "Applies a user-defined function to elements of a matrix.";
     // Unlike most other DaphneIR ops, this op explicitly needs the DaphneContext as an argument, because it is not
     // lowered to CallKernelOp in RewriteToCallKernelOpsPass but in LowerToLLVMPass, where an extraction of the
